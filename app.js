@@ -1212,6 +1212,7 @@ const defaultState = {
   areas:["Front Garden","Back Garden","Patio","Indoors","Greenhouse","Unplaced"],
   journal: [],
   careTasks: [],
+  gardenView: "gallery",
   discoveries: [],
   lastQuota: null
 };
@@ -1232,6 +1233,7 @@ function loadState(){
     merged.discoveries = Array.isArray(old.discoveries) ? old.discoveries : [];
     merged.journal = Array.isArray(old.journal) ? old.journal : [];
     merged.careTasks = Array.isArray(old.careTasks) ? old.careTasks : [];
+    merged.gardenView = old.gardenView==="map" ? "map" : "gallery";
     return merged;
   } catch { return structuredClone(defaultState); }
 }
@@ -1323,11 +1325,109 @@ function renderHome(){
 }
 
 function renderGarden(){
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">My collection</div><h1>My Garden</h1><p class="sub">${state.plants.length} plants, each with its own little story.</p></section>
-    <input class="search" id="gardenSearch" placeholder="Search your plants…" oninput="filterGarden(this.value)">
-    <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea('${esc(a)}',this)">${esc(a)}</button>`).join("")}</div>
-    <section class="masonry" id="gardenPins">${state.plants.map(pin).join("")}</section>`;
+  const isMap=state.gardenView==="map";
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">My collection</div><h1>My Garden</h1><p class="sub">${state.plants.length} plants across ${state.areas.filter(x=>x!=="Unplaced").length} named spaces.</p></section>
+    <div class="garden-view-switch">
+      <button class="${!isMap?"active":""}" onclick="setGardenView('gallery')">▦ Gallery</button>
+      <button class="${isMap?"active":""}" onclick="setGardenView('map')">⌂ Garden Map</button>
+    </div>
+    ${isMap?gardenMapMarkup():gardenGalleryMarkup()}`;
   hydratePhotos();
+}
+function setGardenView(mode){
+  state.gardenView=mode==="map"?"map":"gallery";
+  saveState();
+  renderGarden();
+}
+function gardenGalleryMarkup(){
+  return `<input class="search" id="gardenSearch" placeholder="Search your plants…" oninput="filterGarden(this.value)">
+    <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea(decodeURIComponent('${encodeURIComponent(a)}'),this)">${esc(a)}</button>`).join("")}</div>
+    <section class="masonry" id="gardenPins">${state.plants.map(pin).join("")}</section>`;
+}
+function areaMood(area){
+  const s=String(area).toLowerCase();
+  if(/indoor|house|kitchen|bedroom|living|conservatory/.test(s)) return {icon:"⌂",cls:"indoor",note:"Indoor collection"};
+  if(/patio|terrace|deck|pot|container/.test(s)) return {icon:"◌",cls:"patio",note:"Pots & containers"};
+  if(/greenhouse|glasshouse/.test(s)) return {icon:"◇",cls:"glass",note:"Under glass"};
+  if(/front/.test(s)) return {icon:"❀",cls:"front",note:"Front garden"};
+  if(/border|bed/.test(s)) return {icon:"❧",cls:"border",note:"Planting bed"};
+  if(/back|garden|lawn/.test(s)) return {icon:"✿",cls:"garden",note:"Outdoor space"};
+  if(/unplaced/.test(s)) return {icon:"?",cls:"unplaced",note:"Needs a home"};
+  return {icon:"❦",cls:"other",note:"Garden area"};
+}
+function gardenMapMarkup(){
+  const areas=[...state.areas];
+  const empty=areas.filter(area=>!state.plants.some(p=>p.area===area)).length;
+  return `<section class="map-intro">
+      <div><div class="eyebrow">Your spaces</div><h2>A map made from the way you organise your garden.</h2><p>Tap an area to open it. Tap a plant marker to jump straight to that plant.</p></div>
+      <button class="map-add-area" onclick="addAreaFromMap()">＋ Area</button>
+    </section>
+    <div class="map-summary"><span><b>${areas.length}</b> spaces</span><span><b>${state.plants.length}</b> plants</span><span><b>${empty}</b> empty</span></div>
+    <section class="garden-map">
+      ${areas.map((area,i)=>gardenZone(area,i)).join("")}
+    </section>
+    <div class="map-footnote"><span>❧</span><p><b>Think in spaces, not coordinates.</b><br>FloraLens maps the garden the same way you naturally describe it: patio, border, greenhouse, kitchen, front garden and so on.</p></div>`;
+}
+function gardenZone(area,index){
+  const plants=state.plants.filter(p=>p.area===area);
+  const mood=areaMood(area);
+  const limit=5;
+  return `<article class="garden-zone ${mood.cls}" onclick="openAreaMap(decodeURIComponent('${encodeURIComponent(area)}'))">
+    <div class="zone-top"><span class="zone-icon">${mood.icon}</span><button class="zone-menu" onclick="event.stopPropagation();areaMenu(decodeURIComponent('${encodeURIComponent(area)}'))">•••</button></div>
+    <div class="zone-copy"><div class="eyebrow">${esc(mood.note)}</div><h2>${esc(area)}</h2><p>${plants.length} ${plants.length===1?"plant":"plants"}</p></div>
+    <div class="zone-plants">
+      ${plants.slice(0,limit).map((p,pi)=>`<button class="map-plant map-plant-${pi+1}" onclick="event.stopPropagation();setRoute('profile',{id:'${p.id}'})" title="${esc(p.common)}"><span class="map-plant-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><small>${esc(p.common)}</small></button>`).join("")}
+      ${plants.length>limit?`<span class="map-more">+${plants.length-limit}</span>`:""}
+      ${!plants.length?`<div class="zone-empty">A quiet patch waiting for something lovely.</div>`:""}
+    </div>
+  </article>`;
+}
+function openAreaMap(area){
+  const plants=state.plants.filter(p=>p.area===area);
+  const mood=areaMood(area);
+  modal(`<div class="area-detail-head"><span>${mood.icon}</span><div><div class="eyebrow">${esc(mood.note)}</div><h2>${esc(area)}</h2><p class="sub">${plants.length} ${plants.length===1?"plant":"plants"} here</p></div></div>
+    ${plants.length?`<div class="area-plant-list">${plants.map(p=>`<button onclick="closeModal();setRoute('profile',{id:'${p.id}'})"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small></span><b>→</b></button>`).join("")}</div>`:`<div class="empty-card" style="text-align:center"><p class="sub">There aren't any plants in this area yet.</p></div>`}
+    <button class="btn secondary" style="width:100%;margin-top:12px" onclick="closeModal();startCamera('identify')">⌾ Identify a plant</button>`);
+  hydratePhotos(document);
+}
+function addAreaFromMap(){
+  modal(`<div class="eyebrow">Garden Map</div><h2>Create a new space</h2><p class="sub">Use the name you naturally use at home — “Rose bed”, “Kitchen window”, “Back patio”…</p><input id="mapNewArea" class="search" placeholder="Name this area"><button class="btn primary" style="width:100%" onclick="saveMapArea()">Add to map</button>`);
+}
+function saveMapArea(){
+  const name=(document.getElementById("mapNewArea")?.value||"").trim();
+  if(!name) return;
+  if(state.areas.some(a=>a.toLowerCase()===name.toLowerCase())){toast("That area already exists");return}
+  state.areas.splice(Math.max(0,state.areas.length-1),0,name);
+  saveState();closeModal();toast(`${name} added`);renderGarden();
+}
+function areaMenu(area){
+  const plants=state.plants.filter(p=>p.area===area);
+  modal(`<div class="eyebrow">Garden area</div><h2>${esc(area)}</h2>
+    <button class="destination-choice" onclick="renameAreaPrompt(decodeURIComponent('${encodeURIComponent(area)}'))"><span>✎</span><div><b>Rename area</b><small>Update this name everywhere in My Garden.</small></div></button>
+    ${area!=="Unplaced"?`<button class="destination-choice" onclick="closeModal();startCamera('identify')"><span>⌾</span><div><b>Add another plant</b><small>Identify something and save it to this space.</small></div></button>`:""}
+    ${area!=="Unplaced"?`<button class="link-btn discovery-delete-link" style="width:100%" onclick="deleteAreaPrompt(decodeURIComponent('${encodeURIComponent(area)}'))">Remove area${plants.length?` (${plants.length} plants move to Unplaced)`:""}</button>`:""}`);
+}
+function renameAreaPrompt(area){
+  modal(`<div class="eyebrow">Garden area</div><h2>Rename ${esc(area)}</h2><input id="renameArea" class="search" value="${esc(area)}"><button class="btn primary" style="width:100%" onclick="saveAreaRename(decodeURIComponent('${encodeURIComponent(area)}'))">Save name</button>`);
+}
+function saveAreaRename(oldName){
+  const name=(document.getElementById("renameArea")?.value||"").trim();
+  if(!name||name===oldName){closeModal();return}
+  if(state.areas.some(a=>a!==oldName&&a.toLowerCase()===name.toLowerCase())){toast("That area already exists");return}
+  state.areas=state.areas.map(a=>a===oldName?name:a);
+  state.plants.forEach(p=>{if(p.area===oldName)p.area=name});
+  saveState();closeModal();toast("Area renamed");renderGarden();
+}
+function deleteAreaPrompt(area){
+  const count=state.plants.filter(p=>p.area===area).length;
+  modal(`<div class="eyebrow">Garden Map</div><h2>Remove ${esc(area)}?</h2><p class="sub">${count?`${count} ${count===1?"plant":"plants"} will be kept safely and moved to Unplaced.`:"This removes the empty area from your map."}</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deleteGardenArea(decodeURIComponent('${encodeURIComponent(area)}'))">Remove area</button></div>`);
+}
+function deleteGardenArea(area){
+  if(area==="Unplaced")return;
+  state.plants.forEach(p=>{if(p.area===area)p.area="Unplaced"});
+  state.areas=state.areas.filter(a=>a!==area);
+  if(!state.areas.includes("Unplaced"))state.areas.push("Unplaced");
+  saveState();closeModal();toast("Area removed");renderGarden();
 }
 function filterGarden(q){
   const list=state.plants.filter(p=>(p.common+p.scientific+p.area).toLowerCase().includes(q.toLowerCase()));
@@ -1695,6 +1795,26 @@ async function refreshIntel(id){
   else toast("Couldn’t refresh botanical notes");
 }
 
+
+function movePlantPrompt(id){
+  const p=state.plants.find(x=>x.id===id);if(!p)return;
+  modal(`<div class="eyebrow">Garden Map</div><h2>Move ${esc(p.common)}</h2><p class="sub">Where does this plant live now?</p><div class="area-grid">${state.areas.map(area=>`<button class="area-choice ${area===p.area?"active":""}" onclick="movePlantTo('${p.id}',decodeURIComponent('${encodeURIComponent(area)}'))">${esc(area)}</button>`).join("")}</div><button class="link-btn" style="width:100%;margin-top:12px" onclick="addAreaFromMove('${p.id}')">＋ Create a new area</button>`);
+}
+function movePlantTo(id,area){
+  const p=state.plants.find(x=>x.id===id);if(!p)return;
+  p.area=area;saveState();closeModal();toast(`${p.common} moved to ${area}`);renderProfile(id);
+}
+function addAreaFromMove(id){
+  modal(`<div class="eyebrow">Garden Map</div><h2>Create a new space</h2><input id="moveNewArea" class="search" placeholder="e.g. Shady border"><button class="btn primary" style="width:100%" onclick="saveMoveArea('${id}')">Create & move plant</button>`);
+}
+function saveMoveArea(id){
+  const name=(document.getElementById("moveNewArea")?.value||"").trim();if(!name)return;
+  if(!state.areas.some(a=>a.toLowerCase()===name.toLowerCase()))state.areas.splice(Math.max(0,state.areas.length-1),0,name);
+  const actual=state.areas.find(a=>a.toLowerCase()===name.toLowerCase())||name;
+  const p=state.plants.find(x=>x.id===id);if(p)p.area=actual;
+  saveState();closeModal();toast(`${p?.common||"Plant"} moved to ${actual}`);renderProfile(id);
+}
+
 async function renderProfile(id,isNew=false){
   currentRoute="profile";
   const gardenPlant=state.plants.find(x=>x.id===id);
@@ -1805,6 +1925,7 @@ async function renderProfile(id,isNew=false){
         ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
       </div>`
       :`
+      <div class="profile-location-card"><div><div class="eyebrow">Lives in</div><h3>${esc(p.area||"Unplaced")}</h3></div><button class="link-btn" onclick="movePlantPrompt('${p.id}')">Move area</button></div>
       <div class="section-title"><h3>Our story</h3><div style="display:flex;gap:10px"><button class="link-btn" onclick="openCareComposer('${p.id}')">＋ Care</button><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Moment</button></div></div>
       <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
       `}`;
@@ -2119,7 +2240,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.0 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.1 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();

@@ -249,3 +249,16 @@ No Cloudflare or API-secret changes are required.
 - Completed jobs retain a lightweight recent history.
 - Care tasks live in the normal FloraLens backup state.
 - No Cloudflare/API changes.
+
+
+## v1.1 — Garden Map
+- My Garden now switches between Gallery and Garden Map.
+- The map turns existing areas into a visual botanical plan, including indoor spaces.
+- Each area shows live plant counts and plant photo markers.
+- Tap an area for its plant list; tap a marker to open the plant.
+- Create, rename and remove areas from the map.
+- Removing an area never deletes plants; they move safely to Unplaced.
+- Garden plant profiles now show their current area with a Move Area action.
+- Plants can be moved between existing areas or into a newly-created area.
+- Existing users migrate automatically and keep all current data.
+- No Cloudflare/API changes.
