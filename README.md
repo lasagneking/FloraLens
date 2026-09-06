@@ -226,3 +226,14 @@ No Cloudflare or API-secret changes are required.
 - The profile includes the original identification confidence and spotted date.
 - Backup export now includes photos belonging to Discover records as well as Garden plants.
 - No Cloudflare or API changes.
+
+
+## v0.9 — Garden Journal & Plant Story
+- Real dated journal moments linked to Garden plants.
+- Optional photo and note.
+- Flowering, New growth, Pruned, Moved, Problem, Repotted, Planted, Harvest and Note types.
+- Chronological garden-wide Journal feed.
+- Journal cards jump to plant profiles.
+- Plant profiles show linked moments in Our Story.
+- Journal photos included in backup export.
+- No Cloudflare/API changes.

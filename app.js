@@ -8,6 +8,15 @@ const PHOTO_STORE = "photos";
   Never put your Pl@ntNet API key in this browser file.
 */
 const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
+const journalPhotoInput=document.createElement("input");
+journalPhotoInput.type="file";
+journalPhotoInput.accept="image/*";
+journalPhotoInput.setAttribute("capture","environment");
+journalPhotoInput.hidden=true;
+document.body.appendChild(journalPhotoInput);
+let pendingJournalPhotoFile=null;
+let pendingJournalPlantId=null;
+
 
 
 const FLORALENS_CARE_LIBRARY = {
@@ -1201,10 +1210,7 @@ const defaultState = {
     "lavandula-angustifolia": {scientific:"Lavandula angustifolia", common:"English Lavender", family:"Lamiaceae", source:"starter", fetchedAt:"2026-09-06"}
   },
   areas:["Front Garden","Back Garden","Patio","Indoors","Greenhouse","Unplaced"],
-  journal:[
-    {date:"6 Sep",icon:"✿",title:"Hydrangea looking beautiful",text:"Added a quick garden note and checked the late-summer flowers."},
-    {date:"2 Sep",icon:"✓",title:"Lavender care",text:"Light tidy and checked soil moisture."}
-  ],
+  journal: [],
   discoveries: [],
   lastQuota: null
 };
@@ -1223,6 +1229,7 @@ function loadState(){
     merged.speciesCache = {...defaultState.speciesCache, ...(old.speciesCache||{})};
     merged.areas = old.areas?.length ? old.areas : defaultState.areas;
     merged.discoveries = Array.isArray(old.discoveries) ? old.discoveries : [];
+    merged.journal = Array.isArray(old.journal) ? old.journal : [];
     return merged;
   } catch { return structuredClone(defaultState); }
 }
@@ -1795,18 +1802,19 @@ async function renderProfile(id,isNew=false){
       </div>`
       :`
       <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
-      <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
+      <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
       `}`;
 
   if(p.photoKey){
     const url=await getPhotoUrl(p.photoKey);
     if(url){ document.querySelector("#profileHero .plant-art")?.remove(); profileHero.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
   }
+  hydratePhotos();
 }
 async function exportBackup(){
   try{
     const photos={};
-    for(const p of [...state.plants,...state.discoveries]){
+    for(const p of [...state.plants,...state.discoveries,...state.journal]){
       if(!p.photoKey) continue;
       const db=await photoDB();
       const blob=await new Promise((resolve,reject)=>{
@@ -1844,11 +1852,68 @@ async function deletePlant(id){
   renderHome();
 }
 
-function renderJournal(){
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Garden journal</div><h1>Little moments</h1><p class="sub">The small things are the ones worth remembering.</p></section><button class="lens-banner" style="background:linear-gradient(135deg,#9f777d,#c49ca1)" onclick="newJournal()"><span class="lens-icon">＋</span><span><strong>Add a journal moment</strong><small>Photo, note, care task or something you noticed.</small></span></button><div class="profile-card">${state.journal.map(j=>`<div class="timeline-item"><div class="timeline-icon">${j.icon}</div><div><b>${esc(j.title)}</b><div class="small">${esc(j.date)}</div><p class="small" style="margin:5px 0 0">${esc(j.text)}</p></div></div>`).join("")}</div>`;
+function journalTypeIcon(type){
+  return ({"Flowering":"✿","New growth":"❧","Pruned":"✂","Moved":"⌂","Problem":"!","Repotted":"◌","Planted":"♧","Harvest":"◇","Note":"✎"})[type]||"✎";
 }
-function newJournal(){modal(`<div class="eyebrow">New journal moment</div><h2>What happened today?</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="A new flower, something you pruned, a little garden win…"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
-function saveJournal(){const text=document.getElementById("journalText").value.trim();if(!text)return;state.journal.unshift({date:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"short"}),icon:"✿",title:"Garden note",text});saveState();closeModal();renderJournal()}
+function formatJournalDate(v){
+  if(!v)return "";
+  const d=new Date(`${v}T12:00:00`);
+  return d.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
+}
+function renderJournal(){
+  const entries=[...state.journal].sort((x,y)=>String(y.date||"").localeCompare(String(x.date||"")));
+  const plantCount=new Set(entries.map(j=>j.plantId)).size;
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Garden memories</div><h1>Journal</h1><p class="sub">A living record of what changed, flowered, moved and surprised you.</p></section>
+  <button class="journal-hero-button" onclick="openJournalComposer()"><span class="journal-hero-mark">✎</span><span><strong>Add a garden moment</strong><small>Photo, note, care job or milestone</small></span><b>＋</b></button>
+  <div class="stats-strip"><div class="stat"><b>${entries.length}</b><small>moments</small></div><div class="stat"><b>${plantCount}</b><small>plants</small></div><div class="stat"><b>${entries.filter(j=>j.photoKey).length}</b><small>photos</small></div></div>
+  ${entries.length?`<div class="journal-feed">${entries.map(j=>{
+    const p=state.plants.find(x=>x.id===j.plantId); if(!p)return "";
+    return `<article class="journal-entry" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${p.id}'})">
+      ${j.photoKey?`<div class="journal-photo" data-photo-key="${esc(j.photoKey)}"></div>`:""}
+      <div class="journal-entry-body"><div class="journal-date">${formatJournalDate(j.date)}</div>
+      <div class="journal-entry-head"><span class="journal-type">${journalTypeIcon(j.type)} ${esc(j.type||"Note")}</span><button class="journal-delete" onclick="event.stopPropagation();confirmDeleteJournal('${j.id}')">×</button></div>
+      <h2>${esc(p.common)}</h2><em>${esc(p.scientific)}</em>${j.text?`<p>${esc(j.text)}</p>`:""}<div class="journal-link">View ${esc(p.common)} →</div></div>
+    </article>`}).join("")}</div>`:`<div class="empty-card journal-empty"><div class="pressed-flower">❀</div><h2>Your garden story starts here</h2><p class="sub">Capture first flowers, new growth, pruning, moves, problems or simply a moment you loved.</p><button class="btn primary" onclick="openJournalComposer()">Add first moment</button></div>`}`;
+  hydratePhotos();
+}
+function addJournalForPlant(id){openJournalComposer(id)}
+function openJournalComposer(plantId=null){
+  if(!state.plants.length){modal(`<div class="eyebrow">Garden journal</div><h2>Add a plant first</h2><p class="sub">Journal moments belong to plants in My Garden.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant</button>`);return}
+  pendingJournalPlantId=plantId||state.plants[0].id; pendingJournalPhotoFile=null; renderJournalComposer();
+}
+function renderJournalComposer(){
+  const p=state.plants.find(x=>x.id===pendingJournalPlantId)||state.plants[0]; if(!p)return;
+  pendingJournalPlantId=p.id;
+  const types=["Flowering","New growth","Pruned","Moved","Problem","Repotted","Planted","Harvest","Note"];
+  modal(`<div class="journal-composer"><div class="eyebrow">Garden moment</div><h2>Add to the story</h2>
+  <label class="field-label">Plant</label><select id="journalPlant" class="journal-field" onchange="pendingJournalPlantId=this.value">${state.plants.map(x=>`<option value="${x.id}" ${x.id===p.id?"selected":""}>${esc(x.common)} · ${esc(x.area||"Unplaced")}</option>`).join("")}</select>
+  <label class="field-label">What happened?</label><div class="journal-type-grid">${types.map((t,i)=>`<button type="button" class="journal-type-choice ${i===0?"active":""}" data-journal-type="${esc(t)}" onclick="selectJournalType(this)">${journalTypeIcon(t)}<span>${esc(t)}</span></button>`).join("")}</div><input type="hidden" id="journalType" value="Flowering">
+  <div class="journal-two-col"><div><label class="field-label">Date</label><input id="journalDate" class="journal-field" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div><label class="field-label">Photo</label><button class="journal-photo-button" type="button" onclick="journalPhotoInput.click()">📷 <span id="journalPhotoLabel">Add photo</span></button></div></div>
+  <label class="field-label">A little note</label><textarea id="journalText" class="journal-field journal-textarea" maxlength="500" placeholder="What changed? What did you notice?"></textarea>
+  <button class="btn primary" style="width:100%;margin-top:14px" onclick="saveJournalMoment()">Save moment</button></div>`);
+}
+function selectJournalType(btn){
+  document.querySelectorAll(".journal-type-choice").forEach(x=>x.classList.remove("active"));btn.classList.add("active");document.getElementById("journalType").value=btn.dataset.journalType;
+}
+journalPhotoInput.addEventListener("change",()=>{
+  const f=journalPhotoInput.files?.[0];if(!f)return;pendingJournalPhotoFile=f;
+  const el=document.getElementById("journalPhotoLabel");if(el)el.textContent="Photo ready ✓";journalPhotoInput.value="";
+});
+async function saveJournalMoment(){
+  const plantId=document.getElementById("journalPlant")?.value||pendingJournalPlantId;
+  const p=state.plants.find(x=>x.id===plantId);if(!p)return;
+  const id="journal-"+Date.now(), photoKey=pendingJournalPhotoFile?`${id}-photo`:null;
+  if(photoKey){try{await savePhoto(photoKey,pendingJournalPhotoFile)}catch(e){console.warn(e)}}
+  state.journal.unshift({id,plantId,date:document.getElementById("journalDate")?.value||new Date().toISOString().slice(0,10),type:document.getElementById("journalType")?.value||"Note",text:(document.getElementById("journalText")?.value||"").trim(),photoKey,createdAt:new Date().toISOString()});
+  saveState();pendingJournalPhotoFile=null;pendingJournalPlantId=null;closeModal();toast(`Moment added to ${p.common}`);setRoute("journal");
+}
+function confirmDeleteJournal(id){
+  const j=state.journal.find(x=>x.id===id);if(!j)return;
+  modal(`<div class="eyebrow">Journal</div><h2>Remove this moment?</h2><p class="sub">The note${j.photoKey?" and photo":""} will be removed from this device.</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deleteJournalMoment('${id}')">Delete</button></div>`);
+}
+async function deleteJournalMoment(id){
+  const j=state.journal.find(x=>x.id===id);if(!j)return;state.journal=state.journal.filter(x=>x.id!==id);saveState();closeModal();if(j.photoKey)await deletePhoto(j.photoKey);toast("Journal moment removed");renderJournal();
+}
 function addJournalForPlant(id){const p=state.plants.find(x=>x.id===id);modal(`<div class="eyebrow">${esc(p.common)}</div><h2>Add to its story</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="What did you notice?"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
 
 function renderDiscover(){
@@ -1908,7 +1973,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.3 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.9 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();
