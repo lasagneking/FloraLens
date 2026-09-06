@@ -175,3 +175,19 @@ For this release, the functional application change is in `app.js`.
 - Existing Pl@ntNet/Cloudflare identification path is unchanged.
 
 Attribution: Díaz et al. (2016), Nature, doi:10.1038/nature16489; Díaz et al. (2022), Scientific Data 9, 755, doi:10.1038/s41597-022-01774-9; TRY File Archive package DOI 10.17871/TRY.81.
+
+
+## v0.8 — Botanical editorial redesign
+
+A full visual refresh inspired by a premium botanical scrapbook rather than a generic card-based app.
+
+- floating translucent navigation dock
+- richer paper, sage, rose and lilac palette
+- editorial Cormorant typography with handwritten botanical annotations
+- more tactile Pinterest plant cards
+- premium camera/lens treatment
+- richer profile, care, season and timeline cards
+- softer shadows, layered glass/paper surfaces and subtle motion
+- cache-busted CSS/JS/trait files for easier GitHub Pages testing
+
+No API or data-layer changes. Cloudflare and all existing secrets stay untouched.

@@ -195,3 +195,166 @@ linear-gradient(145deg,#4a614b,#24392e);box-shadow:var(--shadow)}
 .backup-card{background:linear-gradient(145deg,rgba(215,204,225,.34),rgba(225,234,218,.44));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
 .coverage{height:7px;border-radius:999px;background:rgba(65,89,66,.09);overflow:hidden;margin-top:9px}
 .coverage > span{display:block;height:100%;background:linear-gradient(90deg,#8da58b,#b998a3);border-radius:999px}
+
+/* ==========================================================
+   FloraLens v0.8 — Botanical Editorial / Scrapbook refresh
+   ========================================================== */
+:root{
+  --paper:#f3ede2;
+  --paper-2:#fffaf3;
+  --paper-3:#eee5d8;
+  --ink:#273028;
+  --muted:#77756d;
+  --sage:#91a48b;
+  --deep:#344c3a;
+  --deep-2:#26392d;
+  --moss:#62785d;
+  --rose:#c98f98;
+  --rose-soft:#ead2d5;
+  --lilac:#d8cede;
+  --sun:#d2b56f;
+  --line:rgba(52,76,58,.12);
+  --shadow:0 18px 60px rgba(57,48,38,.10),0 2px 10px rgba(57,48,38,.04);
+  --shadow-soft:0 12px 34px rgba(57,48,38,.075);
+  --radius:30px;
+}
+html{background:#e9e1d4}
+body{
+  background:
+    radial-gradient(circle at 8% -4%, rgba(205,186,211,.52), transparent 26%),
+    radial-gradient(circle at 104% 11%, rgba(224,189,193,.47), transparent 23%),
+    radial-gradient(circle at 82% 82%, rgba(167,187,157,.16), transparent 28%),
+    linear-gradient(180deg,#f8f3eb 0%,#f2ebdf 55%,#eee6da 100%);
+  background-attachment:fixed;
+}
+body:before,body:after{position:fixed;z-index:-1;pointer-events:none;color:rgba(66,86,67,.055);font-family:"Cormorant Garamond",serif;line-height:1}
+body:before{content:"❧";font-size:290px;left:-95px;top:16%;transform:rotate(-26deg)}
+body:after{content:"❦";font-size:260px;right:-100px;bottom:5%;transform:rotate(21deg)}
+#app{background:linear-gradient(90deg,rgba(255,255,255,.10),rgba(255,255,255,.28),rgba(255,255,255,.10));box-shadow:0 0 80px rgba(71,58,42,.05)}
+
+/* floating glass header */
+.topbar{height:82px;padding:13px 18px;background:linear-gradient(180deg,rgba(250,246,239,.92),rgba(247,241,231,.74));backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);border-bottom:1px solid rgba(255,255,255,.45)}
+.brand{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:30px;letter-spacing:-.03em}
+.brand-flower{font-size:22px;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#eed9dd,#f9eee7);box-shadow:inset 0 0 0 1px rgba(130,86,94,.09),0 5px 16px rgba(100,76,76,.08)}
+.round-btn{background:rgba(255,252,247,.74);border-color:rgba(52,76,58,.10);box-shadow:0 6px 22px rgba(60,48,37,.055);transition:.22s ease}
+.round-btn:active{transform:scale(.93)}
+
+/* typography */
+h1,h2,.serif{font-family:"Cormorant Garamond",serif;font-weight:600}
+h1{font-size:48px;line-height:.95;letter-spacing:-.045em}
+h2{font-size:35px;letter-spacing:-.025em}
+.eyebrow{font-size:10px;letter-spacing:.19em;color:#71806d}
+.sub{font-size:14px;line-height:1.65;color:#74746d}
+
+/* home editorial hero */
+.hero{padding:27px 5px 20px;min-height:210px;display:flex;flex-direction:column;justify-content:center}
+.hero:before{content:"BOTANICAL NOTES";position:absolute;right:4px;top:31px;font:600 10px/1 "Caveat",cursive;letter-spacing:.08em;color:rgba(79,103,76,.42);transform:rotate(5deg)}
+.hero h1{max-width:520px;font-size:54px;margin:10px 0 13px;color:#26352b}
+.hero .sub{max-width:470px;font-size:15px}
+.hero-bloom{font-size:92px;right:4px;top:58px;color:rgba(191,137,147,.22);filter:drop-shadow(0 10px 18px rgba(120,80,90,.06))}
+
+/* hero lens card */
+.lens-banner{padding:20px 20px;border-radius:31px;background:
+  radial-gradient(circle at 88% 0%,rgba(255,255,255,.16),transparent 28%),
+  linear-gradient(135deg,#314a38 0%,#526c51 52%,#74866f 100%);
+  box-shadow:0 22px 55px rgba(48,72,53,.20);border:1px solid rgba(255,255,255,.13);transition:transform .24s ease,box-shadow .24s ease}
+.lens-banner:active{transform:scale(.985)}
+.lens-banner:before{content:"";position:absolute;inset:1px;border-radius:30px;border:1px solid rgba(255,255,255,.09);pointer-events:none}
+.lens-banner:after{content:"❦";right:-24px;top:-47px;font-size:142px;transform:rotate(-18deg);color:rgba(255,255,255,.08)}
+.lens-icon{width:62px;height:62px;border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.20),rgba(255,255,255,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 10px 26px rgba(20,35,25,.14)}
+.lens-banner strong{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:600}
+.lens-banner small{line-height:1.45}
+
+/* stats become petite journal labels */
+.stats-strip{gap:11px;margin:13px 0 23px}
+.stat{position:relative;overflow:hidden;padding:16px 8px 14px;background:rgba(255,251,245,.72);backdrop-filter:blur(10px);border-color:rgba(52,76,58,.09);box-shadow:0 7px 26px rgba(58,49,39,.045)}
+.stat:after{content:"";position:absolute;left:18%;right:18%;bottom:0;height:2px;border-radius:99px;background:linear-gradient(90deg,transparent,rgba(201,143,152,.45),transparent)}
+.stat b{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:31px}
+.stat small{letter-spacing:.01em}
+.section-title{margin-top:28px}.section-title h3{font-family:"Cormorant Garamond",serif;font-size:23px;font-weight:600;letter-spacing:-.015em}
+.link-btn{background:rgba(255,255,255,.45);border:1px solid var(--line);padding:8px 12px;border-radius:999px;font-size:11px}
+
+/* Pinterest cards with tactile print feel */
+.masonry{column-gap:14px}
+.pin{position:relative;border-radius:28px;margin-bottom:14px;background:rgba(255,251,246,.91);border:1px solid rgba(255,255,255,.75);box-shadow:0 14px 34px rgba(62,50,39,.095);transform:translateZ(0);transition:transform .24s ease,box-shadow .24s ease}
+.pin:before{content:"";position:absolute;inset:0;border-radius:28px;box-shadow:inset 0 0 0 1px rgba(72,88,69,.055);pointer-events:none;z-index:2}
+.pin:active{transform:scale(.985)}
+.pin .plant-art{filter:saturate(.91) contrast(.98);transition:filter .25s ease}
+.pin-body{padding:15px 15px 17px}
+.pin-body b{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:600;line-height:1.05}
+.pin-body small{display:block;margin-top:3px;font-size:10px;color:#87847c}
+.chip{margin-top:10px;padding:6px 10px;background:#eef2ea;color:#556b54;font-size:9px;text-transform:uppercase;letter-spacing:.09em}
+
+/* page headers + controls */
+.page-head{padding:23px 4px 9px}.page-head h1{font-size:49px;margin:7px 0 8px}
+.search{background:rgba(255,252,247,.82);backdrop-filter:blur(12px);border:1px solid rgba(52,76,58,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 24px rgba(57,48,38,.045);padding:15px 17px}
+.filter{background:rgba(255,252,247,.72);box-shadow:0 5px 16px rgba(60,49,38,.03);font-size:11px;padding:10px 14px}
+.filter.active{background:linear-gradient(135deg,#324b38,#52684e);box-shadow:0 9px 21px rgba(49,72,53,.14)}
+
+/* premium camera */
+.camera-stage{min-height:500px;border-radius:36px;background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.14),transparent 30%),linear-gradient(150deg,#425846,#1f3027);box-shadow:0 28px 70px rgba(35,52,40,.24)}
+.camera-stage:before{inset:20px;border-radius:32px;border-color:rgba(255,255,255,.23)}
+.focus-corners{width:174px;height:174px;border:1px solid rgba(255,255,255,.78);border-radius:50%;box-shadow:0 0 0 16px rgba(255,255,255,.025)}
+.focus-corners:after{content:"✿";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:27px;color:rgba(255,255,255,.55)}
+.camera-copy{top:32px}.camera-copy h2{font-size:31px;font-family:"Cormorant Garamond",serif}.camera-copy p{max-width:340px;margin:0 auto;line-height:1.5}
+.capture{box-shadow:0 10px 26px rgba(0,0,0,.18),inset 0 0 0 8px rgba(255,255,255,.09);transition:.18s}.capture:active{transform:scale(.91)}
+.mini-cam{backdrop-filter:blur(12px);background:rgba(255,255,255,.10)}
+
+/* result and profile hero */
+.result-hero{border-radius:34px;min-height:380px;box-shadow:0 24px 62px rgba(54,63,49,.17);border:1px solid rgba(255,255,255,.35)}
+.result-gradient{background:linear-gradient(180deg,transparent 25%,rgba(24,38,29,.12) 45%,rgba(21,33,25,.92) 100%)}
+.result-copy{padding:29px}.result-copy h1{font-size:45px;line-height:.92;text-shadow:0 5px 18px rgba(0,0,0,.15)}
+.confidence{background:rgba(255,255,255,.13);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.14)}
+
+/* buttons */
+.btn{border-radius:18px;padding:14px 16px;transition:transform .18s ease,box-shadow .18s ease}.btn:active{transform:scale(.975)}
+.btn.primary{background:linear-gradient(135deg,#324b38,#53694f);box-shadow:0 12px 26px rgba(51,75,56,.16)}
+.btn.secondary{background:linear-gradient(145deg,#edd9db,#e6c9cd);color:#62484d}
+.btn.outline{background:rgba(255,255,255,.42)}
+
+/* content cards */
+.empty-card,.note-card,.profile-card{background:rgba(255,251,245,.78);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.72);box-shadow:0 13px 38px rgba(58,48,38,.065);border-radius:29px}
+.profile-card{padding:20px}
+.intel-banner{background:linear-gradient(145deg,rgba(218,226,211,.72),rgba(235,220,230,.56));border:1px solid rgba(255,255,255,.72);box-shadow:0 12px 30px rgba(58,48,38,.05);border-radius:28px}
+.source-pill{background:rgba(255,255,255,.54);border:1px solid rgba(71,91,70,.08)}
+
+/* care tiles feel like individual botanical notes */
+.care-grid{gap:11px;margin:14px 0}
+.care-tile{position:relative;overflow:hidden;min-height:116px;padding:16px 16px 17px;border-radius:24px;background:linear-gradient(145deg,rgba(255,253,249,.94),rgba(248,242,234,.82));border:1px solid rgba(255,255,255,.8);box-shadow:0 10px 28px rgba(58,49,39,.06)}
+.care-tile:after{content:"";position:absolute;width:64px;height:64px;border-radius:50%;right:-30px;top:-30px;background:rgba(200,164,170,.08)}
+.care-tile .care-icon{font-size:25px;width:39px;height:39px;display:grid;place-items:center;border-radius:14px;background:rgba(107,133,103,.10);margin-bottom:12px}
+.care-tile b{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600}
+.care-tile small{font-size:11px;line-height:1.55}
+.care-wide{min-height:auto}
+
+/* flowering calendar */
+.months{gap:5px}.month{font-size:9px;padding:8px 1px;background:#ece8df;border:1px solid rgba(65,89,66,.035)}.month.on{background:linear-gradient(180deg,#d6a3aa,#c88791);box-shadow:0 6px 15px rgba(192,127,139,.20)}
+
+/* seasonal + good to know */
+.season-card,.good-know,.backup-card{border-radius:29px;border:1px solid rgba(255,255,255,.72);box-shadow:0 12px 34px rgba(58,48,38,.055)}
+.season-card{background:linear-gradient(145deg,rgba(238,222,202,.82),rgba(219,229,211,.78))}
+.season-card h2,.good-know h2{font-family:"Cormorant Garamond",serif}
+.good-know{background:linear-gradient(145deg,rgba(238,217,221,.68),rgba(255,249,241,.82))}
+.timeline-icon,.fact-row .fact-icon{background:linear-gradient(145deg,rgba(143,165,139,.15),rgba(215,204,225,.16))}
+
+/* bottom dock */
+.bottom-nav{height:90px;width:min(724px,calc(100% - 18px));bottom:9px;border-radius:28px;padding:10px 17px calc(10px + env(safe-area-inset-bottom));background:rgba(255,251,245,.88);backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);border:1px solid rgba(255,255,255,.75);box-shadow:0 18px 50px rgba(57,49,39,.14)}
+.nav-item{transition:.2s}.nav-item span{font-size:21px}.nav-item small{font-size:9px;font-weight:600;letter-spacing:.03em}.nav-item.active{color:#344d3a}.nav-item.active span{transform:translateY(-1px)}
+.lens-nav{width:66px;height:66px;border-radius:24px;margin:-32px auto 0;background:linear-gradient(145deg,#2f4836,#52684f);box-shadow:0 14px 32px rgba(46,70,52,.28),inset 0 0 0 1px rgba(255,255,255,.12)}
+
+/* sheets */
+.modal{background:rgba(30,39,31,.28);backdrop-filter:blur(9px)}
+.sheet{background:linear-gradient(180deg,#fffaf3,#f5ede3);border:1px solid rgba(255,255,255,.85);box-shadow:0 -24px 70px rgba(38,33,28,.20);padding-top:28px}
+.sheet:before{content:"";display:block;width:42px;height:4px;border-radius:10px;background:rgba(52,76,58,.16);margin:-14px auto 18px}
+
+/* small motion */
+@keyframes floraRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.hero,.lens-banner,.stats-strip,.masonry,.profile-card,.care-grid,.intel-banner,.season-card,.good-know{animation:floraRise .42s ease both}
+.masonry{animation-delay:.05s}
+
+@media (hover:hover){
+  .pin:hover{transform:translateY(-4px) rotate(-.15deg);box-shadow:0 22px 48px rgba(62,50,39,.13)}
+  .lens-banner:hover{transform:translateY(-2px);box-shadow:0 26px 60px rgba(48,72,53,.24)}
+  .link-btn:hover,.round-btn:hover{background:rgba(255,255,255,.8)}
+}
+@media (max-width:390px){h1{font-size:43px}.hero h1{font-size:48px}.page-head h1{font-size:44px}.care-grid{grid-template-columns:1fr 1fr}.bottom-nav{width:calc(100% - 12px);bottom:6px}}
