@@ -95,17 +95,15 @@ export default {
             const best = exact || rows[0];
 
             if (best?.id) {
-              const detailRes = await fetch(
-                `${PERENUAL_BASE}/species/details/${best.id}?key=${encodeURIComponent(env.PERENUAL_API_KEY)}`
-              );
-
-              if (detailRes.ok) {
-                const d = await detailRes.json();
-                result.perenual = normalizePerenual(d);
-                result.sources.push("Perenual");
-              } else {
-                result.perenualError = `Perenual detail ${detailRes.status}`;
-              }
+              // IMPORTANT: use the free species-list result directly.
+              // Perenual's free plan can return 429 for the separate details
+              // endpoint on species outside its free detail-data range.
+              // The list result already contains useful fields such as
+              // watering, sunlight and cycle, so do not immediately make a
+              // second paid/gated request.
+              result.perenual = normalizePerenual(best);
+              result.perenual.mode = "species-list";
+              result.sources.push("Perenual");
             } else {
               result.perenualStatus = "no-match";
             }
@@ -219,14 +217,14 @@ function normalizePerenual(d) {
   return {
     id: d?.id || null,
     commonName: d?.common_name || null,
-    scientificNames: Array.isArray(d?.scientific_name) ? d.scientific_name : [],
+    scientificNames: Array.isArray(d?.scientific_name) ? d.scientific_name : (d?.scientific_name ? [d.scientific_name] : []),
     family: d?.family || null,
     type: d?.type || null,
     cycle: d?.cycle || null,
     watering: d?.watering || null,
     wateringGeneralBenchmark: d?.watering_general_benchmark || null,
-    sunlight: Array.isArray(d?.sunlight) ? d.sunlight : [],
-    soil: Array.isArray(d?.soil) ? d.soil : [],
+    sunlight: Array.isArray(d?.sunlight) ? d.sunlight : (d?.sunlight ? [d.sunlight] : []),
+    soil: Array.isArray(d?.soil) ? d.soil : (d?.soil ? [d.soil] : []),
     growthRate: d?.growth_rate || null,
     maintenance: d?.maintenance || null,
     careLevel: d?.care_level || null,

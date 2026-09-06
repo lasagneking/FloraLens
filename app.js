@@ -11,118 +11,1043 @@ const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
 
 
 const FLORALENS_CARE_LIBRARY = {
-  // Species-first, then genus fallbacks. This is deliberately modest and labelled
-  // separately from third-party botanical data.
   "lavandula angustifolia": {
-    commonName: "English lavender",
-    light: "Full sun",
-    water: "Water while establishing; once established, water sparingly and avoid prolonged wet soil.",
-    soil: "Free-draining soil; performs well in neutral to alkaline conditions.",
-    height: "About 40–90 cm, depending on cultivar and conditions",
-    bloomMonths: [6,7,8],
-    growthHabit: "Woody, aromatic evergreen subshrub",
-    pruning: "Trim after flowering, keeping some green growth below the cut. Avoid cutting hard into old bare wood.",
-    propagation: "Semi-ripe cuttings in summer are a reliable method.",
-    hardiness: "Generally hardy in UK gardens when drainage is good.",
-    seasonal: {
-      spring: "Remove winter damage and tidy lightly once strong new growth is visible.",
-      summer: "Enjoy flowering; deadhead or trim after the main flush if a compact shape is wanted.",
-      autumn: "Avoid heavy pruning late in the year.",
-      winter: "Protect from waterlogged soil; cold combined with wet roots is more troublesome than cold alone."
+    "commonName": "English lavender",
+    "light": "Full sun",
+    "water": "Water while establishing; once established, water sparingly and avoid prolonged wet soil.",
+    "soil": "Very free-draining soil; neutral to alkaline conditions are usually suitable.",
+    "height": "About 40–90 cm, depending on cultivar and conditions",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Woody, aromatic evergreen subshrub",
+    "pruning": "Trim after flowering, keeping some green growth below the cut. Avoid cutting hard into old bare wood.",
+    "propagation": "Semi-ripe cuttings in summer are usually reliable.",
+    "hardiness": "Generally hardy in UK gardens when drainage is good.",
+    "seasonal": {
+      "spring": "Remove winter damage and tidy lightly once strong new growth is visible.",
+      "summer": "Enjoy flowering; trim after the main flush if a compact shape is wanted.",
+      "autumn": "Avoid heavy pruning late in the year.",
+      "winter": "Protect from waterlogged soil; winter wet is often more troublesome than cold."
     }
   },
   "lavandula": {
-    light: "Full sun",
-    water: "Low to moderate once established; avoid waterlogging.",
-    soil: "Very free-draining soil is important.",
-    growthHabit: "Aromatic evergreen or semi-evergreen subshrub",
-    pruning: "Trim after flowering rather than cutting hard into old woody stems.",
-    hardiness: "Varies by species and cultivar; drainage is especially important in winter."
+    "light": "Full sun",
+    "water": "Low to moderate once established; avoid waterlogging.",
+    "soil": "Very free-draining soil is important.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Aromatic evergreen or semi-evergreen subshrub",
+    "pruning": "Trim after flowering rather than cutting hard into old woody stems.",
+    "hardiness": "Varies by species and cultivar; winter drainage is especially important."
   },
   "hydrangea macrophylla": {
-    commonName: "Mophead / lacecap hydrangea",
-    light: "Part shade or gentle sun; shelter from intense drying heat.",
-    water: "Keep evenly moist, especially in warm weather and while establishing.",
-    soil: "Moist but well-drained, humus-rich soil.",
-    height: "Commonly around 1–2 m",
-    bloomMonths: [7,8,9],
-    growthHabit: "Deciduous flowering shrub",
-    pruning: "Prune lightly in spring, removing old flowerheads and dead wood. Many cultivars flower on older stems, so avoid indiscriminate hard pruning.",
-    propagation: "Softwood cuttings are commonly taken in summer.",
-    hardiness: "Generally hardy in much of the UK; young growth can be damaged by late frost."
+    "commonName": "Mophead / lacecap hydrangea",
+    "light": "Part shade or gentle sun; shelter from intense drying heat.",
+    "water": "Keep evenly moist, especially in warm weather and while establishing.",
+    "soil": "Moist but well-drained, humus-rich soil.",
+    "height": "Commonly around 1–2 m",
+    "bloomMonths": [
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Deciduous flowering shrub",
+    "pruning": "Prune lightly in spring, removing old flowerheads and dead wood. Many cultivars flower on older stems, so avoid indiscriminate hard pruning.",
+    "propagation": "Softwood cuttings are commonly taken in summer.",
+    "hardiness": "Generally hardy in much of the UK; young growth can be damaged by late frost."
   },
   "hydrangea": {
-    light: "Part shade to sun, with more shelter in hotter/drier positions.",
-    water: "Usually prefers consistent moisture.",
-    soil: "Moist but well-drained, humus-rich soil.",
-    growthHabit: "Usually a deciduous shrub or climber",
-    hardiness: "Varies by species and cultivar."
+    "light": "Part shade to sun, with more shelter in hotter or drier positions.",
+    "water": "Usually prefers consistent moisture.",
+    "soil": "Moist but well-drained, humus-rich soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Usually a deciduous shrub or climber",
+    "hardiness": "Varies by species and cultivar."
   },
   "rosa": {
-    light: "Full sun is best for most roses; some tolerate light shade.",
-    water: "Water deeply in dry spells, especially newly planted roses.",
-    soil: "Fertile, moisture-retentive but well-drained soil.",
-    growthHabit: "Deciduous flowering shrub or climber",
-    pruning: "Main pruning is usually carried out in the dormant season; exact technique depends on whether the rose is shrub, climbing or rambling.",
-    propagation: "Hardwood or semi-ripe cuttings can be used, though named cultivars may not always come true from seed.",
-    hardiness: "Many garden roses are hardy across much of the UK, but cultivar differences matter."
-  },
-  "rosmarinus officinalis": {
-    commonName: "Rosemary",
-    light: "Full sun",
-    water: "Low to moderate once established; avoid persistently wet roots.",
-    soil: "Free-draining soil.",
-    height: "Usually around 0.8–1.5 m, depending on cultivar",
-    bloomMonths: [3,4,5,6],
-    growthHabit: "Aromatic evergreen shrub",
-    pruning: "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
-    propagation: "Semi-ripe cuttings root readily in summer.",
-    hardiness: "Generally hardy in sheltered UK gardens with good drainage."
+    "light": "Full sun is best for most roses; some tolerate light shade.",
+    "water": "Water deeply in dry spells, especially newly planted roses.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Deciduous flowering shrub or climber",
+    "pruning": "Main pruning is usually carried out in the dormant season; technique depends on whether the rose is shrub, climbing or rambling.",
+    "propagation": "Hardwood or semi-ripe cuttings can be used; named cultivars may not come true from seed.",
+    "hardiness": "Many garden roses are hardy across much of the UK, but cultivar differences matter."
   },
   "salvia rosmarinus": {
-    commonName: "Rosemary",
-    light: "Full sun",
-    water: "Low to moderate once established; avoid persistently wet roots.",
-    soil: "Free-draining soil.",
-    height: "Usually around 0.8–1.5 m, depending on cultivar",
-    bloomMonths: [3,4,5,6],
-    growthHabit: "Aromatic evergreen shrub",
-    pruning: "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
-    propagation: "Semi-ripe cuttings root readily in summer.",
-    hardiness: "Generally hardy in sheltered UK gardens with good drainage."
+    "commonName": "Rosemary",
+    "light": "Full sun",
+    "water": "Low to moderate once established; avoid persistently wet roots.",
+    "soil": "Free-draining soil.",
+    "height": "Usually around 0.8–1.5 m, depending on cultivar",
+    "bloomMonths": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "growthHabit": "Aromatic evergreen shrub",
+    "pruning": "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
+    "propagation": "Semi-ripe cuttings root readily in summer.",
+    "hardiness": "Generally hardy in sheltered UK gardens with good drainage."
+  },
+  "rosmarinus officinalis": {
+    "commonName": "Rosemary",
+    "light": "Full sun",
+    "water": "Low to moderate once established; avoid persistently wet roots.",
+    "soil": "Free-draining soil.",
+    "height": "Usually around 0.8–1.5 m, depending on cultivar",
+    "bloomMonths": [
+      3,
+      4,
+      5,
+      6
+    ],
+    "growthHabit": "Aromatic evergreen shrub",
+    "pruning": "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
+    "propagation": "Semi-ripe cuttings root readily in summer.",
+    "hardiness": "Generally hardy in sheltered UK gardens with good drainage."
   },
   "digitalis purpurea": {
-    commonName: "Foxglove",
-    light: "Part shade to sun",
-    water: "Moderate; avoid prolonged drought while establishing.",
-    soil: "Moist but well-drained soil with organic matter.",
-    height: "Often around 1–1.5 m in flower",
-    bloomMonths: [5,6,7],
-    growthHabit: "Usually biennial or short-lived perennial",
-    pruning: "Remove spent spikes to reduce self-seeding, or leave some if you want naturalised seedlings.",
-    hardiness: "Hardy in UK conditions.",
-    safety: "Toxic if eaten. Keep away from children and pets that may ingest plants."
+    "commonName": "Foxglove",
+    "light": "Part shade to sun",
+    "water": "Moderate; avoid prolonged drought while establishing.",
+    "soil": "Moist but well-drained soil with organic matter.",
+    "height": "Often around 1–1.5 m in flower",
+    "bloomMonths": [
+      5,
+      6,
+      7
+    ],
+    "growthHabit": "Usually biennial or short-lived perennial",
+    "pruning": "Remove spent spikes to reduce self-seeding, or leave some if you want naturalised seedlings.",
+    "hardiness": "Hardy in UK conditions.",
+    "safety": "Toxic if eaten. Avoid ingestion and keep away from pets or young children likely to chew plants."
   },
   "buxus sempervirens": {
-    commonName: "Common box",
-    light: "Sun to shade",
-    water: "Moderate; established plants tolerate some dryness.",
-    soil: "Well-drained soil; avoid persistently waterlogged ground.",
-    height: "Can exceed 2 m untrimmed, but commonly kept much smaller",
-    growthHabit: "Dense evergreen shrub",
-    pruning: "Clip during the growing season for formal shapes, avoiding very hot dry weather.",
-    hardiness: "Hardy in UK gardens.",
-    safety: "All parts are harmful if eaten."
+    "commonName": "Common box",
+    "light": "Sun to shade",
+    "water": "Moderate; established plants tolerate some dryness.",
+    "soil": "Well-drained soil; avoid persistently waterlogged ground.",
+    "height": "Can exceed 2 m untrimmed, but commonly kept much smaller",
+    "growthHabit": "Dense evergreen shrub",
+    "pruning": "Clip during the growing season for formal shapes, avoiding very hot dry weather.",
+    "hardiness": "Hardy in UK gardens.",
+    "safety": "All parts are harmful if eaten."
+  },
+  "acer": {
+    "light": "Sun to part shade; many Japanese maples prefer shelter from scorching sun and wind.",
+    "water": "Keep evenly moist while establishing; avoid prolonged waterlogging.",
+    "soil": "Moist but well-drained soil; many species prefer slightly acidic to neutral conditions.",
+    "growthHabit": "Deciduous tree or shrub",
+    "hardiness": "Many garden maples are hardy in the UK; exposure tolerance varies by species.",
+    "pruning": "Prune only when necessary, generally avoiding heavy pruning during active sap flow."
+  },
+  "agapanthus": {
+    "light": "Full sun",
+    "water": "Water regularly in active growth; reduce in winter.",
+    "soil": "Fertile, well-drained soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Clump-forming perennial",
+    "hardiness": "Hardiness varies; evergreen forms are often less hardy than deciduous forms.",
+    "pruning": "Remove spent flower stems and dead foliage as needed."
+  },
+  "alchemilla": {
+    "light": "Sun to part shade",
+    "water": "Moderate; established plants cope with short dry spells.",
+    "soil": "Most reasonably fertile, well-drained soils.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Low, clump-forming herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut back untidy flowers and foliage after flowering to encourage fresh growth."
+  },
+  "allium": {
+    "light": "Full sun",
+    "water": "Moderate during growth; avoid wet dormant soil.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7
+    ],
+    "growthHabit": "Bulbous perennial",
+    "hardiness": "Most ornamental alliums are hardy in UK gardens.",
+    "pruning": "Leave foliage to die back naturally after flowering."
+  },
+  "anemone": {
+    "light": "Sun to part shade, depending on species.",
+    "water": "Moderate; keep evenly moist during active growth.",
+    "soil": "Humus-rich, well-drained soil.",
+    "bloomMonths": [
+      3,
+      4,
+      5,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Herbaceous perennial or tuberous plant",
+    "hardiness": "Many garden anemones are hardy; species differ."
+  },
+  "aquilegia": {
+    "light": "Sun to part shade",
+    "water": "Moderate; avoid prolonged drought.",
+    "soil": "Moist but well-drained soil.",
+    "bloomMonths": [
+      5,
+      6
+    ],
+    "growthHabit": "Short-lived herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut back after flowering if you want to limit self-seeding."
+  },
+  "astilbe": {
+    "light": "Part shade; tolerates sun if soil stays moist.",
+    "water": "Likes consistent moisture and dislikes drying out.",
+    "soil": "Moist, humus-rich soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Clump-forming herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut old stems to the ground in late winter or early spring."
+  },
+  "begonia": {
+    "light": "Bright shade or gentle sun; avoid harsh midday sun for many types.",
+    "water": "Keep moderately moist but not waterlogged.",
+    "soil": "Free-draining, humus-rich compost or soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tender perennial often grown as an annual",
+    "hardiness": "Many bedding and tuberous begonias are frost tender in the UK."
+  },
+  "bergenia": {
+    "light": "Sun to shade",
+    "water": "Moderate; established plants are fairly tolerant.",
+    "soil": "Moist but well-drained soil.",
+    "bloomMonths": [
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Evergreen clump-forming perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Remove damaged leaves and spent flower stems."
+  },
+  "buddleja": {
+    "light": "Full sun",
+    "water": "Moderate while establishing; fairly drought tolerant once established.",
+    "soil": "Well-drained soil; tolerates relatively poor soils.",
+    "bloomMonths": [
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Deciduous or semi-evergreen flowering shrub",
+    "hardiness": "Many common garden forms are hardy in the UK.",
+    "pruning": "Many Buddleja davidii types are cut back hard in early spring; other species differ."
+  },
+  "camellia": {
+    "light": "Part shade or sheltered dappled light",
+    "water": "Keep evenly moist, especially during bud formation and dry weather.",
+    "soil": "Acidic, humus-rich, well-drained soil.",
+    "bloomMonths": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Evergreen flowering shrub",
+    "hardiness": "Many cultivars are hardy, but flower buds can be damaged by severe frost.",
+    "pruning": "Usually needs little pruning; shape after flowering if required."
+  },
+  "campanula": {
+    "light": "Sun to part shade",
+    "water": "Moderate; avoid waterlogging.",
+    "soil": "Well-drained soil; many tolerate poorer ground.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Herbaceous or evergreen perennial",
+    "hardiness": "Many garden campanulas are hardy.",
+    "pruning": "Deadhead or trim after flowering to encourage tidiness and sometimes a second flush."
+  },
+  "ceanothus": {
+    "light": "Full sun in a sheltered position",
+    "water": "Moderate while establishing; avoid winter wet.",
+    "soil": "Free-draining soil.",
+    "bloomMonths": [
+      4,
+      5,
+      6
+    ],
+    "growthHabit": "Evergreen or deciduous flowering shrub",
+    "hardiness": "Hardiness varies; many evergreen types benefit from shelter.",
+    "pruning": "Prune lightly after flowering; avoid cutting hard into old wood."
+  },
+  "choisya": {
+    "light": "Sun to part shade",
+    "water": "Moderate; water while establishing.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      4,
+      5,
+      6,
+      8,
+      9
+    ],
+    "growthHabit": "Evergreen flowering shrub",
+    "hardiness": "Generally hardy in sheltered UK gardens.",
+    "pruning": "Trim after flowering if needed; avoid severe pruning unless rejuvenating."
+  },
+  "clematis": {
+    "light": "Sun to part shade; many prefer cool, shaded roots with growth reaching the light.",
+    "water": "Water regularly while establishing and during dry spells.",
+    "soil": "Deep, fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Climbing perennial",
+    "hardiness": "Many cultivars are hardy in the UK.",
+    "pruning": "Pruning depends on flowering group, so identify the cultivar or group before cutting back heavily."
+  },
+  "cornus": {
+    "light": "Sun to part shade",
+    "water": "Moderate; many prefer soil that does not dry out severely.",
+    "soil": "Moist but well-drained soil.",
+    "growthHabit": "Deciduous shrub or small tree",
+    "hardiness": "Many garden dogwoods are hardy.",
+    "pruning": "Pruning depends on type: coloured-stem dogwoods are often cut hard in spring, while flowering trees need lighter treatment."
+  },
+  "cosmos": {
+    "light": "Full sun",
+    "water": "Moderate; avoid overwatering.",
+    "soil": "Well-drained soil; too much fertility can produce leaves at the expense of flowers.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tender annual",
+    "hardiness": "Frost tender.",
+    "pruning": "Deadhead regularly to extend flowering."
+  },
+  "crocus": {
+    "light": "Sun to part shade",
+    "water": "Usually needs little extra water once established.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      2,
+      3,
+      4,
+      9,
+      10
+    ],
+    "growthHabit": "Corm-forming perennial",
+    "hardiness": "Most common garden crocuses are hardy.",
+    "pruning": "Let foliage die back naturally after flowering."
+  },
+  "dahlia": {
+    "light": "Full sun",
+    "water": "Water regularly in dry weather, especially in containers.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tuberous tender perennial",
+    "hardiness": "Top growth is frost tender; tubers may need winter protection depending on location and soil.",
+    "pruning": "Deadhead often; pinch young plants for bushier growth if desired."
+  },
+  "delphinium": {
+    "light": "Full sun with shelter from strong wind",
+    "water": "Keep evenly moist in active growth.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Tall herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut spent flower spikes after the first flush; some plants rebloom later.",
+    "safety": "Harmful if eaten; avoid ingestion."
+  },
+  "dianthus": {
+    "light": "Full sun",
+    "water": "Moderate; avoid soggy soil.",
+    "soil": "Free-draining, neutral to alkaline soil suits many types.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Evergreen or semi-evergreen perennial",
+    "hardiness": "Many garden pinks are hardy.",
+    "pruning": "Deadhead regularly and trim lightly after flowering."
+  },
+  "echinacea": {
+    "light": "Full sun",
+    "water": "Moderate while establishing; reasonably drought tolerant once established.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Herbaceous perennial",
+    "hardiness": "Hardy in most UK gardens if winter drainage is good.",
+    "pruning": "Leave seed heads for winter interest or cut down after flowering."
+  },
+  "erica": {
+    "light": "Sun to part shade",
+    "water": "Moderate; avoid prolonged drought.",
+    "soil": "Usually acidic to neutral and free-draining; exact preference varies by species.",
+    "bloomMonths": [
+      1,
+      2,
+      3,
+      4,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "growthHabit": "Low evergreen shrub",
+    "hardiness": "Many heathers are hardy.",
+    "pruning": "Trim lightly after flowering, avoiding old leafless wood."
+  },
+  "euonymus": {
+    "light": "Sun to shade, depending on cultivar.",
+    "water": "Moderate; established plants are fairly tolerant.",
+    "soil": "Well-drained soil.",
+    "growthHabit": "Evergreen or deciduous shrub",
+    "hardiness": "Many garden forms are hardy.",
+    "pruning": "Trim to shape during the growing season if required."
+  },
+  "forsythia": {
+    "light": "Full sun to part shade",
+    "water": "Moderate while establishing.",
+    "soil": "Most fertile, well-drained soils.",
+    "bloomMonths": [
+      3,
+      4
+    ],
+    "growthHabit": "Deciduous flowering shrub",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Prune after flowering, removing some older stems to keep the shrub open."
+  },
+  "fuchsia": {
+    "light": "Part shade or gentle sun, sheltered from drying winds.",
+    "water": "Keep evenly moist in active growth.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Shrub or tender perennial",
+    "hardiness": "Hardiness varies greatly; many bedding types are frost tender."
+  },
+  "galanthus": {
+    "light": "Part shade to sun before trees leaf out",
+    "water": "Usually needs little extra watering in suitable ground.",
+    "soil": "Moist but well-drained, humus-rich soil.",
+    "bloomMonths": [
+      1,
+      2,
+      3
+    ],
+    "growthHabit": "Bulbous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Allow foliage to die back naturally."
+  },
+  "geranium": {
+    "light": "Sun to part shade, depending on species.",
+    "water": "Moderate; many hardy geraniums tolerate short dry spells once established.",
+    "soil": "Most reasonably fertile, well-drained soils.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Clump-forming hardy perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Many hardy geraniums respond well to cutting back after the first flush."
+  },
+  "helleborus": {
+    "light": "Part shade",
+    "water": "Moderate; dislikes prolonged waterlogging.",
+    "soil": "Humus-rich, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      1,
+      2,
+      3,
+      4
+    ],
+    "growthHabit": "Evergreen or semi-evergreen perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Remove damaged old foliage before flowers emerge if needed.",
+    "safety": "Harmful if eaten and sap may irritate skin; handle with sensible care."
+  },
+  "hebe": {
+    "light": "Sun to part shade in a sheltered position",
+    "water": "Moderate; avoid prolonged waterlogging.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Evergreen shrub",
+    "hardiness": "Hardiness varies by cultivar; smaller-leaved forms are often tougher.",
+    "pruning": "Trim lightly after flowering; avoid cutting hard into old bare wood."
+  },
+  "heuchera": {
+    "light": "Part shade to sun; darker-leaved cultivars often tolerate more sun.",
+    "water": "Moderate; avoid waterlogged crowns.",
+    "soil": "Humus-rich, well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Evergreen or semi-evergreen clump-forming perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Remove old leaves and spent flower stems; lift and replant if crowns become woody."
+  },
+  "hosta": {
+    "light": "Part shade to shade; some cultivars tolerate more sun with adequate moisture.",
+    "water": "Keep evenly moist, especially during active growth.",
+    "soil": "Moist, fertile, humus-rich soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Herbaceous clump-forming perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Remove collapsed foliage after frost."
+  },
+  "ilex": {
+    "light": "Sun to shade, depending on species and cultivar.",
+    "water": "Moderate while establishing.",
+    "soil": "Moist but well-drained soil.",
+    "growthHabit": "Evergreen or deciduous shrub or tree",
+    "hardiness": "Many hollies are hardy.",
+    "pruning": "Prune to shape in late spring or summer if needed.",
+    "safety": "Berries can be harmful if eaten in quantity; avoid ingestion."
+  },
+  "iris": {
+    "light": "Full sun for many bearded types; some moisture-loving irises prefer damper sites.",
+    "water": "Moderate; needs vary strongly by type.",
+    "soil": "Well-drained for bearded iris; moisture-retentive for bog or water irises.",
+    "bloomMonths": [
+      5,
+      6,
+      7
+    ],
+    "growthHabit": "Rhizomatous or bulbous perennial",
+    "hardiness": "Many garden irises are hardy.",
+    "pruning": "Remove spent flower stems and damaged leaves."
+  },
+  "jasminum": {
+    "light": "Sun to part shade in a sheltered position",
+    "water": "Moderate; water during prolonged dry spells while establishing.",
+    "soil": "Fertile, well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      12,
+      1,
+      2
+    ],
+    "growthHabit": "Climbing shrub",
+    "hardiness": "Hardiness varies by species.",
+    "pruning": "Prune after flowering; timing differs between summer- and winter-flowering jasmine."
+  },
+  "lilium": {
+    "light": "Sun to part shade with roots kept cool",
+    "water": "Keep evenly moist in active growth but avoid waterlogging.",
+    "soil": "Fertile, well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Bulbous perennial",
+    "hardiness": "Many lilies are hardy with good drainage.",
+    "pruning": "Remove flower heads after flowering but leave foliage until it yellows.",
+    "safety": "Lilies can be extremely dangerous to cats if ingested; keep plants and pollen away from cats."
+  },
+  "lonicera": {
+    "light": "Sun to part shade",
+    "water": "Moderate; water during dry spells while establishing.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Climber or shrub",
+    "hardiness": "Many honeysuckles are hardy.",
+    "pruning": "Pruning depends on flowering time and whether the plant is climbing or shrubby."
+  },
+  "lupinus": {
+    "light": "Full sun",
+    "water": "Moderate; avoid waterlogged soil.",
+    "soil": "Well-drained soil; many prefer neutral to slightly acidic conditions.",
+    "bloomMonths": [
+      5,
+      6,
+      7
+    ],
+    "growthHabit": "Herbaceous perennial",
+    "hardiness": "Hardy in UK gardens with good drainage.",
+    "pruning": "Deadhead after flowering for tidiness and possible repeat bloom.",
+    "safety": "Seeds and other parts may be harmful if eaten; avoid ingestion."
+  },
+  "magnolia": {
+    "light": "Sun to part shade in a sheltered position",
+    "water": "Keep evenly moist while establishing.",
+    "soil": "Moist but well-drained, humus-rich soil; many prefer neutral to acidic conditions.",
+    "bloomMonths": [
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Deciduous or evergreen tree or shrub",
+    "hardiness": "Many common magnolias are hardy, but flowers can be frost damaged.",
+    "pruning": "Generally needs little pruning; remove damaged or crossing branches after flowering if required."
+  },
+  "narcissus": {
+    "light": "Sun to part shade",
+    "water": "Usually needs little extra water in open ground.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Bulbous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Let foliage die back naturally for several weeks after flowering.",
+    "safety": "Bulbs and plant parts are harmful if eaten; avoid ingestion."
+  },
+  "nepeta": {
+    "light": "Full sun",
+    "water": "Low to moderate once established.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Aromatic herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut back after the first flush to encourage fresh growth and often more flowers."
+  },
+  "paeonia": {
+    "light": "Full sun to light shade",
+    "water": "Moderate; avoid prolonged waterlogging.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      5,
+      6
+    ],
+    "growthHabit": "Herbaceous perennial or deciduous shrub",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Herbaceous peonies are cut down after foliage dies back; tree peonies need only light pruning."
+  },
+  "pelargonium": {
+    "light": "Full sun to bright light",
+    "water": "Water when the top of the compost begins to dry; avoid waterlogging.",
+    "soil": "Free-draining compost or soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tender perennial often grown as bedding or in containers",
+    "hardiness": "Frost tender in the UK.",
+    "pruning": "Deadhead regularly and trim back leggy growth."
+  },
+  "penstemon": {
+    "light": "Full sun to part shade",
+    "water": "Moderate; avoid winter waterlogging.",
+    "soil": "Fertile, free-draining soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Semi-evergreen or herbaceous perennial",
+    "hardiness": "Many cultivars are reasonably hardy in sheltered UK gardens.",
+    "pruning": "Leave top growth over winter, then cut back in spring when new shoots are visible."
+  },
+  "petunia": {
+    "light": "Full sun",
+    "water": "Water regularly, especially in containers.",
+    "soil": "Fertile, well-drained compost or soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tender annual or short-lived perennial",
+    "hardiness": "Frost tender.",
+    "pruning": "Deadhead and trim straggly growth to encourage repeat flowering."
+  },
+  "phlox": {
+    "light": "Full sun to part shade",
+    "water": "Moderate; keep taller border types evenly moist.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9
+    ],
+    "growthHabit": "Herbaceous or evergreen perennial",
+    "hardiness": "Many garden phlox are hardy.",
+    "pruning": "Deadhead after flowering; cut herbaceous stems down after they die back."
+  },
+  "pieris": {
+    "light": "Part shade with shelter from cold drying winds",
+    "water": "Keep evenly moist, especially while establishing.",
+    "soil": "Acidic, humus-rich, well-drained soil.",
+    "bloomMonths": [
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Evergreen shrub",
+    "hardiness": "Generally hardy in sheltered UK gardens.",
+    "pruning": "Usually needs little pruning; remove damaged growth after flowering."
+  },
+  "primula": {
+    "light": "Part shade to gentle sun",
+    "water": "Likes consistent moisture, especially in spring.",
+    "soil": "Humus-rich, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Herbaceous or evergreen perennial",
+    "hardiness": "Many primulas are hardy.",
+    "pruning": "Deadhead and remove old leaves as needed."
+  },
+  "rhododendron": {
+    "light": "Part shade or dappled light",
+    "water": "Keep evenly moist, especially during dry spells.",
+    "soil": "Acidic, humus-rich, well-drained soil.",
+    "bloomMonths": [
+      4,
+      5,
+      6
+    ],
+    "growthHabit": "Evergreen or deciduous flowering shrub",
+    "hardiness": "Many cultivars are hardy; exposure tolerance varies.",
+    "pruning": "Usually needs little pruning; deadhead carefully and shape after flowering if needed.",
+    "safety": "Plant parts can be harmful if eaten; avoid ingestion."
+  },
+  "rudbeckia": {
+    "light": "Full sun",
+    "water": "Moderate; established plants tolerate short dry spells.",
+    "soil": "Fertile, well-drained soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Herbaceous perennial or annual",
+    "hardiness": "Many perennial forms are hardy.",
+    "pruning": "Deadhead to extend flowering, or leave seed heads for winter interest."
+  },
+  "salvia": {
+    "light": "Full sun",
+    "water": "Moderate; many shrubby and Mediterranean types prefer drier conditions once established.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Herbaceous or shrubby perennial",
+    "hardiness": "Hardiness varies widely by species and cultivar.",
+    "pruning": "Pruning varies by type; many hardy salvias are cut back in spring rather than autumn."
+  },
+  "sedum": {
+    "light": "Full sun",
+    "water": "Low once established.",
+    "soil": "Free-draining soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Succulent perennial",
+    "hardiness": "Many hardy sedums are reliable in UK gardens.",
+    "pruning": "Cut old stems in late winter or spring if not left for winter structure."
+  },
+  "hylotelephium": {
+    "light": "Full sun",
+    "water": "Low to moderate once established.",
+    "soil": "Free-draining soil.",
+    "bloomMonths": [
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Succulent herbaceous perennial",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Cut old stems in late winter or early spring."
+  },
+  "skimmia": {
+    "light": "Part shade to shade",
+    "water": "Moderate; dislikes drying out severely.",
+    "soil": "Humus-rich, moist but well-drained, preferably acidic to neutral soil.",
+    "bloomMonths": [
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Compact evergreen shrub",
+    "hardiness": "Hardy in sheltered UK gardens.",
+    "pruning": "Usually needs little pruning; lightly shape after flowering if necessary."
+  },
+  "spiraea": {
+    "light": "Full sun to part shade",
+    "water": "Moderate while establishing.",
+    "soil": "Most fertile, well-drained soils.",
+    "bloomMonths": [
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "growthHabit": "Deciduous flowering shrub",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Pruning timing depends on whether it flowers on old or new wood."
+  },
+  "syringa": {
+    "light": "Full sun",
+    "water": "Moderate; avoid prolonged waterlogging.",
+    "soil": "Fertile, well-drained soil, often neutral to alkaline.",
+    "bloomMonths": [
+      4,
+      5,
+      6
+    ],
+    "growthHabit": "Deciduous flowering shrub or small tree",
+    "hardiness": "Hardy in UK gardens.",
+    "pruning": "Prune immediately after flowering if needed; remove suckers from grafted plants."
+  },
+  "tulipa": {
+    "light": "Full sun",
+    "water": "Moderate during active growth; relatively dry during summer dormancy.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      3,
+      4,
+      5
+    ],
+    "growthHabit": "Bulbous perennial",
+    "hardiness": "Bulbs are generally hardy, but some cultivars perform best when replanted annually.",
+    "pruning": "Remove spent flowers but leave foliage until it yellows."
+  },
+  "verbena": {
+    "light": "Full sun",
+    "water": "Moderate; drought tolerance varies by type.",
+    "soil": "Well-drained soil.",
+    "bloomMonths": [
+      6,
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Annual or perennial flowering plant",
+    "hardiness": "Hardiness varies; Verbena bonariensis often survives in free-draining sheltered sites.",
+    "pruning": "Deadhead or cut back after flowering; protect crowns from severe winter wet where marginal."
+  },
+  "viburnum": {
+    "light": "Sun to part shade",
+    "water": "Moderate; many prefer soil that does not dry out severely.",
+    "soil": "Moist but well-drained soil.",
+    "bloomMonths": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      11,
+      12
+    ],
+    "growthHabit": "Evergreen or deciduous shrub",
+    "hardiness": "Many garden viburnums are hardy.",
+    "pruning": "Prune after flowering if needed; timing varies by species."
+  },
+  "wisteria": {
+    "light": "Full sun for best flowering",
+    "water": "Water regularly while establishing and during dry spells.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "bloomMonths": [
+      5,
+      6,
+      7
+    ],
+    "growthHabit": "Vigorous woody climber",
+    "hardiness": "Hardy in many UK gardens.",
+    "pruning": "Usually pruned twice yearly: shortening new growth in summer and again in winter."
+  },
+  "zinnia": {
+    "light": "Full sun",
+    "water": "Water at the base when needed; avoid keeping foliage constantly wet.",
+    "soil": "Fertile, well-drained soil.",
+    "bloomMonths": [
+      7,
+      8,
+      9,
+      10
+    ],
+    "growthHabit": "Tender annual",
+    "hardiness": "Frost tender.",
+    "pruning": "Deadhead regularly to prolong flowering."
+  },
+  "fatsia": {
+    "light": "Part shade to shade; shelter from cold drying winds.",
+    "water": "Moderate; keep evenly moist while establishing.",
+    "soil": "Fertile, moisture-retentive but well-drained soil.",
+    "growthHabit": "Evergreen architectural shrub",
+    "hardiness": "Generally hardy in sheltered UK gardens.",
+    "pruning": "Remove damaged leaves or reduce overlong stems in spring if needed."
+  },
+  "monstera": {
+    "light": "Bright indirect light",
+    "water": "Water when the upper compost has begun to dry; do not leave roots waterlogged.",
+    "soil": "Airy, free-draining houseplant compost.",
+    "growthHabit": "Evergreen climbing houseplant",
+    "hardiness": "Tender; protect from cold.",
+    "safety": "Plant sap and tissues can irritate and are harmful if chewed; keep away from pets and young children likely to bite plants."
+  },
+  "ficus": {
+    "light": "Bright indirect light; avoid sudden major changes in position.",
+    "water": "Allow the upper compost to dry slightly between waterings.",
+    "soil": "Free-draining houseplant compost.",
+    "growthHabit": "Evergreen houseplant, shrub or tree",
+    "hardiness": "Tender indoors in the UK.",
+    "pruning": "Prune lightly in active growth if shaping is needed."
+  },
+  "dracaena": {
+    "light": "Bright indirect light; many tolerate lower light.",
+    "water": "Allow the top portion of compost to dry before watering again.",
+    "soil": "Free-draining houseplant compost.",
+    "growthHabit": "Evergreen cane-forming houseplant",
+    "hardiness": "Tender indoors in the UK.",
+    "safety": "Some Dracaena species can be harmful to pets if chewed."
+  },
+  "spathiphyllum": {
+    "light": "Bright indirect light to moderate shade",
+    "water": "Keep lightly moist but not waterlogged; allow the surface to dry a little between waterings.",
+    "soil": "Moisture-retentive but free-draining houseplant compost.",
+    "growthHabit": "Evergreen clump-forming houseplant",
+    "hardiness": "Tender indoors in the UK.",
+    "safety": "Plant tissues can irritate the mouth if chewed; keep away from pets and young children likely to bite plants."
   }
 };
 
-function floralensCareFor(scientificName=""){
+function floralensCareMatches(scientificName=""){
   const n=String(scientificName).toLowerCase().trim();
-  if(FLORALENS_CARE_LIBRARY[n]) return {...FLORALENS_CARE_LIBRARY[n], source:"FloraLens care library"};
+  const exact=FLORALENS_CARE_LIBRARY[n] ? {...FLORALENS_CARE_LIBRARY[n], source:"FloraLens care library · species guidance", matchLevel:"species"} : null;
   const genus=n.split(/\s+/)[0];
-  if(genus && FLORALENS_CARE_LIBRARY[genus]) return {...FLORALENS_CARE_LIBRARY[genus], source:"FloraLens care library · genus guidance"};
-  return null;
+  const genusCare=genus && FLORALENS_CARE_LIBRARY[genus]
+    ? {...FLORALENS_CARE_LIBRARY[genus], source:"FloraLens care library · genus guidance", matchLevel:"genus"}
+    : null;
+  return {exact,genus:genusCare};
 }
+
+function floralensCareFor(scientificName=""){
+  const m=floralensCareMatches(scientificName);
+  return m.exact||m.genus||null;
+}
+
+
 
 function seasonKey(){
   const m=new Date().getMonth()+1;
@@ -175,7 +1100,10 @@ function floweringSeasonMonths(season){
 }
 
 function resolvedCare(scientificName,t,pn){
-  const local=floralensCareFor(scientificName);
+  const localMatches=floralensCareMatches(scientificName);
+  const exactLocal=localMatches.exact;
+  const genusLocal=localMatches.genus;
+  const local=exactLocal||genusLocal;
   const trefleSoil = t ? usable(soilLabel(t)) : null;
 
   const pCare={
@@ -204,19 +1132,23 @@ function resolvedCare(scientificName,t,pn){
     safety: toxicityCopy(t)
   };
 
-  const pick=(k)=>usable(pCare[k]) || usable(tCare[k]) || usable(local?.[k]) || null;
-  const bloom = pCare.bloomMonths?.length ? pCare.bloomMonths :
+  const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || null;
+  const bloom = exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
+                pCare.bloomMonths?.length ? pCare.bloomMonths :
                 tCare.bloomMonths?.length ? tCare.bloomMonths :
-                local?.bloomMonths || [];
+                genusLocal?.bloomMonths || [];
 
   return {
     light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"),
     bloomMonths:bloom,
     growthHabit:pick("growthHabit"), growthRate:pick("growthRate"),
-    pruning:usable(local?.pruning), propagation:usable(local?.propagation),
-    hardiness:pick("hardiness"), safety:pCare.safety || tCare.safety || usable(local?.safety),
-    seasonal:local?.seasonal||null,
+    pruning:usable(exactLocal?.pruning)||usable(genusLocal?.pruning),
+    propagation:usable(exactLocal?.propagation)||usable(genusLocal?.propagation),
+    hardiness:pick("hardiness"),
+    safety:usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety),
+    seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
     localSource:local?.source||null,
+    localMatchLevel:local?.matchLevel||null,
     usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v),
     usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v),
     usedLocal:!!local
@@ -584,7 +1516,7 @@ async function renderProfile(id,isNew=false){
       intelText=care.usedPerenual
         ?"FloraLens found horticultural care data for this species and combined it with the botanical record."
         :care.usedLocal
-          ?"Connected botanical records were sparse, so FloraLens filled available gaps with its curated care library."
+          ?"FloraLens matched this plant to its curated UK-garden care library and filled gaps left by the botanical APIs."
           :"Connected botanical sources supplied useful growing information for this species.";
     }else if(taxonConfirmed){
       intelTitle="Botanical record found";
@@ -601,7 +1533,7 @@ async function renderProfile(id,isNew=false){
       <p class="small">${esc(intelText)}</p>
       ${intel?`<div class="coverage"><span style="width:${careCoverage}%"></span></div>
       <div class="small" style="margin-top:6px">${careCoverage}% of core care fields available</div>
-      <div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}</div>
+      <div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div>
       <div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div>`:""}
     </div>
 
@@ -631,7 +1563,7 @@ async function renderProfile(id,isNew=false){
 
     ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
 
-    ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated care library because the connected botanical APIs returned incomplete care fields. Species-specific API data takes priority whenever it is available.</p></div>`:""}
+    ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated UK-garden care library because the connected botanical APIs often omit practical growing information. Species guidance is preferred where available; genus guidance is used as a cautious fallback.</p></div>`:""}
 
     <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
     <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${new Date(intel.fetchedAt).toLocaleDateString("en-GB")} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;

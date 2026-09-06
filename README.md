@@ -1,4 +1,4 @@
-# FloraLens v0.5 — Real Care Coverage
+# FloraLens v0.6 — UK Garden Care Engine
 
 FloraLens v0.3 keeps the working Pl@ntNet identification flow and adds the first real botanical-intelligence layer.
 
@@ -131,3 +131,34 @@ Do not change:
 - `TREFLE_TOKEN`
 
 Perenual is an additional fallback; Pl@ntNet identification remains unchanged.
+
+
+## v0.5.1 Worker hotfix
+
+The Perenual free-plan integration no longer makes an immediate second
+`species/details/{id}` request after search. That second request was returning
+HTTP 429 for the lavender test. FloraLens now uses the successful species-list
+record directly and leaves Trefle/local care fallbacks in place for fields that
+the free Perenual record does not contain.
+
+No secret names changed.
+
+
+## v0.6 — expanded care engine
+
+This release replaces the tiny fallback table with a substantially broader
+UK-garden-oriented care library covering 75 species/genus entries.
+
+Resolution order is now:
+
+1. FloraLens exact species guidance
+2. Perenual usable species fields
+3. Trefle usable botanical growing fields
+4. FloraLens genus guidance
+5. Friendly missing-field text
+
+The UI labels whether the FloraLens match is species-level or genus-level.
+Literal placeholders such as `Not available` are still treated as missing data.
+
+The Cloudflare Worker and secret names are unchanged from v0.5.1.
+For this release, the functional application change is in `app.js`.
