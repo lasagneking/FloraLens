@@ -438,3 +438,29 @@ h2{font-size:35px;letter-spacing:-.025em}
 .area-detail-head{display:flex;gap:13px;align-items:center;margin-bottom:14px}.area-detail-head>span{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:rgba(67,99,74,.09);color:var(--green);font-size:23px}.area-detail-head h2{margin:2px 0;font-size:28px}.area-plant-list{display:grid;gap:8px;max-height:48vh;overflow:auto}.area-plant-list>button{display:flex;align-items:center;gap:11px;border:1px solid rgba(63,83,64,.08);background:rgba(255,255,255,.56);border-radius:17px;padding:9px;text-align:left;color:var(--ink)}.area-plant-list>button>span:nth-child(2){flex:1;min-width:0}.area-plant-list b,.area-plant-list small{display:block}.area-plant-list small{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}.area-list-photo{width:45px;height:45px;flex:none;border-radius:13px;background:#ddd center/cover no-repeat}
 .profile-location-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:20px;background:rgba(227,231,211,.55);border:1px solid rgba(61,86,65,.08);margin:14px 0}.profile-location-card h3{font-family:var(--serif);font-size:22px;margin:2px 0 0}
 @media(min-width:700px){.garden-map{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+
+/* v1.1.1 — iOS Discover card fragmentation fix
+   Safari can fragment positioned children inside CSS multi-column cards,
+   which made the heart/delete controls appear as a "ghost" copy. */
+.discovery-masonry{
+  columns:auto !important;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  align-items:start;
+}
+.discovery-masonry .discovery-pin{
+  width:100%;
+  margin:0;
+  break-inside:auto;
+  -webkit-column-break-inside:auto;
+  page-break-inside:auto;
+  align-self:start;
+}
+@media (min-width:650px){
+  .discovery-masonry{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px;
+  }
+}

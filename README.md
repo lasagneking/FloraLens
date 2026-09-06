@@ -262,3 +262,10 @@ No Cloudflare or API-secret changes are required.
 - Plants can be moved between existing areas or into a newly-created area.
 - Existing users migrate automatically and keep all current data.
 - No Cloudflare/API changes.
+
+
+## v1.1.1 — Discover iPhone display hotfix
+- Fixes a Safari/iOS multi-column fragmentation bug that could paint a duplicate heart/delete control beside a Discover card.
+- Discover now uses a stable two-column grid on phones and three columns on wider screens.
+- No discovery records or delete logic were changed.
+- No Cloudflare/API changes.
