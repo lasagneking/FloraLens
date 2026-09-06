@@ -1205,7 +1205,7 @@ const defaultState = {
     {date:"6 Sep",icon:"✿",title:"Hydrangea looking beautiful",text:"Added a quick garden note and checked the late-summer flowers."},
     {date:"2 Sep",icon:"✓",title:"Lavender care",text:"Light tidy and checked soil moisture."}
   ],
-  discoveries: 12,
+  discoveries: [],
   lastQuota: null
 };
 
@@ -1214,6 +1214,7 @@ let currentRoute = "home";
 let captures = []; // [{id,file,dataUrl,organ}]
 let pendingResults = null;
 let chosenArea = "Unplaced";
+let captureIntent = "identify"; // identify | discover
 
 function loadState(){
   try {
@@ -1221,6 +1222,7 @@ function loadState(){
     const merged = {...structuredClone(defaultState), ...old};
     merged.speciesCache = {...defaultState.speciesCache, ...(old.speciesCache||{})};
     merged.areas = old.areas?.length ? old.areas : defaultState.areas;
+    merged.discoveries = Array.isArray(old.discoveries) ? old.discoveries : [];
     return merged;
   } catch { return structuredClone(defaultState); }
 }
@@ -1301,7 +1303,7 @@ function renderHome(){
   view.innerHTML=`
     <section class="hero"><div class="eyebrow">Your botanical scrapbook</div><h1>Your little world<br>in bloom.</h1><p class="sub">Keep every flower, story and small garden discovery in one beautiful place.</p><div class="hero-bloom">❀</div></section>
     <button class="lens-banner" onclick="startCamera()"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
-    <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries}</b><small>discoveries</small></div></div>
+    <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
     <div class="section-title"><h3>From your garden</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
     <section class="masonry">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>
     <div class="section-title"><h3>FloraLens memory</h3></div>
@@ -1328,9 +1330,10 @@ function filterByArea(area,btn){
   hydratePhotos(gardenPins);
 }
 
-function startCamera(){
+function startCamera(intent="identify"){
   captures=[];
   pendingResults=null;
+  captureIntent=intent;
   window.captureOrgan="auto";
   // Called directly from a user tap so iOS opens the rear camera immediately.
   cameraInput.click();
@@ -1359,10 +1362,10 @@ function renderCaptureReview(){
     <div class="capture-stack">${captures.map((c,i)=>`<div class="capture-card"><button class="capture-remove" onclick="removeCapture(${i})">×</button><img src="${c.dataUrl}"><span class="organ">${esc(c.organ)}</span></div>`).join("")}${captures.length<5?`<button class="add-capture" onclick="chooseOrganForNext()">＋<br>Add view</button>`:""}</div>
     <div class="result-hero" style="min-height:330px"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${captures.length} of 5 photos</div><h1>Ready to identify?</h1><span class="confidence">${captures.map(c=>c.organ).join(" · ")}</span></div></div>
     <div class="actions"><button class="btn primary" onclick="identifyPlant()">✿ Identify plant</button><button class="btn secondary" onclick="chooseOrganForNext()" ${captures.length>=5?"disabled":""}>＋ Another view</button></div>
-    <button class="btn outline" style="width:100%" onclick="startCamera()">Start again</button>
+    <button class="btn outline" style="width:100%" onclick="startCamera(captureIntent)">Start again</button>
     ${!API_PROXY_URL?`<div class="setup-card"><div class="eyebrow">Demo mode</div><p class="sub" style="margin:6px 0 0">The complete flow works now. Deploy the included free Cloudflare Worker and set <code>API_PROXY_URL</code> to switch on real Pl@ntNet results.</p></div>`:""}`;
 }
-function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():startCamera(); }
+function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():startCamera(captureIntent); }
 function chooseOrganForNext(){
   if(captures.length>=5) return;
   modal(`<div class="eyebrow">Add another view</div><h2>What will you photograph?</h2><div class="organ-grid">
@@ -1413,13 +1416,33 @@ function renderResult(){
   const r=pendingResults[0], info=resultInfo(r);
   view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens match</div><h1>I think I found it!</h1>${state.lastQuota!==null?`<span class="quota-pill">❧ ${state.lastQuota} identifications left today</span>`:""}</section>
     <div class="result-hero"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(info.family)}</div><h1>${esc(info.common)}</h1><em>${esc(info.sci)}</em><br><span class="confidence">${Math.round(r.score*100)}% match</span></div></div>
-    <div class="actions"><button class="btn primary" onclick="chooseSaveArea()">✓ That’s it</button><button class="btn secondary" onclick="showMatches()">Other matches</button></div>
+    <div class="actions">
+      ${captureIntent==="discover"
+        ? `<button class="btn primary" onclick="saveDiscovery()">♡ Save to Discover</button><button class="btn secondary" onclick="chooseSaveArea()">Add to Garden</button>`
+        : `<button class="btn primary" onclick="chooseDestination()">✓ That’s it</button><button class="btn secondary" onclick="showMatches()">Other matches</button>`}
+    </div>
+    ${captureIntent==="discover"?`<button class="link-btn" style="width:100%;margin:8px 0 2px" onclick="finishWithoutSaving()">Just looking — don't save</button>`:""}
     <div class="profile-card"><div class="eyebrow">Identification evidence</div><h2 style="font-size:25px;margin-top:7px">${captures.length} ${captures.length===1?"photo":"photos"} considered</h2><div class="photo-strip">${captures.map(c=>`<div><img class="thumb" src="${c.dataUrl}"><div class="small" style="text-align:center">${esc(c.organ)}</div></div>`).join("")}</div><p class="small">Confidence is Pl@ntNet's ranked identification score, not a guarantee. Confirming the visual match keeps FloraLens's garden records cleaner.</p></div>`;
 }
 function showMatches(){
   modal(`<div class="eyebrow">Possible matches</div><h2>What looks right?</h2>${pendingResults.slice(0,5).map((r,i)=>{const x=resultInfo(r);return `<button class="match-card" onclick="selectMatch(${i})"><span><b>${esc(x.common)}</b><br><small><i>${esc(x.sci)}</i> · ${esc(x.family)}</small></span><span class="match-score">${Math.round(r.score*100)}%</span></button>`}).join("")}`);
 }
 function selectMatch(i){ pendingResults=[pendingResults[i],...pendingResults.filter((_,x)=>x!==i)]; closeModal(); renderResult(); }
+
+function chooseDestination(){
+  modal(`<div class="eyebrow">Keep this one?</div><h2>Where should it go?</h2>
+    <button class="destination-choice" onclick="closeModal();chooseSaveArea()"><span>⌂</span><div><b>Add to My Garden</b><small>A plant you own — choose its area and keep a care record.</small></div></button>
+    <button class="destination-choice" onclick="closeModal();saveDiscovery()"><span>♡</span><div><b>Save to Discover</b><small>Something you spotted, liked or might buy later.</small></div></button>
+    <button class="link-btn" style="width:100%;margin-top:14px" onclick="finishWithoutSaving()">Just looking — don't save</button>`);
+}
+
+function finishWithoutSaving(){
+  closeModal();
+  captures=[];
+  pendingResults=null;
+  toast("Identification complete");
+  setRoute(captureIntent==="discover"?"discover":"home");
+}
 
 function chooseSaveArea(){
   chosenArea="Unplaced";
@@ -1431,6 +1454,111 @@ function addAreaPrompt(){
   modal(`<div class="eyebrow">Garden areas</div><h2>Create a new area</h2><input id="newArea" class="search" placeholder="e.g. Rose bed"><button class="btn primary" style="width:100%" onclick="saveNewArea()">Add area</button>`);
 }
 function saveNewArea(){ const a=document.getElementById("newArea").value.trim();if(!a)return;if(!state.areas.includes(a))state.areas.push(a);saveState();chosenArea=a;closeModal();chooseSaveArea(); }
+
+async function saveDiscovery(){
+  const r=pendingResults?.[0];
+  if(!r) return;
+  const x=resultInfo(r);
+  const speciesKey=slug(x.sci);
+  if(!state.speciesCache[speciesKey]){
+    state.speciesCache[speciesKey]={
+      scientific:x.sci,common:x.common,family:x.family,genus:x.genus,
+      source:"Pl@ntNet identification",fetchedAt:new Date().toISOString(),enrichment:null
+    };
+  }
+
+  const id="discovery-"+Date.now();
+  const photoKey=`${id}-hero`;
+  try{ await savePhoto(photoKey,captures[0].file); }catch(e){ console.warn("Discovery photo storage failed",e); }
+
+  state.discoveries.unshift({
+    id, speciesKey, photoKey,
+    common:x.common, scientific:x.sci, family:x.family,
+    score:Math.round((r.score||0)*100),
+    spotted:new Date().toISOString(),
+    wishlist:false,
+    note:""
+  });
+  saveState();
+  captures=[];
+  pendingResults=null;
+  toast(`${x.common} saved to Discover`);
+
+  // Enrich once so its Discover detail page has the same knowledge as Garden plants.
+  if(!state.speciesCache[speciesKey]?.enrichment){
+    enrichSpecies(x.sci,speciesKey).catch(()=>{});
+  }
+  setRoute("discover");
+}
+
+function confirmDeleteDiscovery(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  modal(`<div class="eyebrow">Remove discovery</div><h2>Forget ${esc(d.common)}?</h2>
+    <p class="sub">This removes the saved discovery and its photo from this device. Your reusable species knowledge stays cached.</p>
+    <div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deleteDiscovery('${id}')">Delete</button></div>`);
+}
+
+async function deleteDiscovery(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  state.discoveries=state.discoveries.filter(x=>x.id!==id);
+  saveState();
+  closeModal();
+  await deletePhoto(d.photoKey);
+  toast("Discovery removed");
+  renderDiscover();
+}
+
+function addDiscoveryToGarden(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  chosenArea="Unplaced";
+  modal(`<div class="eyebrow">Bring it home</div><h2>Add ${esc(d.common)} to My Garden?</h2>
+    <p class="sub">Choose where it lives. The original discovery can stay in Discover as part of the story.</p>
+    <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea('${esc(a)}',this)">${esc(a)}</button>`).join("")}</div>
+    <button class="btn primary" style="width:100%" onclick="confirmDiscoveryToGarden('${id}')">Add to garden</button>`);
+}
+
+async function confirmDiscoveryToGarden(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  const cached=state.speciesCache[d.speciesKey]||{};
+  const newId="plant-"+Date.now();
+  const newPhotoKey=`${newId}-hero`;
+  const oldUrl=await getPhotoUrl(d.photoKey);
+  if(oldUrl){
+    try{
+      const blob=await fetch(oldUrl).then(r=>r.blob());
+      await savePhoto(newPhotoKey,blob);
+      URL.revokeObjectURL(oldUrl);
+    }catch(e){ console.warn("Could not copy discovery photo",e); }
+  }
+  state.plants.unshift({
+    id:newId,speciesKey:d.speciesKey,photoKey:newPhotoKey,
+    common:d.common,scientific:d.scientific,family:d.family,
+    area:chosenArea,status:"New",added:new Date().toISOString().slice(0,10),
+    notes:cached.notes||"First spotted in Discover.",
+    sun:cached.sun||"Gathering botanical notes…",
+    water:cached.water||"Gathering botanical notes…",
+    soil:cached.soil||"Gathering botanical notes…",
+    height:cached.height||"Gathering botanical notes…",
+    bloom:cached.bloom||[]
+  });
+  saveState();
+  closeModal();
+  toast(`${d.common} added to ${chosenArea}`);
+  setRoute("garden");
+}
+
+function toggleWishlist(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  d.wishlist=!d.wishlist;
+  saveState();
+  renderDiscover();
+  toast(d.wishlist?"Added to wishlist":"Removed from wishlist");
+}
 
 async function enrichSpecies(scientificName, speciesKey, force=false){
   const cached=state.speciesCache[speciesKey]||{};
@@ -1684,7 +1812,28 @@ function saveJournal(){const text=document.getElementById("journalText").value.t
 function addJournalForPlant(id){const p=state.plants.find(x=>x.id===id);modal(`<div class="eyebrow">${esc(p.common)}</div><h2>Add to its story</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="What did you notice?"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
 
 function renderDiscover(){
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or want to remember.</p></section><div class="stats-strip"><div class="stat"><b>${state.discoveries}</b><small>discoveries</small></div><div class="stat"><b>5</b><small>families</small></div><div class="stat"><b>3</b><small>wishlist</small></div></div><div class="empty-card" style="text-align:center;padding:38px 22px"><div style="font-size:52px;color:var(--rose)">❀</div><h2 style="font-size:27px">Your botanical scrapbook</h2><p class="sub">When you identify something away from home, save it here instead of adding it to your garden.</p><button class="btn primary" onclick="startCamera()">Find something</button></div>`;
+  const items=state.discoveries;
+  const families=new Set(items.map(d=>d.family).filter(Boolean)).size;
+  const wishlist=items.filter(d=>d.wishlist).length;
+
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or might want to bring home one day.</p></section>
+    <button class="lens-banner" style="background:linear-gradient(135deg,#91727d,#ba969f)" onclick="startCamera('discover')">
+      <span class="lens-icon">⌾</span><span><strong>Identify while you're out</strong><small>Perfect for garden centres, walks and plants you don't own.</small></span>
+    </button>
+    <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
+    ${items.length
+      ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin">
+          <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
+          <button class="pin-delete" aria-label="Delete ${esc(d.common)}" onclick="event.stopPropagation();confirmDeleteDiscovery('${d.id}')">×</button>
+          <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
+          <div class="pin-body">
+            <b>${esc(d.common)}</b><small><i>${esc(d.scientific)}</i></small>
+            <div class="discovery-meta"><span class="chip">${d.score||"—"}% match</span><span class="chip">${d.wishlist?"Wishlist":"Spotted"}</span></div>
+            <button class="mini-action" onclick="event.stopPropagation();addDiscoveryToGarden('${d.id}')">＋ Add to Garden</button>
+          </div>
+        </article>`).join("")}</section>`
+      : `<div class="empty-card" style="text-align:center;padding:38px 22px"><div style="font-size:52px;color:var(--rose)">❀</div><h2 style="font-size:27px">Your botanical scrapbook</h2><p class="sub">Identify something you like without adding it to your garden. Save it here, wishlist it, or bring it into My Garden later.</p><button class="btn primary" onclick="startCamera('discover')">Find something</button></div>`}`;
+  hydratePhotos();
 }
 function showLensTips(){modal(`<div class="eyebrow">Photo tips</div><h2>Help FloraLens see clearly</h2><p class="sub">Fill most of the frame with the plant, use good light and photograph a distinctive flower or leaf. All images in one request should show the same individual plant.</p><button class="btn primary" style="width:100%" onclick="closeModal()">Got it</button>`)}
 function modal(html){document.body.insertAdjacentHTML("beforeend",`<div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`)}
@@ -1719,7 +1868,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.1 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.2 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();

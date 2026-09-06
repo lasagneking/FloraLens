@@ -200,3 +200,18 @@ No API or data-layer changes. Cloudflare and all existing secrets stay untouched
 - Home garden cards now have a small delete control with confirmation.
 - Deleting an entry removes its saved local photo as well as the plant record, while retaining the reusable species cache.
 - Cloudflare Worker and API secrets are unchanged.
+
+
+## v0.8.2 — Discover workflow
+
+Discover is now a real saved-inspiration area rather than a placeholder.
+
+- Launching the camera from Discover starts a Discover identification.
+- After identification, the primary action is **Save to Discover**, not choose a garden area.
+- A discovery stores the identification photo, scientific/common name, family and match score.
+- Discoveries can be wishlisted, deleted, or later promoted into My Garden with an area.
+- General Lens identifications now ask whether the plant belongs in My Garden or Discover.
+- “Just looking — don’t save” is available for one-off identifications.
+- Existing numeric demo discovery counts are migrated away in favour of real saved records.
+
+No Cloudflare or API-secret changes are required.
