@@ -215,3 +215,14 @@ Discover is now a real saved-inspiration area rather than a placeholder.
 - Existing numeric demo discovery counts are migrated away in favour of real saved records.
 
 No Cloudflare or API-secret changes are required.
+
+
+## v0.8.3 — Discover detail profiles
+
+- Discover cards are now tappable.
+- A saved discovery opens the same full botanical/care profile used by My Garden.
+- The detail screen returns to Discover rather than My Garden.
+- Discovery-specific controls allow wishlist changes, Add to Garden and removal.
+- The profile includes the original identification confidence and spotted date.
+- Backup export now includes photos belonging to Discover records as well as Garden plants.
+- No Cloudflare or API changes.

@@ -1560,6 +1560,16 @@ function toggleWishlist(id){
   toast(d.wishlist?"Added to wishlist":"Removed from wishlist");
 }
 
+function toggleWishlistFromProfile(id){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d) return;
+  d.wishlist=!d.wishlist;
+  saveState();
+  toast(d.wishlist?"Added to wishlist":"Removed from wishlist");
+  renderProfile(id);
+}
+
+
 async function enrichSpecies(scientificName, speciesKey, force=false){
   const cached=state.speciesCache[speciesKey]||{};
   if(!force && cached.enrichment?.fetchedAt) return cached.enrichment;
@@ -1666,7 +1676,8 @@ function dataCoverage(t,g){
 }
 
 async function refreshIntel(id){
-  const p=state.plants.find(x=>x.id===id); if(!p)return;
+  const p=state.plants.find(x=>x.id===id) || state.discoveries.find(x=>x.id===id);
+  if(!p) return;
   toast("Refreshing botanical notes…");
   const intel=await enrichSpecies(p.scientific,p.speciesKey,true);
   if(intel){ toast("Botanical notes refreshed"); renderProfile(id); }
@@ -1675,7 +1686,11 @@ async function refreshIntel(id){
 
 async function renderProfile(id,isNew=false){
   currentRoute="profile";
-  const p=state.plants.find(x=>x.id===id); if(!p)return setRoute("garden");
+  const gardenPlant=state.plants.find(x=>x.id===id);
+  const discovery=state.discoveries.find(x=>x.id===id);
+  const p=gardenPlant||discovery;
+  const isDiscovery=!!discovery&&!gardenPlant;
+  if(!p) return setRoute("home");
   const cached=state.speciesCache[p.speciesKey]||{};
   const intel=cached.enrichment||null;
   const t=intel?.trefle||null;
@@ -1709,8 +1724,14 @@ async function renderProfile(id,isNew=false){
     }
   }
 
-  view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('garden')">← My Garden</button></section>
-    <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family)}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">♡ ${esc(p.area)}</span></div></div>
+  const backRoute=isDiscovery?"discover":"garden";
+  const backLabel=isDiscovery?"Discover":"My Garden";
+  const heroLabel=isDiscovery
+    ? (p.wishlist?"♥ Wishlist":"♡ Spotted")
+    : `♡ ${esc(p.area||"My Garden")}`;
+
+  view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
+    <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family||"")}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">${heroLabel}</span></div></div>
 
     <div class="intel-banner ${!intel?"loading":""}">
       <div class="eyebrow">Botanical intelligence</div>
@@ -1755,8 +1776,27 @@ async function renderProfile(id,isNew=false){
 
     ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Growth form, woodiness, leaf type and measured height can come from the TRY File Archive ID 81 dataset. Where FloraLens derives a general watering or soil starting point from those traits, it is labelled as general guidance rather than species-specific API data.</p></div>`:""}
 
-    <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
-    <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${new Date(intel.fetchedAt).toLocaleDateString("en-GB")} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
+    ${isDiscovery?`
+      <div class="profile-card discovery-profile-actions">
+        <div class="eyebrow">Saved inspiration</div>
+        <h2 style="font-size:25px;margin:6px 0 8px">${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2>
+        <p class="sub">Keep it here for reference, add it to your wishlist, or bring it into My Garden if it comes home with you.</p>
+        <div class="actions">
+          <button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button>
+          <button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button>
+        </div>
+        <button class="link-btn discovery-delete-link" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>
+      </div>
+      <div class="section-title"><h3>Discovery story</h3></div>
+      <div class="profile-card">
+        <div class="timeline-item"><div class="timeline-icon">⌾</div><div><b>Spotted by FloraLens</b><div class="small">${p.spotted?new Date(p.spotted).toLocaleDateString("en-GB"):"Saved discovery"}</div></div></div>
+        <div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Identification photo saved</b><div class="small">${p.score?`${p.score}% identification match`:"Original identification photo stored on this device."}</div></div></div>
+        ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
+      </div>`
+      :`
+      <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
+      <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
+      `}`;
 
   if(p.photoKey){
     const url=await getPhotoUrl(p.photoKey);
@@ -1766,7 +1806,7 @@ async function renderProfile(id,isNew=false){
 async function exportBackup(){
   try{
     const photos={};
-    for(const p of state.plants){
+    for(const p of [...state.plants,...state.discoveries]){
       if(!p.photoKey) continue;
       const db=await photoDB();
       const blob=await new Promise((resolve,reject)=>{
@@ -1822,7 +1862,7 @@ function renderDiscover(){
     </button>
     <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
     ${items.length
-      ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin">
+      ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
           <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
           <button class="pin-delete" aria-label="Delete ${esc(d.common)}" onclick="event.stopPropagation();confirmDeleteDiscovery('${d.id}')">×</button>
           <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
@@ -1868,7 +1908,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.2 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.3 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();

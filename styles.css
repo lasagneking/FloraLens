@@ -390,3 +390,11 @@ h2{font-size:35px;letter-spacing:-.025em}
   width:100%;margin-top:10px;border:0;border-radius:999px;padding:9px 12px;
   background:rgba(52,83,61,.09);color:var(--green);font-weight:700;
 }
+
+
+/* v0.8.3 — Discover detail profiles */
+.discovery-pin{cursor:pointer}
+.discovery-profile-actions{margin-top:18px}
+.discovery-delete-link{
+  width:100%;margin-top:12px;text-align:center;color:#8e6168;
+}
