@@ -269,3 +269,14 @@ No Cloudflare or API-secret changes are required.
 - Discover now uses a stable two-column grid on phones and three columns on wider screens.
 - No discovery records or delete logic were changed.
 - No Cloudflare/API changes.
+
+
+## v1.2 — Seasonal Garden
+- New “This month in your garden” seasonal card on Home.
+- Seasonal view uses only known flowering-month data plus the user's own Journal history.
+- Flowering Now and Coming Soon collections.
+- Seasonal care suggestions can be added directly to Care Calendar.
+- Bloom Mosaic builds from real Journal entries tagged Flowering with photos.
+- New Garden Year preview summarises plants added, discoveries, journal moments, flowering moments, spaces and most-recorded plant.
+- No invented flowering predictions where FloraLens lacks data.
+- No Cloudflare/API changes.

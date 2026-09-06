@@ -1310,12 +1310,131 @@ async function hydratePhotos(scope=document){
   }
 }
 
+
+function currentMonthNumber(){ return new Date().getMonth()+1; }
+function currentMonthName(){ return new Date().toLocaleDateString("en-GB",{month:"long"}); }
+function currentSeasonName(){
+  const m=currentMonthNumber();
+  if([3,4,5].includes(m)) return "Spring";
+  if([6,7,8].includes(m)) return "Summer";
+  if([9,10,11].includes(m)) return "Autumn";
+  return "Winter";
+}
+function plantBloomMonths(p){
+  const c=careForPlant(p);
+  const arr=Array.isArray(c?.bloomMonths)?c.bloomMonths:[];
+  return arr.map(Number).filter(n=>n>=1&&n<=12);
+}
+function plantsFloweringNow(){
+  const m=currentMonthNumber();
+  return state.plants.filter(p=>plantBloomMonths(p).includes(m));
+}
+function plantsComingSoon(){
+  const m=currentMonthNumber();
+  const next=m===12?1:m+1;
+  return state.plants.filter(p=>{
+    const months=plantBloomMonths(p);
+    return !months.includes(m) && months.includes(next);
+  });
+}
+function journalFloweringEntries(){
+  return state.journal.filter(j=>String(j.type).toLowerCase()==="flowering");
+}
+function seasonalSnapshot(){
+  const flowering=plantsFloweringNow();
+  const soon=plantsComingSoon();
+  const careDue=activeCareTasks().filter(t=>t.due<=localISODate()).length;
+  const month=currentMonthNumber();
+  const momentsThisMonth=state.journal.filter(j=>{
+    const d=new Date(`${j.date||""}T12:00:00`);
+    return !isNaN(d) && d.getMonth()+1===month && d.getFullYear()===new Date().getFullYear();
+  }).length;
+  return {flowering,soon,careDue,momentsThisMonth};
+}
+function seasonalHomeCard(){
+  const s=seasonalSnapshot();
+  const parts=[];
+  if(s.flowering.length) parts.push(`${s.flowering.length} ${s.flowering.length===1?"plant":"plants"} flowering`);
+  if(s.careDue) parts.push(`${s.careDue} care ${s.careDue===1?"job":"jobs"} due`);
+  if(s.momentsThisMonth) parts.push(`${s.momentsThisMonth} new ${s.momentsThisMonth===1?"moment":"moments"}`);
+  if(!parts.length) parts.push("A quieter month in the garden");
+  return `<button class="season-home-card" onclick="openSeasonalView()">
+    <span class="season-mark">${currentSeasonName()==="Autumn"?"❦":currentSeasonName()==="Winter"?"✦":currentSeasonName()==="Spring"?"❀":"✿"}</span>
+    <span><small>${currentSeasonName().toUpperCase()} · ${currentMonthName().toUpperCase()}</small><strong>${currentMonthName()} in your garden</strong><em>${parts.join(" · ")}</em></span><b>→</b>
+  </button>`;
+}
+function seasonalPlantCard(p,label){
+  return `<article class="season-plant-card" onclick="setRoute('profile',{id:'${p.id}'})">
+    <div class="season-plant-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></div>
+    <div><span>${esc(label)}</span><h3>${esc(p.common)}</h3><small><i>${esc(p.scientific)}</i></small></div>
+  </article>`;
+}
+function openSeasonalView(){
+  const flowering=plantsFloweringNow();
+  const soon=plantsComingSoon();
+  const floweringJournal=journalFloweringEntries().sort((x,y)=>String(y.date||"").localeCompare(String(x.date||"")));
+  const care=smartCareSuggestions().slice(0,6);
+  modal(`<div class="season-sheet">
+    <div class="eyebrow">${currentSeasonName()} garden</div>
+    <h2>${currentMonthName()} in your garden</h2>
+    <p class="sub">What FloraLens genuinely knows from your plant records and your own journal — without guessing where data is missing.</p>
+    ${flowering.length?`<div class="section-title"><h3>Flowering now</h3><span>${flowering.length}</span></div><div class="season-scroll">${flowering.map(p=>seasonalPlantCard(p,"Flowering now")).join("")}</div>`:""}
+    ${soon.length?`<div class="section-title"><h3>Coming soon</h3><span>${soon.length}</span></div><div class="season-scroll">${soon.map(p=>seasonalPlantCard(p,"Expected next month")).join("")}</div>`:""}
+    <div class="section-title"><h3>Seasonal care</h3></div>
+    ${care.length?`<div class="season-care-list">${care.map(s=>`<button onclick="closeModal();addSuggestedCare('${encodeURIComponent(s.key)}')"><span>${careTaskIcon(s.type)}</span><div><b>${esc(s.title)}</b><small>${esc(s.detail)}</small></div><strong>＋</strong></button>`).join("")}</div>`:`<div class="empty-card"><p class="sub">No new seasonal care suggestions right now.</p></div>`}
+    <div class="section-title"><h3>Bloom mosaic</h3><button class="link-btn" onclick="closeModal();openBloomMosaic()">Open</button></div>
+    <p class="sub">${floweringJournal.length?`${floweringJournal.length} flowering ${floweringJournal.length===1?"moment":"moments"} recorded so far.`:"Add a Journal moment marked Flowering to start your bloom mosaic."}</p>
+  </div>`);
+  hydratePhotos();
+}
+function openBloomMosaic(){
+  const entries=journalFloweringEntries().filter(j=>j.photoKey).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||"")));
+  const plantCount=new Set(entries.map(j=>j.plantId)).size;
+  modal(`<div class="eyebrow">Garden year</div><h2>Bloom Mosaic</h2><p class="sub">A photographic record built only from flowering moments you've actually captured.</p>
+    ${entries.length?`<div class="bloom-summary"><span><b>${entries.length}</b><small>flowering moments</small></span><span><b>${plantCount}</b><small>plants</small></span><span><b>${new Date().getFullYear()}</b><small>garden year</small></span></div>
+    <div class="bloom-mosaic">${entries.map(j=>{const p=state.plants.find(x=>x.id===j.plantId);return `<button onclick="closeModal();setRoute('profile',{id:'${j.plantId}'})"><span class="bloom-photo" data-photo-key="${esc(j.photoKey)}"></span><em>${p?esc(p.common):"Garden bloom"}</em><small>${formatJournalDate(j.date)}</small></button>`}).join("")}</div>`
+    :`<div class="empty-card bloom-empty"><div>❀</div><h3>Your blooms will gather here</h3><p class="sub">When something flowers, add a Journal moment with a photo and choose “Flowering”.</p></div>`}
+  `);
+  hydratePhotos();
+}
+function gardenYearStats(){
+  const year=new Date().getFullYear();
+  const inYear=(date)=>{
+    if(!date) return false;
+    const d=new Date(date.length===10?`${date}T12:00:00`:date);
+    return !isNaN(d) && d.getFullYear()===year;
+  };
+  const added=state.plants.filter(p=>inYear(p.added)).length;
+  const discovered=state.discoveries.filter(d=>inYear(d.spotted)).length;
+  const journal=state.journal.filter(j=>inYear(j.date||j.createdAt));
+  const flowering=journal.filter(j=>j.type==="Flowering").length;
+  const areas=state.areas.filter(a=>a!=="Unplaced").length;
+  const counts={};
+  journal.forEach(j=>counts[j.plantId]=(counts[j.plantId]||0)+1);
+  const topId=Object.keys(counts).sort((x,y)=>counts[y]-counts[x])[0];
+  const topPlant=state.plants.find(p=>p.id===topId);
+  return {year,added,discovered,journal:journal.length,flowering,areas,topPlant,topCount:topId?counts[topId]:0};
+}
+function openGardenYear(){
+  const y=gardenYearStats();
+  modal(`<div class="eyebrow">${y.year} garden year</div><h2>Your garden, remembered</h2><p class="sub">A live preview of the story FloraLens is already collecting for your end-of-year recap.</p>
+    <div class="year-grid">
+      <div><b>${y.added}</b><small>plants added</small></div>
+      <div><b>${y.discovered}</b><small>discoveries</small></div>
+      <div><b>${y.journal}</b><small>journal moments</small></div>
+      <div><b>${y.flowering}</b><small>flowering moments</small></div>
+      <div><b>${y.areas}</b><small>garden spaces</small></div>
+      <div><b>${y.topCount||0}</b><small>${y.topPlant?`moments for ${esc(y.topPlant.common)}`:"most-photographed count"}</small></div>
+    </div>
+    <button class="btn secondary" style="width:100%;margin-top:14px" onclick="closeModal();openBloomMosaic()">View bloom mosaic</button>`);
+}
 function renderHome(){
   const flowering=state.plants.filter(p=>p.status==="Flowering").length;
   view.innerHTML=`
     <section class="hero"><div class="eyebrow">Your botanical scrapbook</div><h1>Your little world<br>in bloom.</h1><p class="sub">Keep every flower, story and small garden discovery in one beautiful place.</p><div class="hero-bloom">❀</div></section>
     <button class="lens-banner" onclick="startCamera()"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
     <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
+    ${seasonalHomeCard()}
     ${careHomeCard()}
     <div class="section-title"><h3>From your garden</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
     <section class="masonry">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>
@@ -2240,7 +2359,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.1.1 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();
