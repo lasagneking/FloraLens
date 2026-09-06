@@ -47,7 +47,7 @@ Cloudflare will return a Worker URL similar to:
 Near the top of `app.js`, change:
 
 ```js
-const API_PROXY_URL = "";
+const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
 ```
 
 to:
@@ -73,3 +73,7 @@ FloraLens v0.3 should add:
 3. Flowering / pruning / hardiness calendar.
 4. Per-plant multi-photo timeline.
 5. Backup/export.
+
+
+## Live connection status
+This build is already configured to use `https://floralens-api.lrthumwood.workers.dev`. If the Worker secret `PLANTNET_API_KEY` is present, Lens identification will use live Pl@ntNet results rather than demo data.

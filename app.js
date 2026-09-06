@@ -7,7 +7,7 @@ const PHOTO_STORE = "photos";
   const API_PROXY_URL = "https://floralens-api.yourname.workers.dev";
   Never put your Pl@ntNet API key in this browser file.
 */
-const API_PROXY_URL = "";
+const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
 
 const defaultState = {
   plants: [
