@@ -1,6 +1,7 @@
 const PLANTNET_BASE = "https://my-api.plantnet.org/v2/identify/all";
 const TREFLE_BASE = "https://trefle.io/api/v1";
 const GBIF_BASE = "https://api.gbif.org/v1";
+const PERENUAL_BASE = "https://www.perenual.com/api/v2";
 
 export default {
   async fetch(request, env) {
@@ -71,6 +72,51 @@ export default {
         }
       } catch (e) {
         result.gbifError = String(e?.message || e);
+      }
+
+      // Perenual: optional richer horticultural fallback.
+      // Add PERENUAL_API_KEY as a Worker secret to enable it.
+      if (env.PERENUAL_API_KEY) {
+        try {
+          const searchURL =
+            `${PERENUAL_BASE}/species-list?key=${encodeURIComponent(env.PERENUAL_API_KEY)}` +
+            `&q=${encodeURIComponent(name)}`;
+          const searchRes = await fetch(searchURL);
+
+          if (searchRes.ok) {
+            const found = await searchRes.json();
+            const rows = Array.isArray(found?.data) ? found.data : [];
+            const lower = name.toLowerCase();
+
+            const exact = rows.find(x =>
+              Array.isArray(x.scientific_name) &&
+              x.scientific_name.some(n => String(n).toLowerCase() === lower)
+            );
+            const best = exact || rows[0];
+
+            if (best?.id) {
+              const detailRes = await fetch(
+                `${PERENUAL_BASE}/species/details/${best.id}?key=${encodeURIComponent(env.PERENUAL_API_KEY)}`
+              );
+
+              if (detailRes.ok) {
+                const d = await detailRes.json();
+                result.perenual = normalizePerenual(d);
+                result.sources.push("Perenual");
+              } else {
+                result.perenualError = `Perenual detail ${detailRes.status}`;
+              }
+            } else {
+              result.perenualStatus = "no-match";
+            }
+          } else {
+            result.perenualError = `Perenual search ${searchRes.status}`;
+          }
+        } catch (e) {
+          result.perenualError = String(e?.message || e);
+        }
+      } else {
+        result.perenualStatus = "not-configured";
       }
 
       // Trefle: optional. Add TREFLE_TOKEN as a Worker secret to enable care data.
@@ -166,6 +212,39 @@ export default {
     }
   }
 };
+
+function normalizePerenual(d) {
+  const dims = d?.dimensions || {};
+  const hardiness = d?.hardiness || {};
+  return {
+    id: d?.id || null,
+    commonName: d?.common_name || null,
+    scientificNames: Array.isArray(d?.scientific_name) ? d.scientific_name : [],
+    family: d?.family || null,
+    type: d?.type || null,
+    cycle: d?.cycle || null,
+    watering: d?.watering || null,
+    wateringGeneralBenchmark: d?.watering_general_benchmark || null,
+    sunlight: Array.isArray(d?.sunlight) ? d.sunlight : [],
+    soil: Array.isArray(d?.soil) ? d.soil : [],
+    growthRate: d?.growth_rate || null,
+    maintenance: d?.maintenance || null,
+    careLevel: d?.care_level || null,
+    floweringSeason: d?.flowering_season || null,
+    droughtTolerant: typeof d?.drought_tolerant === "boolean" ? d.drought_tolerant : null,
+    saltTolerant: typeof d?.salt_tolerant === "boolean" ? d.salt_tolerant : null,
+    thorny: typeof d?.thorny === "boolean" ? d.thorny : null,
+    invasive: typeof d?.invasive === "boolean" ? d.invasive : null,
+    poisonousToHumans: typeof d?.poisonous_to_humans === "boolean" ? d.poisonous_to_humans : null,
+    poisonousToPets: typeof d?.poisonous_to_pets === "boolean" ? d.poisonous_to_pets : null,
+    dimensionMin: typeof dims?.min_value === "number" ? dims.min_value : null,
+    dimensionMax: typeof dims?.max_value === "number" ? dims.max_value : null,
+    dimensionUnit: dims?.unit || null,
+    hardinessMin: hardiness?.min ?? null,
+    hardinessMax: hardiness?.max ?? null,
+    description: d?.description || null
+  };
+}
 
 function normalizeTrefle(d) {
   const g = d.growth || {};

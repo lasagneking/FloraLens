@@ -132,31 +132,94 @@ function seasonKey(){
   return "winter";
 }
 
-function resolvedCare(scientificName,t){
+function usable(v){
+  if(v===null||v===undefined||v==="") return null;
+  const s=String(v).trim();
+  if(!s) return null;
+  if(["not available","care detail not yet available","gathering botanical notes…","gathering botanical notes..."].includes(s.toLowerCase())) return null;
+  return v;
+}
+
+function perenualHeight(p){
+  if(!p || (p.dimensionMin===null && p.dimensionMax===null)) return null;
+  const unit=p.dimensionUnit||"";
+  if(p.dimensionMin!==null && p.dimensionMax!==null) return `${p.dimensionMin}–${p.dimensionMax} ${unit}`.trim();
+  const v=p.dimensionMax ?? p.dimensionMin;
+  return `${v} ${unit}`.trim();
+}
+function perenualSun(p){
+  if(!p?.sunlight?.length) return null;
+  return p.sunlight.map(x=>String(x).replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase())).join(" · ");
+}
+function perenualWater(p){
+  if(!p) return null;
+  if(p.wateringGeneralBenchmark?.value && p.wateringGeneralBenchmark?.unit)
+    return `${p.watering || "Water"} · about every ${p.wateringGeneralBenchmark.value} ${p.wateringGeneralBenchmark.unit}`;
+  return usable(p.watering);
+}
+function perenualSoil(p){
+  return p?.soil?.length ? p.soil.join(" · ") : null;
+}
+function perenualHardiness(p){
+  if(!p || (p.hardinessMin===null && p.hardinessMax===null)) return null;
+  if(p.hardinessMin!==null && p.hardinessMax!==null) return `USDA zones ${p.hardinessMin}–${p.hardinessMax}`;
+  return `USDA zone ${p.hardinessMin ?? p.hardinessMax}`;
+}
+function floweringSeasonMonths(season){
+  const s=String(season||"").toLowerCase();
+  if(s.includes("spring")) return [3,4,5];
+  if(s.includes("summer")) return [6,7,8];
+  if(s.includes("autumn")||s.includes("fall")) return [9,10,11];
+  if(s.includes("winter")) return [12,1,2];
+  return [];
+}
+
+function resolvedCare(scientificName,t,pn){
   const local=floralensCareFor(scientificName);
-  const fromTrefle={
-    light: t?.light!==null && t?.light!==undefined ? lightLabel(t.light) : null,
-    water: t?.soilHumidity!==null && t?.soilHumidity!==undefined ? moistureLabel(t.soilHumidity) : null,
-    soil: t ? soilLabel(t) : null,
-    height: t && (t.averageHeightCm||t.maximumHeightCm) ? formatHeight(t.averageHeightCm,t.maximumHeightCm) : null,
-    bloomMonths: t?.bloomMonths?.length ? monthsToNumbers(t.bloomMonths) : null,
-    growthHabit: t?.growthHabit || null,
-    growthRate: t?.growthRate || null,
+  const trefleSoil = t ? usable(soilLabel(t)) : null;
+
+  const pCare={
+    light: usable(perenualSun(pn)),
+    water: usable(perenualWater(pn)),
+    soil: usable(perenualSoil(pn)),
+    height: usable(perenualHeight(pn)),
+    bloomMonths: floweringSeasonMonths(pn?.floweringSeason),
+    growthHabit: usable(pn?.type),
+    growthRate: usable(pn?.growthRate),
+    hardiness: usable(perenualHardiness(pn)),
+    safety: pn?.poisonousToHumans===true || pn?.poisonousToPets===true
+      ? `Recorded as poisonous${pn.poisonousToHumans===true?" to humans":""}${pn.poisonousToHumans===true&&pn.poisonousToPets===true?" and":""}${pn.poisonousToPets===true?" to pets":""}.`
+      : null
+  };
+
+  const tCare={
+    light: t?.light!==null && t?.light!==undefined ? usable(lightLabel(t.light)) : null,
+    water: t?.soilHumidity!==null && t?.soilHumidity!==undefined ? usable(moistureLabel(t.soilHumidity)) : null,
+    soil: trefleSoil,
+    height: t && (t.averageHeightCm||t.maximumHeightCm) ? usable(formatHeight(t.averageHeightCm,t.maximumHeightCm)) : null,
+    bloomMonths: t?.bloomMonths?.length ? monthsToNumbers(t.bloomMonths) : [],
+    growthHabit: usable(t?.growthHabit),
+    growthRate: usable(t?.growthRate),
     hardiness: t?.minimumTemperatureC!==null && t?.minimumTemperatureC!==undefined ? `Recorded minimum temperature ${t.minimumTemperatureC}°C` : null,
     safety: toxicityCopy(t)
   };
-  const pick=(k)=>fromTrefle[k] || local?.[k] || null;
+
+  const pick=(k)=>usable(pCare[k]) || usable(tCare[k]) || usable(local?.[k]) || null;
+  const bloom = pCare.bloomMonths?.length ? pCare.bloomMonths :
+                tCare.bloomMonths?.length ? tCare.bloomMonths :
+                local?.bloomMonths || [];
+
   return {
     light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"),
-    bloomMonths:fromTrefle.bloomMonths || local?.bloomMonths || [],
+    bloomMonths:bloom,
     growthHabit:pick("growthHabit"), growthRate:pick("growthRate"),
-    pruning:local?.pruning||null, propagation:local?.propagation||null,
-    hardiness:pick("hardiness"), safety:fromTrefle.safety||local?.safety||null,
+    pruning:usable(local?.pruning), propagation:usable(local?.propagation),
+    hardiness:pick("hardiness"), safety:pCare.safety || tCare.safety || usable(local?.safety),
     seasonal:local?.seasonal||null,
     localSource:local?.source||null,
-    usedLocal:!!local && [
-      "light","water","soil","height","growthHabit","hardiness"
-    ].some(k=>!fromTrefle[k] && local[k])
+    usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v),
+    usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v),
+    usedLocal:!!local
   };
 }
 
@@ -404,16 +467,16 @@ async function enrichSpecies(scientificName, speciesKey, force=false){
 function syncPlantsFromSpecies(speciesKey){
   const cache=state.speciesCache[speciesKey];
   if(!cache) return;
-  const t=cache.enrichment?.trefle;
-  if(!t) return;
-  const bloom=monthsToNumbers(t.bloomMonths);
+  const intel=cache.enrichment||{};
   state.plants.filter(p=>p.speciesKey===speciesKey).forEach(p=>{
-    if(bloom.length) p.bloom=bloom;
-    if(t.averageHeightCm || t.maximumHeightCm) p.height=formatHeight(t.averageHeightCm,t.maximumHeightCm);
-    if(t.light!==null) p.sun=lightLabel(t.light);
-    if(t.soilHumidity!==null) p.water=moistureLabel(t.soilHumidity);
-    p.soil=soilLabel(t);
-    p.notes=t.observations || t.growthDescription || p.notes;
+    const care=resolvedCare(p.scientific,intel.trefle||null,intel.perenual||null);
+    if(care.bloomMonths?.length) p.bloom=care.bloomMonths;
+    if(care.height) p.height=care.height;
+    if(care.light) p.sun=care.light;
+    if(care.water) p.water=care.water;
+    if(care.soil) p.soil=care.soil;
+    const desc=intel.perenual?.description||intel.trefle?.growthDescription||intel.trefle?.observations;
+    if(desc) p.notes=desc;
   });
   saveState();
 }
@@ -500,12 +563,13 @@ async function renderProfile(id,isNew=false){
   const cached=state.speciesCache[p.speciesKey]||{};
   const intel=cached.enrichment||null;
   const t=intel?.trefle||null;
+  const pn=intel?.perenual||null;
   const g=intel?.gbif||null;
-  const care=resolvedCare(p.scientific,t);
+  const care=resolvedCare(p.scientific,t,pn);
   const sourceNames=[...(intel?.sources||[])];
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
-  const desc=t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
+  const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
   const seasonalLocal=care.seasonal?.[currentSeason]||null;
   const taxonConfirmed=!!(g||t);
@@ -517,9 +581,11 @@ async function renderProfile(id,isNew=false){
   if(intel){
     if(careAvailable>=4){
       intelTitle="Growing guide ready";
-      intelText=care.usedLocal
-        ?"Third-party botanical records were sparse, so FloraLens filled the gaps with its curated care library."
-        :"Connected botanical sources supplied useful growing information for this species.";
+      intelText=care.usedPerenual
+        ?"FloraLens found horticultural care data for this species and combined it with the botanical record."
+        :care.usedLocal
+          ?"Connected botanical records were sparse, so FloraLens filled available gaps with its curated care library."
+          :"Connected botanical sources supplied useful growing information for this species.";
     }else if(taxonConfirmed){
       intelTitle="Botanical record found";
       intelText="The species is confirmed, but detailed horticultural care information is still limited for this plant.";
@@ -619,8 +685,22 @@ cameraInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.ta
 galleryInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],"auto"); e.target.value=""; });
 multiPhotoInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],window.captureOrgan||"auto"); e.target.value=""; });
 
+
+function refreshStoredCareFields(){
+  let changed=false;
+  for(const p of state.plants){
+    const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
+    const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null);
+    const set=(k,v)=>{ if(usable(v) && p[k]!==v){p[k]=v;changed=true;} };
+    set("sun",care.light); set("water",care.water); set("soil",care.soil); set("height",care.height);
+    if(care.bloomMonths?.length && JSON.stringify(p.bloom)!==JSON.stringify(care.bloomMonths)){p.bloom=care.bloomMonths;changed=true;}
+  }
+  if(changed) saveState();
+}
+
 menuBtn?.addEventListener("click",()=>{
   modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.3 · private botanical journal</div>`);
 });
 
+refreshStoredCareFields();
 renderHome();

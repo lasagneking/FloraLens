@@ -1,4 +1,4 @@
-# FloraLens v0.4 — Botanical Care Fallback
+# FloraLens v0.5 — Real Care Coverage
 
 FloraLens v0.3 keeps the working Pl@ntNet identification flow and adds the first real botanical-intelligence layer.
 
@@ -101,3 +101,33 @@ Initial curated coverage includes:
 The library is intentionally explicit and expandable rather than inventing care facts for unknown plants.
 
 Existing Pl@ntNet, GBIF and Trefle connections remain unchanged.
+
+
+## v0.5 — coverage fix
+
+v0.4 only contained a very small local fallback table. v0.5 fixes that design.
+
+Care priority is now:
+1. Perenual horticultural species data (when configured and matched)
+2. Trefle botanical growing fields
+3. FloraLens curated species/genus guidance
+4. Friendly missing-field text only when none of those has usable data
+
+v0.5 also:
+- treats literal strings such as "Not available" as missing data instead of letting them override a valid fallback
+- refreshes care values already stored on existing plants
+- updates cached plants after enrichment even when Trefle itself is sparse
+- uses Perenual descriptions, watering, sunlight, soil, dimensions, growth rate, hardiness and toxicity flags when supplied
+
+### Optional Perenual setup
+Create a Perenual API key and add it to Cloudflare as a Secret:
+
+`PERENUAL_API_KEY`
+
+Then deploy the updated `worker.js`.
+
+Do not change:
+- `PLANTNET_API_KEY`
+- `TREFLE_TOKEN`
+
+Perenual is an additional fallback; Pl@ntNet identification remains unchanged.
