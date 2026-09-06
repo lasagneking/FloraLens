@@ -191,3 +191,12 @@ A full visual refresh inspired by a premium botanical scrapbook rather than a ge
 - cache-busted CSS/JS/trait files for easier GitHub Pages testing
 
 No API or data-layer changes. Cloudflare and all existing secrets stay untouched.
+
+
+## v0.8.1 UX hotfix
+
+- The centre Lens button now launches the device camera immediately instead of opening the tall green camera interstitial first.
+- The Home identification banner also launches the camera directly.
+- Home garden cards now have a small delete control with confirmation.
+- Deleting an entry removes its saved local photo as well as the plant record, while retaining the reusable species cache.
+- Cloudflare Worker and API secrets are unchanged.

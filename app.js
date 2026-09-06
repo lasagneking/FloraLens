@@ -1257,6 +1257,18 @@ async function getPhotoUrl(key){
   }catch{return null}
 }
 
+async function deletePhoto(key){
+  if(!key) return;
+  try{
+    const db=await photoDB();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction(PHOTO_STORE,"readwrite");
+      tx.objectStore(PHOTO_STORE).delete(key);
+      tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error);
+    });
+  }catch(e){ console.warn("Photo delete failed",e); }
+}
+
 function setRoute(route, data={}){
   currentRoute=route;
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
@@ -1269,9 +1281,10 @@ function setRoute(route, data={}){
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
-function pin(p){
-  return `<article class="pin" onclick="setRoute('profile',{id:'${p.id}'})">
+function pin(p,{canDelete=false}={}){
+  return `<article class="pin" onclick="if(!event.target.closest('.pin-delete')) setRoute('profile',{id:'${p.id}'})">
     <div class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></div>
+    ${canDelete?`<button class="pin-delete" aria-label="Delete ${esc(p.common)}" title="Delete" onclick="event.stopPropagation();confirmDeletePlant('${p.id}')">×</button>`:""}
     <div class="pin-body"><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small><br><span class="chip">✿ ${esc(p.status||p.area||"Saved")}</span></div>
   </article>`;
 }
@@ -1287,10 +1300,10 @@ function renderHome(){
   const flowering=state.plants.filter(p=>p.status==="Flowering").length;
   view.innerHTML=`
     <section class="hero"><div class="eyebrow">Your botanical scrapbook</div><h1>Your little world<br>in bloom.</h1><p class="sub">Keep every flower, story and small garden discovery in one beautiful place.</p><div class="hero-bloom">❀</div></section>
-    <button class="lens-banner" onclick="setRoute('lens')"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
+    <button class="lens-banner" onclick="startCamera()"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
     <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries}</b><small>discoveries</small></div></div>
     <div class="section-title"><h3>From your garden</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
-    <section class="masonry">${state.plants.map(pin).join("")}</section>
+    <section class="masonry">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>
     <div class="section-title"><h3>FloraLens memory</h3></div>
     <div class="note-card"><div class="eyebrow">Species cache</div><h2 style="font-size:25px;margin-top:6px">${Object.keys(state.speciesCache).length} plant types remembered</h2><p class="sub" style="margin-bottom:0">Once FloraLens has enriched a species, future plants of the same species can reuse that botanical record.</p></div>`;
   hydratePhotos();
@@ -1313,6 +1326,14 @@ function filterByArea(area,btn){
   const list=area==="All"?state.plants:state.plants.filter(p=>p.area===area);
   gardenPins.innerHTML=list.map(pin).join("") || `<div class="empty-card">Nothing saved in ${esc(area)} yet.</div>`;
   hydratePhotos(gardenPins);
+}
+
+function startCamera(){
+  captures=[];
+  pendingResults=null;
+  window.captureOrgan="auto";
+  // Called directly from a user tap so iOS opens the rear camera immediately.
+  cameraInput.click();
 }
 
 function renderLens(){
@@ -1338,10 +1359,10 @@ function renderCaptureReview(){
     <div class="capture-stack">${captures.map((c,i)=>`<div class="capture-card"><button class="capture-remove" onclick="removeCapture(${i})">×</button><img src="${c.dataUrl}"><span class="organ">${esc(c.organ)}</span></div>`).join("")}${captures.length<5?`<button class="add-capture" onclick="chooseOrganForNext()">＋<br>Add view</button>`:""}</div>
     <div class="result-hero" style="min-height:330px"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${captures.length} of 5 photos</div><h1>Ready to identify?</h1><span class="confidence">${captures.map(c=>c.organ).join(" · ")}</span></div></div>
     <div class="actions"><button class="btn primary" onclick="identifyPlant()">✿ Identify plant</button><button class="btn secondary" onclick="chooseOrganForNext()" ${captures.length>=5?"disabled":""}>＋ Another view</button></div>
-    <button class="btn outline" style="width:100%" onclick="setRoute('lens')">Start again</button>
+    <button class="btn outline" style="width:100%" onclick="startCamera()">Start again</button>
     ${!API_PROXY_URL?`<div class="setup-card"><div class="eyebrow">Demo mode</div><p class="sub" style="margin:6px 0 0">The complete flow works now. Deploy the included free Cloudflare Worker and set <code>API_PROXY_URL</code> to switch on real Pl@ntNet results.</p></div>`:""}`;
 }
-function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():setRoute("lens"); }
+function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():startCamera(); }
 function chooseOrganForNext(){
   if(captures.length>=5) return;
   modal(`<div class="eyebrow">Add another view</div><h2>What will you photograph?</h2><div class="organ-grid">
@@ -1639,6 +1660,22 @@ async function exportBackup(){
 }
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});}
 
+function confirmDeletePlant(id){
+  const p=state.plants.find(x=>x.id===id);
+  if(!p) return;
+  modal(`<div class="eyebrow">Remove from your garden</div><h2>Delete ${esc(p.common)}?</h2><p class="sub">This removes the plant entry and its saved identification photo from this device. The shared species knowledge stays cached for future identifications.</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deletePlant('${p.id}')">Delete plant</button></div>`);
+}
+async function deletePlant(id){
+  const p=state.plants.find(x=>x.id===id);
+  if(!p) return;
+  state.plants=state.plants.filter(x=>x.id!==id);
+  saveState();
+  closeModal();
+  await deletePhoto(p.photoKey);
+  toast(`${p.common} removed`);
+  renderHome();
+}
+
 function renderJournal(){
   view.innerHTML=`<section class="page-head"><div class="eyebrow">Garden journal</div><h1>Little moments</h1><p class="sub">The small things are the ones worth remembering.</p></section><button class="lens-banner" style="background:linear-gradient(135deg,#9f777d,#c49ca1)" onclick="newJournal()"><span class="lens-icon">＋</span><span><strong>Add a journal moment</strong><small>Photo, note, care task or something you noticed.</small></span></button><div class="profile-card">${state.journal.map(j=>`<div class="timeline-item"><div class="timeline-icon">${j.icon}</div><div><b>${esc(j.title)}</b><div class="small">${esc(j.date)}</div><p class="small" style="margin:5px 0 0">${esc(j.text)}</p></div></div>`).join("")}</div>`;
 }
@@ -1647,13 +1684,23 @@ function saveJournal(){const text=document.getElementById("journalText").value.t
 function addJournalForPlant(id){const p=state.plants.find(x=>x.id===id);modal(`<div class="eyebrow">${esc(p.common)}</div><h2>Add to its story</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="What did you notice?"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
 
 function renderDiscover(){
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or want to remember.</p></section><div class="stats-strip"><div class="stat"><b>${state.discoveries}</b><small>discoveries</small></div><div class="stat"><b>5</b><small>families</small></div><div class="stat"><b>3</b><small>wishlist</small></div></div><div class="empty-card" style="text-align:center;padding:38px 22px"><div style="font-size:52px;color:var(--rose)">❀</div><h2 style="font-size:27px">Your botanical scrapbook</h2><p class="sub">When you identify something away from home, save it here instead of adding it to your garden.</p><button class="btn primary" onclick="setRoute('lens')">Find something</button></div>`;
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or want to remember.</p></section><div class="stats-strip"><div class="stat"><b>${state.discoveries}</b><small>discoveries</small></div><div class="stat"><b>5</b><small>families</small></div><div class="stat"><b>3</b><small>wishlist</small></div></div><div class="empty-card" style="text-align:center;padding:38px 22px"><div style="font-size:52px;color:var(--rose)">❀</div><h2 style="font-size:27px">Your botanical scrapbook</h2><p class="sub">When you identify something away from home, save it here instead of adding it to your garden.</p><button class="btn primary" onclick="startCamera()">Find something</button></div>`;
 }
 function showLensTips(){modal(`<div class="eyebrow">Photo tips</div><h2>Help FloraLens see clearly</h2><p class="sub">Fill most of the frame with the plant, use good light and photograph a distinctive flower or leaf. All images in one request should show the same individual plant.</p><button class="btn primary" style="width:100%" onclick="closeModal()">Got it</button>`)}
 function modal(html){document.body.insertAdjacentHTML("beforeend",`<div class="modal" id="modal" onclick="if(event.target===this)closeModal()"><div class="sheet">${html}</div></div>`)}
 function closeModal(){document.getElementById("modal")?.remove()}
 
-document.addEventListener("click",e=>{const route=e.target.closest("[data-route]")?.dataset.route;if(route)setRoute(route)});
+document.addEventListener("click",e=>{
+  const routeTarget=e.target.closest("[data-route]");
+  if(!routeTarget) return;
+  const route=routeTarget.dataset.route;
+  if(route==="lens" && routeTarget.classList.contains("lens-nav")){
+    e.preventDefault();
+    startCamera();
+    return;
+  }
+  setRoute(route);
+});
 cameraInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],"auto"); e.target.value=""; });
 galleryInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],"auto"); e.target.value=""; });
 multiPhotoInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],window.captureOrgan||"auto"); e.target.value=""; });
@@ -1672,7 +1719,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.3 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.8.1 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();
