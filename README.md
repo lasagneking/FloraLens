@@ -162,3 +162,16 @@ Literal placeholders such as `Not available` are still treated as missing data.
 
 The Cloudflare Worker and secret names are unchanged from v0.5.1.
 For this release, the functional application change is in `app.js`.
+
+
+## v0.7 — TRY trait engine
+
+- Adds `traits.js` generated from TRY File Archive ID 81.
+- Exact species trait records: 46,045.
+- Genus aggregate fallbacks: 7,227.
+- Uses TRY growth form, woodiness, succulence, habitat, leaf type and measured plant height.
+- Missing care cards are hidden rather than displaying repeated “Not available”.
+- Trait-derived watering/soil text is explicitly general guidance, not represented as TRY-provided horticultural advice.
+- Existing Pl@ntNet/Cloudflare identification path is unchanged.
+
+Attribution: Díaz et al. (2016), Nature, doi:10.1038/nature16489; Díaz et al. (2022), Scientific Data 9, 755, doi:10.1038/s41597-022-01774-9; TRY File Archive package DOI 10.17871/TRY.81.

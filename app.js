@@ -1099,7 +1099,36 @@ function floweringSeasonMonths(season){
   return [];
 }
 
+function traitRecordFor(scientificName=""){
+  const db=window.FLORALENS_TRAITS;
+  if(!db) return null;
+  const n=String(scientificName).toLowerCase().trim().replace(/\s+/g," ");
+  let row=db.species?.[n]; let level="species";
+  if(!row){ const genus=n.split(" ")[0]; row=db.genera?.[genus]; level="genus"; }
+  if(!row) return null;
+  return {growthForm:row[0]||null,woodiness:row[1]||null,succulence:row[2]||null,habitat:row[3]||null,leafType:row[4]||null,heightM:row[5]??null,matchLevel:level};
+}
+function prettyTrait(v){ return usable(v)?String(v).replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase()):null; }
+function traitHeight(tr){
+  if(!tr?.heightM) return null;
+  const h=Number(tr.heightM); if(!Number.isFinite(h)||h<=0) return null;
+  if(h<1) return `Typical TRY vegetative height about ${Math.round(h*100)} cm`;
+  return `Typical TRY vegetative height about ${h.toFixed(h<10?1:0)} m`;
+}
+function traitCareInference(tr){
+  if(!tr) return {};
+  const gf=String(tr.growthForm||"").toLowerCase(), succ=String(tr.succulence||"").toLowerCase(), hab=String(tr.habitat||"").toLowerCase();
+  let water=null,soil=null;
+  if(hab.includes("aquatic")){ water="Moisture-loving / aquatic growth strategy indicated by TRY traits."; soil="Keep consistently wet or aquatic as appropriate to the identified species."; }
+  else if(succ){ water="Succulent growth suggests conservative watering; let the growing medium drain well between waterings."; soil="A free-draining growing medium is a sensible starting point for this succulent growth form."; }
+  else if(gf.includes("fern")){ water="Fern growth form generally points to avoiding prolonged drought; exact moisture needs vary by species."; soil="Moisture-retentive but aerated organic soil is a cautious starting point; verify species-specific needs."; }
+  else if(gf.includes("tree")||gf.includes("shrub")){ water="Water regularly while establishing; established requirements depend on species and site."; soil="Well-drained garden soil is a general starting point; acidity and fertility remain species-specific."; }
+  else if(gf.includes("herbaceous")){ water="Moderate, even moisture during active growth is a general starting point; adjust for the species and weather."; soil="A reasonably fertile, well-drained garden soil suits many herbaceous plants; verify species-specific exceptions."; }
+  return {water,soil};
+}
 function resolvedCare(scientificName,t,pn){
+  const tr=traitRecordFor(scientificName);
+  const inferred=traitCareInference(tr);
   const localMatches=floralensCareMatches(scientificName);
   const exactLocal=localMatches.exact;
   const genusLocal=localMatches.genus;
@@ -1132,7 +1161,11 @@ function resolvedCare(scientificName,t,pn){
     safety: toxicityCopy(t)
   };
 
-  const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || null;
+  const traitFields={
+    water:usable(inferred.water), soil:usable(inferred.soil), height:usable(traitHeight(tr)),
+    growthHabit:usable(prettyTrait(tr?.growthForm))
+  };
+  const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || usable(traitFields[k]) || null;
   const bloom = exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
                 pCare.bloomMonths?.length ? pCare.bloomMonths :
                 tCare.bloomMonths?.length ? tCare.bloomMonths :
@@ -1151,7 +1184,9 @@ function resolvedCare(scientificName,t,pn){
     localMatchLevel:local?.matchLevel||null,
     usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v),
     usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v),
-    usedLocal:!!local
+    usedLocal:!!local,
+    usedTraits:!!tr, traitMatchLevel:tr?.matchLevel||null,
+    traitWoodiness:prettyTrait(tr?.woodiness), traitLeafType:prettyTrait(tr?.leafType), traitHabitat:prettyTrait(tr?.habitat), traitSucculence:prettyTrait(tr?.succulence)
   };
 }
 
@@ -1500,6 +1535,7 @@ async function renderProfile(id,isNew=false){
   const care=resolvedCare(p.scientific,t,pn);
   const sourceNames=[...(intel?.sources||[])];
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
+  if(care.usedTraits) sourceNames.push(`TRY traits · ${care.traitMatchLevel}`);
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
@@ -1542,10 +1578,10 @@ async function renderProfile(id,isNew=false){
     <div class="season-card"><div class="eyebrow">Right now</div><h2>${seasonalLocal?"Seasonal care":"Seasonal note"}</h2><p class="sub" style="margin:0">${esc(seasonalLocal||currentSeasonNote(t,p).text)}</p></div>
 
     <div class="care-grid">
-      <div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(care.light||"Care detail not yet available")}</small></div>
-      <div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water||"Care detail not yet available")}</small></div>
-      <div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil||"Care detail not yet available")}</small></div>
-      <div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height||"Care detail not yet available")}</small></div>
+      ${care.light?`<div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(care.light)}</small></div>`:""}
+      ${care.water?`<div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water)}</small></div>`:""}
+      ${care.soil?`<div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil)}</small></div>`:""}
+      ${care.height?`<div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
       ${care.growthHabit?`<div class="care-tile"><span class="care-icon">❧</span><b>Growth habit</b><small>${esc(care.growthHabit)}</small></div>`:""}
       ${care.hardiness?`<div class="care-tile"><span class="care-icon">❄</span><b>Hardiness</b><small>${esc(care.hardiness)}</small></div>`:""}
       ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
@@ -1554,9 +1590,12 @@ async function renderProfile(id,isNew=false){
 
     <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
 
-    ${(care.growthHabit||care.growthRate||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
+    ${(care.growthHabit||care.growthRate||care.traitWoodiness||care.traitLeafType||care.traitHabitat||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
       ${care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Habit</b><div class="small">${esc(care.growthHabit)}</div></div></div>`:""}
       ${care.growthRate?`<div class="fact-row"><span class="fact-icon">↗</span><div><b>Growth rate</b><div class="small">${esc(care.growthRate)}</div></div></div>`:""}
+      ${care.traitWoodiness?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Woodiness</b><div class="small">${esc(care.traitWoodiness)}</div></div></div>`:""}
+      ${care.traitLeafType?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf type</b><div class="small">${esc(care.traitLeafType)}</div></div></div>`:""}
+      ${care.traitHabitat?`<div class="fact-row"><span class="fact-icon">⌂</span><div><b>Habitat strategy</b><div class="small">${esc(care.traitHabitat)}</div></div></div>`:""}
       ${t?.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
       ${t?.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}</div></div></div>`:""}
     </div></div>`:""}
@@ -1564,6 +1603,8 @@ async function renderProfile(id,isNew=false){
     ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
 
     ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated UK-garden care library because the connected botanical APIs often omit practical growing information. Species guidance is preferred where available; genus guidance is used as a cautious fallback.</p></div>`:""}
+
+    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Growth form, woodiness, leaf type and measured height can come from the TRY File Archive ID 81 dataset. Where FloraLens derives a general watering or soil starting point from those traits, it is labelled as general guidance rather than species-specific API data.</p></div>`:""}
 
     <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
     <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${new Date(intel.fetchedAt).toLocaleDateString("en-GB")} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
