@@ -1,52 +1,75 @@
-# FloraLens
+# FloraLens v0.2
 
-A private, mobile-first botanical journal and plant-identification web app.
+This build turns the starter Lens into a real identification-ready system.
 
-## Current starter build
-- Pinterest-style botanical Home screen
-- My Garden collection with search
-- Mobile camera/gallery Lens flow
-- Identification loading/result experience
-- Alternative matches UI
-- Rich plant profiles
-- Local persistence using `localStorage`
-- Garden journal
-- Discover area
-- Demo identification fallback so the UI works before API credentials are connected
+## What changed
+- 1–5 photos of the **same individual plant**
+- Per-photo organ labels: Auto, Flower, Leaf, Fruit, Bark
+- Ranked identification matches and confidence values
+- Remaining daily Pl@ntNet quota display when real API is connected
+- Confirm-before-save flow
+- Garden area picker + custom areas
+- Real hero photo saved locally in **IndexedDB**
+- Plant metadata saved separately in localStorage
+- Species cache, ready for the next enrichment layer
+- Included secure **Cloudflare Worker** proxy
+- Demo fallback still works until the proxy is configured
 
-## Pl@ntNet integration
-FloraLens is prepared for Pl@ntNet's `/v2/identify/{project}` flow.
+## Why there is a proxy
+Pl@ntNet's API key is private. Putting it in browser JavaScript would expose it to anyone who can inspect the page source.
 
-**Do not put your Pl@ntNet private API key in `app.js`.**
+The Worker keeps that key server-side.
 
-Use a tiny server-side/serverless proxy, then set `API_PROXY_URL` at the top of `app.js` to that proxy URL.
+## Connect the real Pl@ntNet API
 
-The front end currently sends:
-- multipart `images`
-- `organs=auto`
+### 1. Create a Pl@ntNet developer account and API key
+Use Pl@ntNet's developer portal.
 
-The data model can be expanded to send up to five images and matching plant-organ values (`leaf`, `flower`, `fruit`, `bark`, `auto`).
+### 2. Deploy the included Cloudflare Worker
+This folder includes:
+- `worker.js`
+- `wrangler.toml`
 
-## Run locally
-Any simple static server works.
+Using Wrangler:
 
-Example:
 ```bash
-python3 -m http.server 8080
+npx wrangler login
+npx wrangler secret put PLANTNET_API_KEY
+npx wrangler deploy
 ```
 
-Then open `http://localhost:8080`.
+Paste your Pl@ntNet API key when prompted for the secret.
 
-## Files
-- `index.html`
-- `styles.css`
-- `app.js`
-- `README.md`
+Cloudflare will return a Worker URL similar to:
+`https://floralens-api.<your-subdomain>.workers.dev`
 
-## Next recommended build steps
-1. Add secure Pl@ntNet proxy.
-2. Add multiple-image guided identification.
-3. Add botanical enrichment/cache layer.
-4. Replace demo plant art with user photographs after plants are saved.
-5. Add Garden Areas and care calendar.
-6. Add backup/export so the private collection is portable.
+### 3. Put the Worker URL in app.js
+Near the top of `app.js`, change:
+
+```js
+const API_PROXY_URL = "";
+```
+
+to:
+
+```js
+const API_PROXY_URL = "https://floralens-api.<your-subdomain>.workers.dev";
+```
+
+Then upload the updated static app as normal.
+
+## Photo storage
+Confirmed plant hero photos are stored using IndexedDB on the device/browser instead of base64 strings in localStorage. This is much more suitable for a growing personal photo collection.
+
+A later backup/export feature should explicitly include IndexedDB images as well as metadata.
+
+## Species cache
+Every confirmed scientific species gets a reusable local species record. v0.3 can enrich that record once with care/growing information and reuse it for every plant of the same species.
+
+## Current next milestone
+FloraLens v0.3 should add:
+1. Free botanical enrichment.
+2. Source-aware care information.
+3. Flowering / pruning / hardiness calendar.
+4. Per-plant multi-photo timeline.
+5. Backup/export.
