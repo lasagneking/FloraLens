@@ -473,3 +473,67 @@ h2{font-size:35px;letter-spacing:-.025em}
 .bloom-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.bloom-summary span{padding:12px 8px;border-radius:17px;background:rgba(255,255,255,.55);text-align:center}.bloom-summary b,.bloom-summary small{display:block}.bloom-summary b{font-family:var(--serif);font-size:23px}.bloom-summary small{font-size:9px;color:var(--muted);margin-top:3px}
 .bloom-mosaic{columns:2;column-gap:8px}.bloom-mosaic button{width:100%;display:block;break-inside:avoid;border:0;background:transparent;padding:0;margin:0 0 8px;text-align:left;color:var(--ink)}.bloom-photo{display:block;width:100%;aspect-ratio:4/5;border-radius:18px;background:#ddd center/cover no-repeat;box-shadow:0 8px 18px rgba(60,52,45,.08)}.bloom-mosaic em,.bloom-mosaic small{display:block}.bloom-mosaic em{font-family:var(--serif);font-style:normal;font-size:14px;margin:5px 4px 0}.bloom-mosaic small{font-size:9px;color:var(--muted);margin:1px 4px 0}.bloom-empty{text-align:center;padding:34px 20px}.bloom-empty>div{font-size:50px;color:var(--rose)}
 .year-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:16px}.year-grid>div{padding:16px;border-radius:19px;background:linear-gradient(145deg,rgba(255,255,255,.60),rgba(239,232,216,.68));text-align:center}.year-grid b,.year-grid small{display:block}.year-grid b{font-family:var(--serif);font-size:29px}.year-grid small{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.25}
+
+
+/* v1.2.1 — hard Safari fix for Discover controls
+   Avoids the WebKit compositing path entirely: no absolute-positioned
+   glass controls and no transform animation on the Discover grid. */
+.discovery-masonry{
+  animation:none !important;
+  transform:none !important;
+}
+.discovery-masonry .discovery-pin{
+  position:relative;
+  isolation:isolate;
+  overflow:hidden;
+  transform:none !important;
+  animation:none !important;
+}
+.discovery-media{
+  display:grid;
+  grid-template-columns:1fr;
+  grid-template-rows:1fr;
+  position:relative;
+  overflow:hidden;
+}
+.discovery-media > .plant-art,
+.discovery-media > .discovery-controls{
+  grid-column:1;
+  grid-row:1;
+}
+.discovery-media > .plant-art{
+  z-index:1;
+}
+.discovery-controls{
+  z-index:4;
+  align-self:start;
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  padding:10px;
+  pointer-events:none;
+}
+.discovery-controls button{
+  pointer-events:auto;
+  position:static !important;
+  top:auto !important;
+  right:auto !important;
+  left:auto !important;
+  margin:0 !important;
+  flex:none;
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+  background:rgba(255,251,246,.96) !important;
+  border:1px solid rgba(93,79,72,.09);
+  box-shadow:0 5px 14px rgba(44,42,35,.12);
+}
+.discovery-controls .wishlist-heart{
+  width:38px;
+  height:38px;
+  border-radius:50%;
+}
+.discovery-controls .pin-delete{
+  width:34px;
+  height:34px;
+  border-radius:50%;
+}

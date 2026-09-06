@@ -280,3 +280,10 @@ No Cloudflare or API-secret changes are required.
 - New Garden Year preview summarises plants added, discoveries, journal moments, flowering moments, spaces and most-recorded plant.
 - No invented flowering predictions where FloraLens lacks data.
 - No Cloudflare/API changes.
+
+
+## v1.2.1 — Discover Safari hard fix
+- Reworked the Discover card controls rather than applying another CSS-column workaround.
+- Heart and delete controls now live inside a normal grid overlay on the image instead of using absolute-positioned glass layers.
+- Removed backdrop-filter and entrance transforms from Discover cards, avoiding the Safari/WebKit compositing bug that produced clickable “ghost” controls.
+- No data model, Discover records, API or Cloudflare changes.

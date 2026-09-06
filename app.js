@@ -2314,9 +2314,13 @@ function renderDiscover(){
     <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
     ${items.length
       ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
-          <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
-          <button class="pin-delete" aria-label="Delete ${esc(d.common)}" onclick="event.stopPropagation();confirmDeleteDiscovery('${d.id}')">×</button>
-          <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
+          <div class="discovery-media">
+            <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
+            <div class="discovery-controls">
+              <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
+              <button class="pin-delete" aria-label="Delete ${esc(d.common)}" onclick="event.stopPropagation();confirmDeleteDiscovery('${d.id}')">×</button>
+            </div>
+          </div>
           <div class="pin-body">
             <b>${esc(d.common)}</b><small><i>${esc(d.scientific)}</i></small>
             <div class="discovery-meta"><span class="chip">${d.score||"—"}% match</span><span class="chip">${d.wishlist?"Wishlist":"Spotted"}</span></div>
@@ -2359,7 +2363,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.1 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();
