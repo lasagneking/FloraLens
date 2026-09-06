@@ -1211,6 +1211,7 @@ const defaultState = {
   },
   areas:["Front Garden","Back Garden","Patio","Indoors","Greenhouse","Unplaced"],
   journal: [],
+  careTasks: [],
   discoveries: [],
   lastQuota: null
 };
@@ -1230,6 +1231,7 @@ function loadState(){
     merged.areas = old.areas?.length ? old.areas : defaultState.areas;
     merged.discoveries = Array.isArray(old.discoveries) ? old.discoveries : [];
     merged.journal = Array.isArray(old.journal) ? old.journal : [];
+    merged.careTasks = Array.isArray(old.careTasks) ? old.careTasks : [];
     return merged;
   } catch { return structuredClone(defaultState); }
 }
@@ -1285,6 +1287,7 @@ function setRoute(route, data={}){
   if(route==="garden") renderGarden();
   if(route==="lens") renderLens();
   if(route==="journal") renderJournal();
+  if(route==="care") renderCareCalendar();
   if(route==="discover") renderDiscover();
   if(route==="profile" && data.id) renderProfile(data.id);
   window.scrollTo({top:0,behavior:"smooth"});
@@ -1311,6 +1314,7 @@ function renderHome(){
     <section class="hero"><div class="eyebrow">Your botanical scrapbook</div><h1>Your little world<br>in bloom.</h1><p class="sub">Keep every flower, story and small garden discovery in one beautiful place.</p><div class="hero-bloom">❀</div></section>
     <button class="lens-banner" onclick="startCamera()"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
     <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
+    ${careHomeCard()}
     <div class="section-title"><h3>From your garden</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
     <section class="masonry">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>
     <div class="section-title"><h3>FloraLens memory</h3></div>
@@ -1801,7 +1805,7 @@ async function renderProfile(id,isNew=false){
         ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
       </div>`
       :`
-      <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
+      <div class="section-title"><h3>Our story</h3><div style="display:flex;gap:10px"><button class="link-btn" onclick="openCareComposer('${p.id}')">＋ Care</button><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Moment</button></div></div>
       <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
       `}`;
 
@@ -1916,6 +1920,148 @@ async function deleteJournalMoment(id){
 }
 function addJournalForPlant(id){const p=state.plants.find(x=>x.id===id);modal(`<div class="eyebrow">${esc(p.common)}</div><h2>Add to its story</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="What did you notice?"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
 
+
+function localISODate(d=new Date()){
+  const x=new Date(d.getTime()-d.getTimezoneOffset()*60000);
+  return x.toISOString().slice(0,10);
+}
+function careSeason(month=new Date().getMonth()+1){
+  if([3,4,5].includes(month))return "spring";
+  if([6,7,8].includes(month))return "summer";
+  if([9,10,11].includes(month))return "autumn";
+  return "winter";
+}
+function careDateLabel(date){
+  const today=localISODate();
+  const tomorrow=localISODate(new Date(Date.now()+86400000));
+  if(date===today)return "Today";
+  if(date===tomorrow)return "Tomorrow";
+  const d=new Date(`${date}T12:00:00`);
+  return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+}
+function daysFromToday(date){
+  const a=new Date(`${localISODate()}T12:00:00`);
+  const b=new Date(`${date}T12:00:00`);
+  return Math.round((b-a)/86400000);
+}
+function careTaskIcon(type){
+  return ({"Water":"◌","Prune":"✂","Feed":"◇","Check":"⌕","Repot":"♧","Protect":"⌂","Plant":"❧","Other":"✎"})[type]||"✎";
+}
+function careForPlant(p){
+  const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
+  return resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null);
+}
+function smartCareSuggestions(){
+  const season=careSeason(), month=new Date().getMonth()+1;
+  const out=[];
+  for(const p of state.plants){
+    const c=careForPlant(p);
+    const seasonal=c?.seasonal?.[season];
+    if(seasonal) out.push({key:`season-${p.id}-${season}`,plantId:p.id,type:"Check",title:`Seasonal check: ${p.common}`,detail:seasonal});
+    const water=String(c?.water||p.water||"").toLowerCase();
+    if((p.area||"").toLowerCase().includes("indoor") || /keep.*moist|regular|evenly moist|consistent moisture/.test(water)){
+      out.push({key:`water-${p.id}-${month}`,plantId:p.id,type:"Water",title:`Check ${p.common}'s moisture`,detail:c?.water||p.water||"Check the compost/soil before watering rather than watering automatically."});
+    }
+    if(c?.bloomMonths?.includes(month) && /deadhead|spent|flower/.test(String(c?.pruning||"").toLowerCase())){
+      out.push({key:`bloom-${p.id}-${month}`,plantId:p.id,type:"Prune",title:`Flowering care for ${p.common}`,detail:c.pruning});
+    }
+  }
+  return out.slice(0,12);
+}
+function activeCareTasks(){
+  return [...state.careTasks].filter(t=>!t.completed).sort((x,y)=>String(x.due).localeCompare(String(y.due)));
+}
+function careHomeCard(){
+  const tasks=activeCareTasks();
+  const today=localISODate();
+  const due=tasks.filter(t=>t.due<=today).length;
+  const suggestions=smartCareSuggestions();
+  const headline=due?`${due} ${due===1?"job":"jobs"} need attention`:tasks.length?`${tasks.length} care jobs coming up`:`${suggestions.length} seasonal suggestions`;
+  const sub=due?"A little garden care is waiting for you.":tasks.length?"Your next jobs are already organised.":"FloraLens has looked across your garden for useful seasonal care.";
+  return `<button class="care-home-card" onclick="setRoute('care')"><span class="care-home-icon">❧</span><span><small>CARE CALENDAR</small><strong>${headline}</strong><em>${sub}</em></span><b>→</b></button>`;
+}
+function renderCareCalendar(){
+  const tasks=activeCareTasks();
+  const completed=state.careTasks.filter(t=>t.completed).sort((x,y)=>String(y.completedAt||"").localeCompare(String(x.completedAt||""))).slice(0,8);
+  const suggestions=smartCareSuggestions().filter(s=>!state.careTasks.some(t=>t.suggestionKey===s.key));
+  const today=localISODate();
+  const dueNow=tasks.filter(t=>t.due<=today);
+  const upcoming=tasks.filter(t=>t.due>today);
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">A gentler to-do list</div><h1>Care Calendar</h1><p class="sub">Keep the garden thriving without turning it into a spreadsheet.</p></section>
+    <button class="care-add" onclick="openCareComposer()"><span>＋</span><div><b>Add a care job</b><small>Water, prune, feed, repot or anything else</small></div></button>
+    <div class="care-season-card"><div><div class="eyebrow">Right now · ${careSeason()}</div><h2>${new Date().toLocaleDateString("en-GB",{month:"long"})} in your garden</h2><p>${suggestions.length?`FloraLens found ${suggestions.length} useful care ${suggestions.length===1?"suggestion":"suggestions"} from your saved plant guidance.`:"Your suggested seasonal jobs are already covered."}</p></div><span>❀</span></div>
+    ${dueNow.length?`<div class="section-title"><h3>Needs attention</h3><span class="care-count">${dueNow.length}</span></div><div class="care-list">${dueNow.map(careTaskCard).join("")}</div>`:""}
+    ${upcoming.length?`<div class="section-title"><h3>Coming up</h3></div><div class="care-list">${upcoming.map(careTaskCard).join("")}</div>`:""}
+    <div class="section-title"><h3>Suggested for your plants</h3></div>
+    ${suggestions.length?`<div class="care-suggestions">${suggestions.map(careSuggestionCard).join("")}</div>`:`<div class="empty-card care-clear"><span>✓</span><h2>Looking beautifully organised</h2><p class="sub">No new seasonal suggestions at the moment.</p></div>`}
+    ${completed.length?`<div class="section-title"><h3>Recently done</h3></div><div class="care-completed">${completed.map(t=>{const p=state.plants.find(x=>x.id===t.plantId);return `<div><span>✓</span><p><b>${esc(t.title)}</b><small>${p?esc(p.common)+" · ":""}${t.completedAt?new Date(t.completedAt).toLocaleDateString("en-GB"):"Done"}</small></p></div>`}).join("")}</div>`:""}`;
+}
+function careTaskCard(t){
+  const p=state.plants.find(x=>x.id===t.plantId);
+  const overdue=daysFromToday(t.due)<0;
+  return `<article class="care-task ${overdue?"overdue":""}">
+    <button class="care-check" onclick="completeCareTask('${t.id}')">✓</button>
+    <div class="care-task-copy"><div class="care-task-top"><span>${careTaskIcon(t.type)} ${esc(t.type||"Care")}</span><small>${overdue?"Overdue · ":""}${careDateLabel(t.due)}</small></div><h2>${esc(t.title)}</h2>${p?`<button class="care-plant-link" onclick="setRoute('profile',{id:'${p.id}'})">${esc(p.common)} · ${esc(p.area||"Unplaced")}</button>`:""}${t.notes?`<p>${esc(t.notes)}</p>`:""}</div>
+    <button class="care-more" onclick="careTaskMenu('${t.id}')">•••</button>
+  </article>`;
+}
+function careSuggestionCard(s){
+  const p=state.plants.find(x=>x.id===s.plantId);
+  return `<article class="care-suggestion"><div class="care-suggest-icon">${careTaskIcon(s.type)}</div><div><div class="eyebrow">${p?esc(p.area||"Garden"):"Garden"} · suggested</div><h2>${esc(s.title)}</h2><p>${esc(s.detail)}</p><button class="mini-action" onclick="addSuggestedCare('${encodeURIComponent(s.key)}')">＋ Add to calendar</button></div></article>`;
+}
+function openCareComposer(plantId=null){
+  if(!state.plants.length){modal(`<div class="eyebrow">Care Calendar</div><h2>Add a plant first</h2><p class="sub">Care jobs can be linked to plants in My Garden.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant</button>`);return}
+  const selected=state.plants.find(p=>p.id===plantId)||state.plants[0];
+  const inSeven=new Date(Date.now()+7*86400000);
+  modal(`<div class="eyebrow">Care Calendar</div><h2>Add a care job</h2>
+    <label class="field-label">Plant</label><select id="carePlant" class="journal-field">${state.plants.map(p=>`<option value="${p.id}" ${p.id===selected.id?"selected":""}>${esc(p.common)} · ${esc(p.area||"Unplaced")}</option>`).join("")}</select>
+    <label class="field-label">Job</label><input id="careTitle" class="journal-field" placeholder="e.g. Prune after flowering">
+    <div class="journal-two-col"><div><label class="field-label">Type</label><select id="careType" class="journal-field">${["Check","Water","Prune","Feed","Repot","Protect","Plant","Other"].map(x=>`<option>${x}</option>`).join("")}</select></div><div><label class="field-label">Due</label><input id="careDue" class="journal-field" type="date" value="${localISODate(inSeven)}"></div></div>
+    <label class="field-label">Note</label><textarea id="careNotes" class="journal-field journal-textarea" maxlength="400" placeholder="Optional detail"></textarea>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="saveCareTask()">Add to calendar</button>`);
+}
+function saveCareTask(){
+  const plantId=document.getElementById("carePlant")?.value;
+  const title=(document.getElementById("careTitle")?.value||"").trim();
+  if(!title){toast("Give the care job a name");return}
+  state.careTasks.push({id:"care-"+Date.now(),plantId,title,type:document.getElementById("careType")?.value||"Other",due:document.getElementById("careDue")?.value||localISODate(),notes:(document.getElementById("careNotes")?.value||"").trim(),completed:false,createdAt:new Date().toISOString()});
+  saveState();closeModal();toast("Care job added");renderCareCalendar();
+}
+function addSuggestedCare(encodedKey){
+  const key=decodeURIComponent(encodedKey);
+  const s=smartCareSuggestions().find(x=>x.key===key);if(!s)return;
+  const due=new Date(Date.now()+2*86400000);
+  state.careTasks.push({id:"care-"+Date.now(),plantId:s.plantId,title:s.title,type:s.type,due:localISODate(due),notes:s.detail,completed:false,createdAt:new Date().toISOString(),suggestionKey:s.key});
+  saveState();toast("Added to Care Calendar");renderCareCalendar();
+}
+function completeCareTask(id){
+  const t=state.careTasks.find(x=>x.id===id);if(!t)return;
+  t.completed=true;t.completedAt=new Date().toISOString();saveState();toast("Lovely — job done");renderCareCalendar();
+}
+function careTaskMenu(id){
+  const t=state.careTasks.find(x=>x.id===id);if(!t)return;
+  modal(`<div class="eyebrow">Care job</div><h2>${esc(t.title)}</h2><button class="destination-choice" onclick="snoozeCareTask('${id}',7)"><span>↻</span><div><b>Move one week</b><small>Reschedule this job seven days later.</small></div></button><button class="destination-choice" onclick="editCareTask('${id}')"><span>✎</span><div><b>Edit job</b><small>Change its title, date or note.</small></div></button><button class="link-btn discovery-delete-link" style="width:100%" onclick="deleteCareTask('${id}')">Delete care job</button>`);
+}
+function snoozeCareTask(id,days){
+  const t=state.careTasks.find(x=>x.id===id);if(!t)return;
+  const d=new Date(`${t.due}T12:00:00`);d.setDate(d.getDate()+days);t.due=localISODate(d);saveState();closeModal();toast("Moved one week");renderCareCalendar();
+}
+function deleteCareTask(id){
+  state.careTasks=state.careTasks.filter(x=>x.id!==id);saveState();closeModal();toast("Care job removed");renderCareCalendar();
+}
+function editCareTask(id){
+  const t=state.careTasks.find(x=>x.id===id);if(!t)return;
+  modal(`<div class="eyebrow">Care Calendar</div><h2>Edit care job</h2>
+    <label class="field-label">Job</label><input id="editCareTitle" class="journal-field" value="${esc(t.title)}">
+    <div class="journal-two-col"><div><label class="field-label">Type</label><select id="editCareType" class="journal-field">${["Check","Water","Prune","Feed","Repot","Protect","Plant","Other"].map(x=>`<option ${x===t.type?"selected":""}>${x}</option>`).join("")}</select></div><div><label class="field-label">Due</label><input id="editCareDue" class="journal-field" type="date" value="${esc(t.due)}"></div></div>
+    <label class="field-label">Note</label><textarea id="editCareNotes" class="journal-field journal-textarea">${esc(t.notes||"")}</textarea>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="saveCareEdit('${id}')">Save changes</button>`);
+}
+function saveCareEdit(id){
+  const t=state.careTasks.find(x=>x.id===id);if(!t)return;
+  t.title=(document.getElementById("editCareTitle")?.value||t.title).trim();t.type=document.getElementById("editCareType")?.value||t.type;t.due=document.getElementById("editCareDue")?.value||t.due;t.notes=(document.getElementById("editCareNotes")?.value||"").trim();
+  saveState();closeModal();toast("Care job updated");renderCareCalendar();
+}
 function renderDiscover(){
   const items=state.discoveries;
   const families=new Set(items.map(d=>d.family).filter(Boolean)).size;
@@ -1973,7 +2119,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.9 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.0 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();

@@ -237,3 +237,15 @@ No Cloudflare or API-secret changes are required.
 - Plant profiles show linked moments in Our Story.
 - Journal photos included in backup export.
 - No Cloudflare/API changes.
+
+
+## v1.0 — Care Calendar
+- New Care Calendar route with manual plant-linked jobs.
+- Complete, edit, delete or move tasks one week.
+- FloraLens generates cautious seasonal suggestions from each saved plant's existing care profile.
+- Suggested jobs can be added to the calendar with one tap.
+- Home screen shows a compact care status card.
+- Individual Garden profiles can add a care job directly.
+- Completed jobs retain a lightweight recent history.
+- Care tasks live in the normal FloraLens backup state.
+- No Cloudflare/API changes.
