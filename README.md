@@ -1,4 +1,4 @@
-# FloraLens v0.3 — Botanical Intelligence
+# FloraLens v0.4 — Botanical Care Fallback
 
 FloraLens v0.3 keeps the working Pl@ntNet identification flow and adds the first real botanical-intelligence layer.
 
@@ -76,3 +76,28 @@ The JSON backup contains:
 - hero photos converted from IndexedDB to portable data URLs
 
 Import/restore is the next backup milestone.
+
+
+## v0.4 care fallback
+Trefle is useful for species/taxonomy enrichment but many horticultural fields are sparse.
+v0.4 therefore adds a labelled, local FloraLens care library.
+
+Resolution order:
+1. Trefle species-specific field, when present
+2. FloraLens species-specific care note
+3. FloraLens genus-level guidance
+4. Friendly “Care detail not yet available” message
+
+The interface no longer treats missing Trefle fields as an API failure.
+
+Initial curated coverage includes:
+- English lavender / Lavandula genus
+- Hydrangea macrophylla / Hydrangea genus
+- Rosa genus
+- Rosemary
+- Foxglove
+- Common box
+
+The library is intentionally explicit and expandable rather than inventing care facts for unknown plants.
+
+Existing Pl@ntNet, GBIF and Trefle connections remain unchanged.

@@ -9,6 +9,158 @@ const PHOTO_STORE = "photos";
 */
 const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
 
+
+const FLORALENS_CARE_LIBRARY = {
+  // Species-first, then genus fallbacks. This is deliberately modest and labelled
+  // separately from third-party botanical data.
+  "lavandula angustifolia": {
+    commonName: "English lavender",
+    light: "Full sun",
+    water: "Water while establishing; once established, water sparingly and avoid prolonged wet soil.",
+    soil: "Free-draining soil; performs well in neutral to alkaline conditions.",
+    height: "About 40–90 cm, depending on cultivar and conditions",
+    bloomMonths: [6,7,8],
+    growthHabit: "Woody, aromatic evergreen subshrub",
+    pruning: "Trim after flowering, keeping some green growth below the cut. Avoid cutting hard into old bare wood.",
+    propagation: "Semi-ripe cuttings in summer are a reliable method.",
+    hardiness: "Generally hardy in UK gardens when drainage is good.",
+    seasonal: {
+      spring: "Remove winter damage and tidy lightly once strong new growth is visible.",
+      summer: "Enjoy flowering; deadhead or trim after the main flush if a compact shape is wanted.",
+      autumn: "Avoid heavy pruning late in the year.",
+      winter: "Protect from waterlogged soil; cold combined with wet roots is more troublesome than cold alone."
+    }
+  },
+  "lavandula": {
+    light: "Full sun",
+    water: "Low to moderate once established; avoid waterlogging.",
+    soil: "Very free-draining soil is important.",
+    growthHabit: "Aromatic evergreen or semi-evergreen subshrub",
+    pruning: "Trim after flowering rather than cutting hard into old woody stems.",
+    hardiness: "Varies by species and cultivar; drainage is especially important in winter."
+  },
+  "hydrangea macrophylla": {
+    commonName: "Mophead / lacecap hydrangea",
+    light: "Part shade or gentle sun; shelter from intense drying heat.",
+    water: "Keep evenly moist, especially in warm weather and while establishing.",
+    soil: "Moist but well-drained, humus-rich soil.",
+    height: "Commonly around 1–2 m",
+    bloomMonths: [7,8,9],
+    growthHabit: "Deciduous flowering shrub",
+    pruning: "Prune lightly in spring, removing old flowerheads and dead wood. Many cultivars flower on older stems, so avoid indiscriminate hard pruning.",
+    propagation: "Softwood cuttings are commonly taken in summer.",
+    hardiness: "Generally hardy in much of the UK; young growth can be damaged by late frost."
+  },
+  "hydrangea": {
+    light: "Part shade to sun, with more shelter in hotter/drier positions.",
+    water: "Usually prefers consistent moisture.",
+    soil: "Moist but well-drained, humus-rich soil.",
+    growthHabit: "Usually a deciduous shrub or climber",
+    hardiness: "Varies by species and cultivar."
+  },
+  "rosa": {
+    light: "Full sun is best for most roses; some tolerate light shade.",
+    water: "Water deeply in dry spells, especially newly planted roses.",
+    soil: "Fertile, moisture-retentive but well-drained soil.",
+    growthHabit: "Deciduous flowering shrub or climber",
+    pruning: "Main pruning is usually carried out in the dormant season; exact technique depends on whether the rose is shrub, climbing or rambling.",
+    propagation: "Hardwood or semi-ripe cuttings can be used, though named cultivars may not always come true from seed.",
+    hardiness: "Many garden roses are hardy across much of the UK, but cultivar differences matter."
+  },
+  "rosmarinus officinalis": {
+    commonName: "Rosemary",
+    light: "Full sun",
+    water: "Low to moderate once established; avoid persistently wet roots.",
+    soil: "Free-draining soil.",
+    height: "Usually around 0.8–1.5 m, depending on cultivar",
+    bloomMonths: [3,4,5,6],
+    growthHabit: "Aromatic evergreen shrub",
+    pruning: "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
+    propagation: "Semi-ripe cuttings root readily in summer.",
+    hardiness: "Generally hardy in sheltered UK gardens with good drainage."
+  },
+  "salvia rosmarinus": {
+    commonName: "Rosemary",
+    light: "Full sun",
+    water: "Low to moderate once established; avoid persistently wet roots.",
+    soil: "Free-draining soil.",
+    height: "Usually around 0.8–1.5 m, depending on cultivar",
+    bloomMonths: [3,4,5,6],
+    growthHabit: "Aromatic evergreen shrub",
+    pruning: "Trim lightly after flowering to keep compact; avoid cutting back into old bare wood.",
+    propagation: "Semi-ripe cuttings root readily in summer.",
+    hardiness: "Generally hardy in sheltered UK gardens with good drainage."
+  },
+  "digitalis purpurea": {
+    commonName: "Foxglove",
+    light: "Part shade to sun",
+    water: "Moderate; avoid prolonged drought while establishing.",
+    soil: "Moist but well-drained soil with organic matter.",
+    height: "Often around 1–1.5 m in flower",
+    bloomMonths: [5,6,7],
+    growthHabit: "Usually biennial or short-lived perennial",
+    pruning: "Remove spent spikes to reduce self-seeding, or leave some if you want naturalised seedlings.",
+    hardiness: "Hardy in UK conditions.",
+    safety: "Toxic if eaten. Keep away from children and pets that may ingest plants."
+  },
+  "buxus sempervirens": {
+    commonName: "Common box",
+    light: "Sun to shade",
+    water: "Moderate; established plants tolerate some dryness.",
+    soil: "Well-drained soil; avoid persistently waterlogged ground.",
+    height: "Can exceed 2 m untrimmed, but commonly kept much smaller",
+    growthHabit: "Dense evergreen shrub",
+    pruning: "Clip during the growing season for formal shapes, avoiding very hot dry weather.",
+    hardiness: "Hardy in UK gardens.",
+    safety: "All parts are harmful if eaten."
+  }
+};
+
+function floralensCareFor(scientificName=""){
+  const n=String(scientificName).toLowerCase().trim();
+  if(FLORALENS_CARE_LIBRARY[n]) return {...FLORALENS_CARE_LIBRARY[n], source:"FloraLens care library"};
+  const genus=n.split(/\s+/)[0];
+  if(genus && FLORALENS_CARE_LIBRARY[genus]) return {...FLORALENS_CARE_LIBRARY[genus], source:"FloraLens care library · genus guidance"};
+  return null;
+}
+
+function seasonKey(){
+  const m=new Date().getMonth()+1;
+  if([3,4,5].includes(m)) return "spring";
+  if([6,7,8].includes(m)) return "summer";
+  if([9,10,11].includes(m)) return "autumn";
+  return "winter";
+}
+
+function resolvedCare(scientificName,t){
+  const local=floralensCareFor(scientificName);
+  const fromTrefle={
+    light: t?.light!==null && t?.light!==undefined ? lightLabel(t.light) : null,
+    water: t?.soilHumidity!==null && t?.soilHumidity!==undefined ? moistureLabel(t.soilHumidity) : null,
+    soil: t ? soilLabel(t) : null,
+    height: t && (t.averageHeightCm||t.maximumHeightCm) ? formatHeight(t.averageHeightCm,t.maximumHeightCm) : null,
+    bloomMonths: t?.bloomMonths?.length ? monthsToNumbers(t.bloomMonths) : null,
+    growthHabit: t?.growthHabit || null,
+    growthRate: t?.growthRate || null,
+    hardiness: t?.minimumTemperatureC!==null && t?.minimumTemperatureC!==undefined ? `Recorded minimum temperature ${t.minimumTemperatureC}°C` : null,
+    safety: toxicityCopy(t)
+  };
+  const pick=(k)=>fromTrefle[k] || local?.[k] || null;
+  return {
+    light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"),
+    bloomMonths:fromTrefle.bloomMonths || local?.bloomMonths || [],
+    growthHabit:pick("growthHabit"), growthRate:pick("growthRate"),
+    pruning:local?.pruning||null, propagation:local?.propagation||null,
+    hardiness:pick("hardiness"), safety:fromTrefle.safety||local?.safety||null,
+    seasonal:local?.seasonal||null,
+    localSource:local?.source||null,
+    usedLocal:!!local && [
+      "light","water","soil","height","growthHabit","hardiness"
+    ].some(k=>!fromTrefle[k] && local[k])
+  };
+}
+
+
 const defaultState = {
   plants: [
     {id:"rose",speciesKey:"rosa-gertrude-jekyll",common:"Gertrude Jekyll",scientific:"Rosa 'Gertrude Jekyll'",family:"Rosaceae",area:"Back border",status:"Flowering",art:"rose",added:"2026-06-14",notes:"Deep pink, strongly fragrant blooms.",sun:"Full sun",water:"Moderate",soil:"Moist, well-drained",height:"1.2–1.5 m",bloom:[5,6,7,8,9]},
@@ -349,44 +501,71 @@ async function renderProfile(id,isNew=false){
   const intel=cached.enrichment||null;
   const t=intel?.trefle||null;
   const g=intel?.gbif||null;
-  const season=currentSeasonNote(t,p);
-  const tox=toxicityCopy(t);
-  const coverage=dataCoverage(t,g);
-  const bloom=t?.bloomMonths?.length?monthsToNumbers(t.bloomMonths):(p.bloom||[]);
+  const care=resolvedCare(p.scientific,t);
+  const sourceNames=[...(intel?.sources||[])];
+  if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
+  const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
-  const sourceNames=intel?.sources||[];
-  const hasCare=!!t;
+  const currentSeason=seasonKey();
+  const seasonalLocal=care.seasonal?.[currentSeason]||null;
+  const taxonConfirmed=!!(g||t);
+  const careAvailable=[care.light,care.water,care.soil,care.height,care.growthHabit,care.pruning,care.hardiness].filter(Boolean).length;
+  const careCoverage=Math.round((careAvailable/7)*100);
+
+  let intelTitle="Gathering botanical notes…";
+  let intelText="FloraLens is building a reusable species record so this only has to happen once.";
+  if(intel){
+    if(careAvailable>=4){
+      intelTitle="Growing guide ready";
+      intelText=care.usedLocal
+        ?"Third-party botanical records were sparse, so FloraLens filled the gaps with its curated care library."
+        :"Connected botanical sources supplied useful growing information for this species.";
+    }else if(taxonConfirmed){
+      intelTitle="Botanical record found";
+      intelText="The species is confirmed, but detailed horticultural care information is still limited for this plant.";
+    }
+  }
 
   view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('garden')">← My Garden</button></section>
     <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family)}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">♡ ${esc(p.area)}</span></div></div>
 
-    ${!intel?`<div class="intel-banner loading"><div class="eyebrow">Botanical intelligence</div><h2 style="font-size:24px;margin:5px 0">Gathering reliable plant notes…</h2><p class="small">FloraLens is building a reusable species record so this only has to happen once.</p></div>`:
-    `<div class="intel-banner"><div class="eyebrow">Botanical intelligence</div><h2 style="font-size:24px;margin:5px 0">${hasCare?"Species record enriched":"Taxonomy confirmed"}</h2><p class="small">${hasCare?"Growing data is cached for every "+esc(p.common)+" you save in future.":"GBIF data is available. Add the optional Trefle token to the Worker for richer growing and care fields."}</p><div class="coverage"><span style="width:${coverage}%"></span></div><div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>`}
-
-    <section style="padding:10px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(desc||"FloraLens has confirmed the species, but a descriptive botanical note is not available from the connected sources yet.")}</p><div class="species-cache">Species record: ${esc(p.speciesKey||"")} · ${cached.fetchedAt?new Date(cached.fetchedAt).toLocaleDateString("en-GB"):"local"}</div></section>
-
-    <div class="season-card"><div class="eyebrow">Right now</div><h2>${esc(season.title)}</h2><p class="sub" style="margin:0">${esc(season.text)}</p></div>
-
-    <div class="care-grid">
-      <div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(hasCare?lightLabel(t.light):p.sun)}</small></div>
-      <div class="care-tile"><span class="care-icon">💧</span><b>Moisture</b><small>${esc(hasCare?moistureLabel(t.soilHumidity):p.water)}</small></div>
-      <div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(hasCare?soilLabel(t):p.soil)}</small></div>
-      <div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(hasCare?formatHeight(t.averageHeightCm,t.maximumHeightCm):p.height)}</small></div>
-      ${hasCare&&t.growthHabit?`<div class="care-tile"><span class="care-icon">❧</span><b>Growth habit</b><small>${esc(t.growthHabit)}</small></div>`:""}
-      ${hasCare&&t.growthRate?`<div class="care-tile"><span class="care-icon">↗</span><b>Growth rate</b><small>${esc(t.growthRate)}</small></div>`:""}
-      ${hasCare&&(t.minimumTemperatureC!==null||t.maximumTemperatureC!==null)?`<div class="care-tile care-wide"><span class="care-icon">❄</span><b>Recorded temperature range</b><small>${t.minimumTemperatureC!==null?esc(String(t.minimumTemperatureC))+"°C minimum":""}${t.minimumTemperatureC!==null&&t.maximumTemperatureC!==null?" · ":""}${t.maximumTemperatureC!==null?esc(String(t.maximumTemperatureC))+"°C maximum":""}</small></div>`:""}
+    <div class="intel-banner ${!intel?"loading":""}">
+      <div class="eyebrow">Botanical intelligence</div>
+      <h2 style="font-size:24px;margin:5px 0">${esc(intelTitle)}</h2>
+      <p class="small">${esc(intelText)}</p>
+      ${intel?`<div class="coverage"><span style="width:${careCoverage}%"></span></div>
+      <div class="small" style="margin-top:6px">${careCoverage}% of core care fields available</div>
+      <div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}</div>
+      <div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div>`:""}
     </div>
 
-    <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">No reliable flowering-month data is available from the connected sources yet.</p>`:""}</div>
+    <section style="padding:10px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p><div class="species-cache">Species record: ${esc(p.speciesKey||"")} · ${cached.fetchedAt?new Date(cached.fetchedAt).toLocaleDateString("en-GB"):"local"}</div></section>
 
-    ${hasCare?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
-      ${t.duration?.length?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Life cycle</b><div class="small">${esc(t.duration.join(", "))}</div></div></div>`:""}
-      ${t.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
-      ${t.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}${t.leafRetention===true?" · retains leaves":t.leafRetention===false?" · not evergreen":""}</div></div></div>`:""}
-      ${t.spreadCm?`<div class="fact-row"><span class="fact-icon">↔</span><div><b>Average spread</b><div class="small">${esc(formatHeight(t.spreadCm,null))}</div></div></div>`:""}
+    <div class="season-card"><div class="eyebrow">Right now</div><h2>${seasonalLocal?"Seasonal care":"Seasonal note"}</h2><p class="sub" style="margin:0">${esc(seasonalLocal||currentSeasonNote(t,p).text)}</p></div>
+
+    <div class="care-grid">
+      <div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(care.light||"Care detail not yet available")}</small></div>
+      <div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water||"Care detail not yet available")}</small></div>
+      <div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil||"Care detail not yet available")}</small></div>
+      <div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height||"Care detail not yet available")}</small></div>
+      ${care.growthHabit?`<div class="care-tile"><span class="care-icon">❧</span><b>Growth habit</b><small>${esc(care.growthHabit)}</small></div>`:""}
+      ${care.hardiness?`<div class="care-tile"><span class="care-icon">❄</span><b>Hardiness</b><small>${esc(care.hardiness)}</small></div>`:""}
+      ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
+      ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
+    </div>
+
+    <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
+
+    ${(care.growthHabit||care.growthRate||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
+      ${care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Habit</b><div class="small">${esc(care.growthHabit)}</div></div></div>`:""}
+      ${care.growthRate?`<div class="fact-row"><span class="fact-icon">↗</span><div><b>Growth rate</b><div class="small">${esc(care.growthRate)}</div></div></div>`:""}
+      ${t?.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
+      ${t?.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}</div></div></div>`:""}
     </div></div>`:""}
 
-    ${tox?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety flag</h2><p class="sub" style="margin:0">${esc(tox)}</p></div>`:""}
+    ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
+
+    ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated care library because the connected botanical APIs returned incomplete care fields. Species-specific API data takes priority whenever it is available.</p></div>`:""}
 
     <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
     <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${new Date(intel.fetchedAt).toLocaleDateString("en-GB")} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
@@ -396,7 +575,6 @@ async function renderProfile(id,isNew=false){
     if(url){ document.querySelector("#profileHero .plant-art")?.remove(); profileHero.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
   }
 }
-
 async function exportBackup(){
   try{
     const photos={};
