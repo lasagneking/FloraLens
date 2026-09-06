@@ -1,79 +1,78 @@
-# FloraLens v0.2
+# FloraLens v0.3 — Botanical Intelligence
 
-This build turns the starter Lens into a real identification-ready system.
+FloraLens v0.3 keeps the working Pl@ntNet identification flow and adds the first real botanical-intelligence layer.
 
-## What changed
-- 1–5 photos of the **same individual plant**
-- Per-photo organ labels: Auto, Flower, Leaf, Fruit, Bark
-- Ranked identification matches and confidence values
-- Remaining daily Pl@ntNet quota display when real API is connected
-- Confirm-before-save flow
-- Garden area picker + custom areas
-- Real hero photo saved locally in **IndexedDB**
-- Plant metadata saved separately in localStorage
-- Species cache, ready for the next enrichment layer
-- Included secure **Cloudflare Worker** proxy
-- Demo fallback still works until the proxy is configured
+## New in v0.3
+- Species enrichment route: `GET /enrich?name=Scientific%20name`
+- Free GBIF taxonomy/description enrichment with no extra key
+- Optional Trefle growing-data enrichment
+- Species-level cache: enrich once, reuse for every matching plant
+- Richer editorial plant profile
+- Light, moisture, soil, pH, height, spread, growth habit/rate and recorded temperature fields when available
+- Flowering-month timeline from source data
+- “Right now” seasonal context
+- Data-source labels and coverage indicator
+- Safety information only shown when a connected source supplies a toxicity field
+- Garden backup export, including IndexedDB hero photos
 
-## Why there is a proxy
-Pl@ntNet's API key is private. Putting it in browser JavaScript would expose it to anyone who can inspect the page source.
+## IMPORTANT: keep the working Pl@ntNet secret
+Do not change or remove:
+`PLANTNET_API_KEY`
 
-The Worker keeps that key server-side.
+The new Worker deliberately retains the `/identify` code path that fixed live identification.
 
-## Connect the real Pl@ntNet API
+## Deploy the updated Worker
+Replace the current Cloudflare Worker code with `worker.js` from this package, then Deploy.
 
-### 1. Create a Pl@ntNet developer account and API key
-Use Pl@ntNet's developer portal.
+The Worker URL in `app.js` is already:
+`https://floralens-api.lrthumwood.workers.dev`
 
-### 2. Deploy the included Cloudflare Worker
-This folder includes:
-- `worker.js`
-- `wrangler.toml`
+## GBIF
+No additional setup is needed. The Worker uses GBIF's public Species API for taxonomic enrichment.
 
-Using Wrangler:
+## Trefle — optional but recommended for care/growing fields
+Trefle requires a personal access token.
 
-```bash
-npx wrangler login
-npx wrangler secret put PLANTNET_API_KEY
-npx wrangler deploy
-```
+Once you have a token, add a second Cloudflare runtime secret:
 
-Paste your Pl@ntNet API key when prompted for the secret.
+Name:
+`TREFLE_TOKEN`
 
-Cloudflare will return a Worker URL similar to:
-`https://floralens-api.<your-subdomain>.workers.dev`
+Type:
+`Secret`
 
-### 3. Put the Worker URL in app.js
-Near the top of `app.js`, change:
+Value:
+your Trefle access token
 
-```js
-const API_PROXY_URL = "https://floralens-api.lrthumwood.workers.dev";
-```
+Do not put the Trefle token in `app.js`.
 
-to:
+If `TREFLE_TOKEN` is absent, FloraLens still works. Identification remains live and GBIF enrichment still runs; the profile explains that richer growing fields are not yet connected.
 
-```js
-const API_PROXY_URL = "https://floralens-api.<your-subdomain>.workers.dev";
-```
+## Data design
+Plant-specific information:
+- photo
+- garden area
+- added date
+- journal/history
 
-Then upload the updated static app as normal.
+Species-level information:
+- taxonomy
+- growing requirements
+- flowering months
+- habit
+- safety flags
+- source metadata
 
-## Photo storage
-Confirmed plant hero photos are stored using IndexedDB on the device/browser instead of base64 strings in localStorage. This is much more suitable for a growing personal photo collection.
+This separation is intentional. Ten plants of the same species can have ten different stories while reusing one botanical knowledge record.
 
-A later backup/export feature should explicitly include IndexedDB images as well as metadata.
+## Backup
+Open the top-left menu and choose **Export backup**.
 
-## Species cache
-Every confirmed scientific species gets a reusable local species record. v0.3 can enrich that record once with care/growing information and reuse it for every plant of the same species.
+The JSON backup contains:
+- local app state
+- garden plants
+- journal
+- species cache
+- hero photos converted from IndexedDB to portable data URLs
 
-## Current next milestone
-FloraLens v0.3 should add:
-1. Free botanical enrichment.
-2. Source-aware care information.
-3. Flowering / pruning / hardiness calendar.
-4. Per-plant multi-photo timeline.
-5. Backup/export.
-
-
-## Live connection status
-This build is already configured to use `https://floralens-api.lrthumwood.workers.dev`. If the Worker secret `PLANTNET_API_KEY` is present, Lens identification will use live Pl@ntNet results rather than demo data.
+Import/restore is the next backup milestone.

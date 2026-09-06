@@ -229,35 +229,198 @@ function addAreaPrompt(){
 }
 function saveNewArea(){ const a=document.getElementById("newArea").value.trim();if(!a)return;if(!state.areas.includes(a))state.areas.push(a);saveState();chosenArea=a;closeModal();chooseSaveArea(); }
 
+async function enrichSpecies(scientificName, speciesKey, force=false){
+  const cached=state.speciesCache[speciesKey]||{};
+  if(!force && cached.enrichment?.fetchedAt) return cached.enrichment;
+  try{
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/enrich?name=${encodeURIComponent(scientificName)}`);
+    if(!res.ok) throw new Error(`Botanical notes failed (${res.status})`);
+    const data=await res.json();
+    const enrichment={...data,fetchedAt:new Date().toISOString()};
+    state.speciesCache[speciesKey]={...cached,enrichment,source:[...(data.sources||[]),"Pl@ntNet"].join(" + "),fetchedAt:new Date().toISOString()};
+    saveState();
+    syncPlantsFromSpecies(speciesKey);
+    return enrichment;
+  }catch(err){
+    console.warn("Enrichment failed",err);
+    state.speciesCache[speciesKey]={...cached,enrichmentError:String(err.message||err)};
+    saveState();
+    return null;
+  }
+}
+
+function syncPlantsFromSpecies(speciesKey){
+  const cache=state.speciesCache[speciesKey];
+  if(!cache) return;
+  const t=cache.enrichment?.trefle;
+  if(!t) return;
+  const bloom=monthsToNumbers(t.bloomMonths);
+  state.plants.filter(p=>p.speciesKey===speciesKey).forEach(p=>{
+    if(bloom.length) p.bloom=bloom;
+    if(t.averageHeightCm || t.maximumHeightCm) p.height=formatHeight(t.averageHeightCm,t.maximumHeightCm);
+    if(t.light!==null) p.sun=lightLabel(t.light);
+    if(t.soilHumidity!==null) p.water=moistureLabel(t.soilHumidity);
+    p.soil=soilLabel(t);
+    p.notes=t.observations || t.growthDescription || p.notes;
+  });
+  saveState();
+}
+
 async function confirmPlant(){
   const r=pendingResults[0], x=resultInfo(r);
   const speciesKey=slug(x.sci);
   if(!state.speciesCache[speciesKey]){
-    state.speciesCache[speciesKey]={scientific:x.sci,common:x.common,family:x.family,genus:x.genus,source:"Pl@ntNet identification",fetchedAt:new Date().toISOString(),care:null};
+    state.speciesCache[speciesKey]={scientific:x.sci,common:x.common,family:x.family,genus:x.genus,source:"Pl@ntNet identification",fetchedAt:new Date().toISOString(),enrichment:null};
   }
   const id="plant-"+Date.now(), photoKey=`${id}-hero`;
   try{ await savePhoto(photoKey,captures[0].file); }catch(e){ console.warn("Photo storage failed",e); }
   const cached=state.speciesCache[speciesKey]||{};
-  state.plants.unshift({id,speciesKey,photoKey,common:x.common,scientific:x.sci,family:x.family,area:chosenArea,status:"New",added:new Date().toISOString().slice(0,10),notes:cached.notes||"Newly identified with FloraLens.",sun:cached.sun||"Care data coming next",water:cached.water||"Care data coming next",soil:cached.soil||"Care data coming next",height:cached.height||"Care data coming next",bloom:cached.bloom||[]});
-  saveState(); closeModal(); captures=[]; toast(`${x.common} saved to ${chosenArea}`); renderProfile(id,true);
+  state.plants.unshift({id,speciesKey,photoKey,common:x.common,scientific:x.sci,family:x.family,area:chosenArea,status:"New",added:new Date().toISOString().slice(0,10),notes:cached.notes||"Newly identified with FloraLens.",sun:cached.sun||"Gathering botanical notes…",water:cached.water||"Gathering botanical notes…",soil:cached.soil||"Gathering botanical notes…",height:cached.height||"Gathering botanical notes…",bloom:cached.bloom||[]});
+  saveState(); closeModal(); captures=[]; toast(`${x.common} saved to ${chosenArea}`);
+  await renderProfile(id,true);
+  const existing=state.speciesCache[speciesKey]?.enrichment;
+  if(!existing){
+    const intel=await enrichSpecies(x.sci,speciesKey);
+    if(intel){ toast("Botanical notes added"); await renderProfile(id,false); }
+  }
+}
+
+function monthsToNumbers(months=[]){
+  const map={jan:1,january:1,feb:2,february:2,mar:3,march:3,apr:4,april:4,may:5,jun:6,june:6,jul:7,july:7,aug:8,august:8,sep:9,september:9,sept:9,oct:10,october:10,nov:11,november:11,dec:12,december:12};
+  return months.map(m=>map[String(m).toLowerCase()]).filter(Boolean);
+}
+function formatHeight(avg,max){
+  const vals=[avg,max].filter(v=>typeof v==="number"&&v>0);
+  if(!vals.length)return "Not available";
+  if(vals.length===1)return vals[0]>=100?`${(vals[0]/100).toFixed(vals[0]%100?1:0)} m`:`${Math.round(vals[0])} cm`;
+  const a=vals[0]>=100?`${(vals[0]/100).toFixed(1)} m`:`${Math.round(vals[0])} cm`;
+  const b=vals[1]>=100?`${(vals[1]/100).toFixed(1)} m`:`${Math.round(vals[1])} cm`;
+  return `${a} avg · ${b} max`;
+}
+function lightLabel(v){ if(v===null||v===undefined)return "Not available"; if(v>=8)return "Full sun"; if(v>=5)return "Sun to part shade"; if(v>=3)return "Part shade"; return "Shade / low light"; }
+function moistureLabel(v){ if(v===null||v===undefined)return "Not available"; if(v<=2)return "Dry / drought-tolerant"; if(v<=4)return "Allow some drying"; if(v<=7)return "Even moisture"; return "Moist to wet"; }
+function soilLabel(t){
+  const bits=[];
+  if(t.phMinimum!==null||t.phMaximum!==null){
+    const lo=t.phMinimum??"—", hi=t.phMaximum??"—"; bits.push(`pH ${lo}–${hi}`);
+  }
+  if(t.soilTexture!==null){
+    bits.push(t.soilTexture<=3?"Finer / clay-leaning":t.soilTexture>=7?"Coarser / free-draining":"Balanced texture");
+  }
+  return bits.join(" · ")||"Not available";
+}
+function toxicityCopy(t){
+  if(!t || !t.toxicity) return null;
+  const level=String(t.toxicity).toLowerCase();
+  if(level==="none") return "Trefle records no known toxicity in its plant specification.";
+  return `Trefle records ${level} relative toxicity. Treat this as a caution flag, not medical or veterinary advice.`;
+}
+function currentSeasonNote(t,p){
+  const month=new Date().getMonth()+1;
+  const bloom=monthsToNumbers(t?.bloomMonths||p.bloom||[]);
+  const growth=monthsToNumbers(t?.growthMonths||[]);
+  if(bloom.includes(month)) return {title:"In its flowering window",text:"This species is recorded as typically blooming around this time of year."};
+  if(growth.includes(month)) return {title:"Active growth time",text:"This month falls within the species' recorded active-growth period."};
+  if(bloom.length){
+    const next=bloom.find(m=>m>month)||bloom[0];
+    const names=["","January","February","March","April","May","June","July","August","September","October","November","December"];
+    return {title:"Between flowering periods",text:`Its recorded flowering window next includes ${names[next]}.`};
+  }
+  return {title:"A quieter botanical note",text:"There isn't enough seasonal data yet to give this plant a reliable month-by-month status."};
+}
+function dataCoverage(t,g){
+  const vals=[t?.light,t?.soilHumidity,t?.phMinimum,t?.phMaximum,t?.averageHeightCm,t?.maximumHeightCm,t?.bloomMonths?.length,t?.growthHabit,g?.family,g?.rank];
+  const present=vals.filter(v=>v!==null&&v!==undefined&&v!==""&&v!==0).length;
+  return Math.round((present/vals.length)*100);
+}
+
+async function refreshIntel(id){
+  const p=state.plants.find(x=>x.id===id); if(!p)return;
+  toast("Refreshing botanical notes…");
+  const intel=await enrichSpecies(p.scientific,p.speciesKey,true);
+  if(intel){ toast("Botanical notes refreshed"); renderProfile(id); }
+  else toast("Couldn’t refresh botanical notes");
 }
 
 async function renderProfile(id,isNew=false){
   currentRoute="profile";
   const p=state.plants.find(x=>x.id===id); if(!p)return setRoute("garden");
   const cached=state.speciesCache[p.speciesKey]||{};
+  const intel=cached.enrichment||null;
+  const t=intel?.trefle||null;
+  const g=intel?.gbif||null;
+  const season=currentSeasonNote(t,p);
+  const tox=toxicityCopy(t);
+  const coverage=dataCoverage(t,g);
+  const bloom=t?.bloomMonths?.length?monthsToNumbers(t.bloomMonths):(p.bloom||[]);
+  const desc=t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
+  const sourceNames=intel?.sources||[];
+  const hasCare=!!t;
+
   view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('garden')">← My Garden</button></section>
     <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family)}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">♡ ${esc(p.area)}</span></div></div>
-    <section style="padding:20px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(p.notes)}</p><div class="species-cache">FloraLens species record: ${cached.source?esc(cached.source):"local"} · ${esc(p.speciesKey||"")}</div></section>
-    <div class="info-grid"><div class="info"><span>☀</span><b>Happy place</b><small>${esc(p.sun)}</small></div><div class="info"><span>💧</span><b>Water</b><small>${esc(p.water)}</small></div><div class="info"><span>♧</span><b>Soil</b><small>${esc(p.soil)}</small></div><div class="info"><span>↕</span><b>Size</b><small>${esc(p.height)}</small></div></div>
-    <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${p.bloom?.includes(i+1)?"on":""}">${m}</div>`).join("")}</div></div>
+
+    ${!intel?`<div class="intel-banner loading"><div class="eyebrow">Botanical intelligence</div><h2 style="font-size:24px;margin:5px 0">Gathering reliable plant notes…</h2><p class="small">FloraLens is building a reusable species record so this only has to happen once.</p></div>`:
+    `<div class="intel-banner"><div class="eyebrow">Botanical intelligence</div><h2 style="font-size:24px;margin:5px 0">${hasCare?"Species record enriched":"Taxonomy confirmed"}</h2><p class="small">${hasCare?"Growing data is cached for every "+esc(p.common)+" you save in future.":"GBIF data is available. Add the optional Trefle token to the Worker for richer growing and care fields."}</p><div class="coverage"><span style="width:${coverage}%"></span></div><div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>`}
+
+    <section style="padding:10px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(desc||"FloraLens has confirmed the species, but a descriptive botanical note is not available from the connected sources yet.")}</p><div class="species-cache">Species record: ${esc(p.speciesKey||"")} · ${cached.fetchedAt?new Date(cached.fetchedAt).toLocaleDateString("en-GB"):"local"}</div></section>
+
+    <div class="season-card"><div class="eyebrow">Right now</div><h2>${esc(season.title)}</h2><p class="sub" style="margin:0">${esc(season.text)}</p></div>
+
+    <div class="care-grid">
+      <div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(hasCare?lightLabel(t.light):p.sun)}</small></div>
+      <div class="care-tile"><span class="care-icon">💧</span><b>Moisture</b><small>${esc(hasCare?moistureLabel(t.soilHumidity):p.water)}</small></div>
+      <div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(hasCare?soilLabel(t):p.soil)}</small></div>
+      <div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(hasCare?formatHeight(t.averageHeightCm,t.maximumHeightCm):p.height)}</small></div>
+      ${hasCare&&t.growthHabit?`<div class="care-tile"><span class="care-icon">❧</span><b>Growth habit</b><small>${esc(t.growthHabit)}</small></div>`:""}
+      ${hasCare&&t.growthRate?`<div class="care-tile"><span class="care-icon">↗</span><b>Growth rate</b><small>${esc(t.growthRate)}</small></div>`:""}
+      ${hasCare&&(t.minimumTemperatureC!==null||t.maximumTemperatureC!==null)?`<div class="care-tile care-wide"><span class="care-icon">❄</span><b>Recorded temperature range</b><small>${t.minimumTemperatureC!==null?esc(String(t.minimumTemperatureC))+"°C minimum":""}${t.minimumTemperatureC!==null&&t.maximumTemperatureC!==null?" · ":""}${t.maximumTemperatureC!==null?esc(String(t.maximumTemperatureC))+"°C maximum":""}</small></div>`:""}
+    </div>
+
+    <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">No reliable flowering-month data is available from the connected sources yet.</p>`:""}</div>
+
+    ${hasCare?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
+      ${t.duration?.length?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Life cycle</b><div class="small">${esc(t.duration.join(", "))}</div></div></div>`:""}
+      ${t.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
+      ${t.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}${t.leafRetention===true?" · retains leaves":t.leafRetention===false?" · not evergreen":""}</div></div></div>`:""}
+      ${t.spreadCm?`<div class="fact-row"><span class="fact-icon">↔</span><div><b>Average spread</b><div class="small">${esc(formatHeight(t.spreadCm,null))}</div></div></div>`:""}
+    </div></div>`:""}
+
+    ${tox?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety flag</h2><p class="sub" style="margin:0">${esc(tox)}</p></div>`:""}
+
     <div class="section-title"><h3>Our story</h3><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Add moment</button></div>
-    <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div></div>`;
+    <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added)}</div></div></div><div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${new Date(intel.fetchedAt).toLocaleDateString("en-GB")} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
+
   if(p.photoKey){
     const url=await getPhotoUrl(p.photoKey);
     if(url){ document.querySelector("#profileHero .plant-art")?.remove(); profileHero.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
   }
 }
+
+async function exportBackup(){
+  try{
+    const photos={};
+    for(const p of state.plants){
+      if(!p.photoKey) continue;
+      const db=await photoDB();
+      const blob=await new Promise((resolve,reject)=>{
+        const tx=db.transaction(PHOTO_STORE,"readonly");
+        const req=tx.objectStore(PHOTO_STORE).get(p.photoKey);
+        req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+      });
+      if(blob) photos[p.photoKey]=await blobToDataUrl(blob);
+    }
+    const payload={format:"FloraLens Backup",version:3,exportedAt:new Date().toISOString(),state,photos};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`FloraLens-backup-${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("Garden backup created");
+  }catch(err){ console.error(err); toast("Backup couldn’t be created"); }
+}
+function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});}
 
 function renderJournal(){
   view.innerHTML=`<section class="page-head"><div class="eyebrow">Garden journal</div><h1>Little moments</h1><p class="sub">The small things are the ones worth remembering.</p></section><button class="lens-banner" style="background:linear-gradient(135deg,#9f777d,#c49ca1)" onclick="newJournal()"><span class="lens-icon">＋</span><span><strong>Add a journal moment</strong><small>Photo, note, care task or something you noticed.</small></span></button><div class="profile-card">${state.journal.map(j=>`<div class="timeline-item"><div class="timeline-icon">${j.icon}</div><div><b>${esc(j.title)}</b><div class="small">${esc(j.date)}</div><p class="small" style="margin:5px 0 0">${esc(j.text)}</p></div></div>`).join("")}</div>`;
@@ -277,5 +440,9 @@ document.addEventListener("click",e=>{const route=e.target.closest("[data-route]
 cameraInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],"auto"); e.target.value=""; });
 galleryInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],"auto"); e.target.value=""; });
 multiPhotoInput.addEventListener("change",e=>{ if(e.target.files[0]) addCapture(e.target.files[0],window.captureOrgan||"auto"); e.target.value=""; });
+
+menuBtn?.addEventListener("click",()=>{
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v0.3 · private botanical journal</div>`);
+});
 
 renderHome();

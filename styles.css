@@ -164,3 +164,34 @@ linear-gradient(145deg,#4a614b,#24392e);box-shadow:var(--shadow)}
 @keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}}
 .setup-card{background:linear-gradient(145deg,rgba(215,204,225,.42),rgba(238,215,216,.48));border:1px solid var(--line);border-radius:24px;padding:17px;margin-top:14px}
 .setup-card code{font-size:11px;background:rgba(255,255,255,.6);padding:3px 6px;border-radius:7px}
+
+
+/* FloraLens v0.3 — botanical intelligence */
+.intel-banner{
+  background:linear-gradient(145deg,rgba(140,164,137,.17),rgba(217,199,219,.26));
+  border:1px solid var(--line); border-radius:24px; padding:17px; margin:15px 0;
+}
+.intel-banner.loading{animation:intelPulse 1.4s ease-in-out infinite}
+@keyframes intelPulse{50%{opacity:.68}}
+.source-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.source-pill{font-size:10px;font-weight:700;letter-spacing:.04em;padding:6px 9px;border-radius:999px;background:rgba(65,89,66,.09);color:var(--deep)}
+.care-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
+.care-tile{background:rgba(255,251,246,.82);border:1px solid var(--line);border-radius:20px;padding:15px;min-height:105px}
+.care-tile .care-icon{font-size:24px;display:block;margin-bottom:10px}
+.care-tile b{display:block;color:var(--deep);font-size:13px}
+.care-tile small{display:block;color:var(--muted);line-height:1.45;margin-top:3px}
+.care-wide{grid-column:1/-1}
+.season-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(239,224,210,.72),rgba(222,229,214,.72));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
+.season-card:after{content:"❀";position:absolute;right:-8px;top:-22px;font-size:84px;color:rgba(128,104,116,.10)}
+.season-card h2{font-size:27px;margin:5px 0 7px}
+.fact-list{display:grid;gap:10px;margin-top:12px}
+.fact-row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid rgba(65,89,66,.10)}
+.fact-row:first-child{border-top:0}
+.fact-row .fact-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:rgba(65,89,66,.08);flex:none}
+.good-know{background:linear-gradient(145deg,rgba(233,215,218,.52),rgba(249,243,233,.82));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
+.data-missing{color:var(--muted);font-style:italic}
+.action-row{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}
+.mini-action{border:1px solid var(--line);background:rgba(255,255,255,.65);border-radius:999px;padding:9px 12px;font-size:11px;font-weight:700;color:var(--deep)}
+.backup-card{background:linear-gradient(145deg,rgba(215,204,225,.34),rgba(225,234,218,.44));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
+.coverage{height:7px;border-radius:999px;background:rgba(65,89,66,.09);overflow:hidden;margin-top:9px}
+.coverage > span{display:block;height:100%;background:linear-gradient(90deg,#8da58b,#b998a3);border-radius:999px}
