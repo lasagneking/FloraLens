@@ -1108,6 +1108,35 @@ function floweringSeasonMonths(season){
   return [];
 }
 
+
+function plantAtlasPhenology(scientificName=""){
+  const db=window.FLORALENS_PHENOLOGY;
+  if(!db) return null;
+  const key=String(scientificName||"").replace(/[×]/g,"x").replace(/\s+/g," ").trim().toLowerCase();
+  const row=db[key];
+  if(!row) return null;
+  const months=(start,end)=>{
+    start=Number(start);end=Number(end);
+    if(!Number.isFinite(start)||!Number.isFinite(end)||start<1||start>12||end<1||end>12)return [];
+    const out=[];let m=start;
+    for(let i=0;i<12;i++){out.push(m);if(m===end)break;m=m===12?1:m+1;}
+    return out;
+  };
+  return {flowerStart:row[0]??null,flowerEnd:row[1]??null,leafStart:row[2]??null,leafEnd:row[3]??null,
+    flowerNote:row[4]||null,leafNote:row[5]||null,vernacular:row[6]||null,
+    bloomMonths:months(row[0],row[1]),leafMonths:months(row[2],row[3]),source:"Plant Atlas 2020"};
+}
+function monthNameShort(m){return ["","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][Number(m)]||"";}
+function plantAtlasSeasonText(pa){
+  if(!pa?.bloomMonths?.length)return null;
+  const now=new Date().getMonth()+1;
+  const range=pa.flowerStart===pa.flowerEnd?monthNameShort(pa.flowerStart):`${monthNameShort(pa.flowerStart)}–${monthNameShort(pa.flowerEnd)}`;
+  if(pa.bloomMonths.includes(now))
+    return `Plant Atlas records this species flowering in Britain and Ireland from ${range}. ${monthNameShort(now)} falls inside that flowering window.${pa.flowerNote?` ${pa.flowerNote}`:""}`;
+  const next=pa.bloomMonths.find(m=>m>now)||pa.bloomMonths[0];
+  return `Plant Atlas records this species flowering in Britain and Ireland from ${range}. Its next recorded flowering month is ${monthNameShort(next)}.${pa.flowerNote?` ${pa.flowerNote}`:""}`;
+}
+
 function traitRecordFor(scientificName=""){
   const db=window.FLORALENS_TRAITS;
   if(!db) return null;
@@ -1136,6 +1165,7 @@ function traitCareInference(tr){
   return {water,soil};
 }
 function resolvedCare(scientificName,t,pn){
+  const pa=plantAtlasPhenology(scientificName);
   const tr=traitRecordFor(scientificName);
   const inferred=traitCareInference(tr);
   const localMatches=floralensCareMatches(scientificName);
@@ -1175,7 +1205,8 @@ function resolvedCare(scientificName,t,pn){
     growthHabit:usable(prettyTrait(tr?.growthForm))
   };
   const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || usable(traitFields[k]) || null;
-  const bloom = exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
+  const bloom = pa?.bloomMonths?.length ? pa.bloomMonths :
+                exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
                 pCare.bloomMonths?.length ? pCare.bloomMonths :
                 tCare.bloomMonths?.length ? tCare.bloomMonths :
                 genusLocal?.bloomMonths || [];
@@ -1189,6 +1220,7 @@ function resolvedCare(scientificName,t,pn){
     hardiness:pick("hardiness"),
     safety:usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety),
     seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
+    plantAtlas:pa,
     localSource:local?.source||null,
     localMatchLevel:local?.matchLevel||null,
     usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v),
@@ -1948,12 +1980,16 @@ async function renderProfile(id,isNew=false){
   const g=intel?.gbif||null;
   const care=resolvedCare(p.scientific,t,pn);
   const sourceNames=[...(intel?.sources||[])];
+  if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
   if(care.usedTraits) sourceNames.push(`TRY traits · ${care.traitMatchLevel}`);
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
   const seasonalLocal=care.seasonal?.[currentSeason]||null;
+  const atlasSeasonal=plantAtlasSeasonText(care.plantAtlas);
+  const seasonalText=atlasSeasonal||seasonalLocal||null;
+  const seasonalTitle=atlasSeasonal?"Flowering season":seasonalLocal?"Seasonal care":null;
   const taxonConfirmed=!!(g||t);
   const careAvailable=[care.light,care.water,care.soil,care.height,care.growthHabit,care.pruning,care.hardiness].filter(Boolean).length;
   const careCoverage=Math.round((careAvailable/7)*100);
@@ -1995,7 +2031,7 @@ async function renderProfile(id,isNew=false){
 
     <section style="padding:10px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p><div class="species-cache">Species record: ${esc(p.speciesKey||"")} · ${cached.fetchedAt?new Date(cached.fetchedAt).toLocaleDateString("en-GB"):"local"}</div></section>
 
-    <div class="season-card"><div class="eyebrow">Right now</div><h2>${seasonalLocal?"Seasonal care":"Seasonal note"}</h2><p class="sub" style="margin:0">${esc(seasonalLocal||currentSeasonNote(t,p).text)}</p></div>
+    ${seasonalText?`<div class="season-card"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
 
     <div class="care-grid">
       ${care.light?`<div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(care.light)}</small></div>`:""}
@@ -2363,7 +2399,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.1 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.2 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();

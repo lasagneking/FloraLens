@@ -287,3 +287,12 @@ No Cloudflare or API-secret changes are required.
 - Heart and delete controls now live inside a normal grid overlay on the image instead of using absolute-positioned glass layers.
 - Removed backdrop-filter and entrance transforms from Discover cards, avoiding the Safari/WebKit compositing bug that produced clickable “ghost” controls.
 - No data model, Discover records, API or Cloudflare changes.
+
+
+## v1.2.2 — Plant Atlas phenology
+- Added local Plant Atlas 2020 phenology from the supplied dataset.
+- 3,397 taxa with usable leaf and/or flowering phenology are packaged locally.
+- Plant Atlas flowering months now feed profiles, Flowering Now and Coming Soon.
+- The empty Seasonal Note fallback is gone; the card is hidden when there is no useful seasonal information.
+- Plant Atlas-derived information is explicitly labelled.
+- No Cloudflare changes.
