@@ -296,3 +296,15 @@ No Cloudflare or API-secret changes are required.
 - The empty Seasonal Note fallback is gone; the card is hidden when there is no useful seasonal information.
 - Plant Atlas-derived information is explicitly labelled.
 - No Cloudflare changes.
+
+
+## v1.2.3 — Plant Doctor Beta
+- Lens now offers Identify a Plant or Plant Doctor Beta.
+- Plant Doctor works from an existing My Garden species record plus a close health photo.
+- For supported PlantVillage crop classes, an open TensorFlow.js disease classifier runs client-side in the browser.
+- Unsupported ornamental plants are never assigned a made-up disease label.
+- A clearly labelled colour-pattern pre-screen can report visible browning/yellowing, but is not presented as AI diagnosis.
+- Results are phrased as things to investigate, not confirmed diagnoses.
+- Health checks can be saved to the plant's Journal story with the original photo.
+- TensorFlow.js and model files load only when Plant Doctor is used.
+- No paid API and no Cloudflare changes.
