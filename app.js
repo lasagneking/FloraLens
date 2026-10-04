@@ -1400,7 +1400,7 @@ function buildDistributionRecord({g=null,p=null}={}){
   };
 }
 function distributionBaseSvg(regions=[]){
-  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.15" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
+  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.16" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
 }
 
 function renderDistributionCard(record){
@@ -1440,7 +1440,7 @@ function getWorldMapMask(){
       }catch(err){ reject(err); }
     };
     img.onerror=()=>reject(new Error('Map mask failed to load'));
-    img.src='world-map.svg?v=1.2.15';
+    img.src='world-map.svg?v=1.2.16';
   });
   return worldMapMaskPromise;
 }
@@ -2296,6 +2296,98 @@ function setProfileTab(tab){
   const active=document.querySelector(`.profile-panel[data-profile-panel="${tab}"]`);
   if(active) active.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
+function firstSentence(text="",max=138){
+  const clean=String(text||"").replace(/\s+/g," ").trim();
+  if(!clean) return "";
+  const m=clean.match(/^(.+?[.!?])(?:\s|$)/);
+  const sentence=(m?.[1]||clean).trim();
+  return sentence.length>max ? `${sentence.slice(0,max-1).trim()}…` : sentence;
+}
+function monthDistance(from,to){
+  return (to-from+12)%12;
+}
+function plantTodayModel(p,care,isDiscovery=false){
+  const now=new Date();
+  const month=now.getMonth()+1;
+  const season=seasonKey();
+  const bloom=Array.isArray(care?.bloomMonths)?care.bloomMonths:[];
+  const items=[];
+  const add=(icon,title,detail,tone="calm")=>{
+    if(!detail||items.some(x=>x.title===title)) return;
+    items.push({icon,title,detail:firstSentence(detail,156),tone});
+  };
+
+  if(!isDiscovery){
+    const today=localISODate(now);
+    const tasks=state.careTasks
+      .filter(t=>t.plantId===p.id && !t.completed)
+      .sort((a,b)=>String(a.due||"").localeCompare(String(b.due||"")));
+    const due=tasks.find(t=>t.due && t.due<=today);
+    if(due){
+      add(careTaskIcon(due.type),"Care job due",`${due.title}${due.notes?` — ${due.notes}`:""}`,"attention");
+    }else{
+      const next=tasks.find(t=>t.due && daysFromToday(t.due)<=14);
+      if(next) add(careTaskIcon(next.type),"Coming up",`${next.title} · ${careDateLabel(next.due)}`,"calm");
+    }
+  }
+
+  if(bloom.length){
+    if(bloom.includes(month)){
+      add("✿","Flowering now","This month sits inside the recorded flowering window.","positive");
+    }else{
+      const future=bloom.map(m=>({m,d:monthDistance(month,m)})).filter(x=>x.d>0).sort((a,b)=>a.d-b.d)[0];
+      if(future){
+        const names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const detail=future.d<=3?`The next recorded flowering month is ${names[future.m-1]}.`:`The recorded flowering window is currently closed; next recorded flowering is ${names[future.m-1]}.`;
+        add("◌","Flowering status",detail,"calm");
+      }
+    }
+  }
+
+  const water=String(care?.water||p?.water||"").trim();
+  const waterLower=water.toLowerCase();
+  if(water){
+    if(/keep.*moist|evenly moist|consistent moisture|regular|water regularly|lightly moist/.test(waterLower)){
+      add("💧","Check moisture","Moisture matters for this plant; check the soil or compost before deciding whether to water.","calm");
+    }else if(/dry|low|drought|allow.*dry|free-draining/.test(waterLower)){
+      add("💧","Don’t overwater","Its stored guidance favours drying or lower moisture between waterings.","positive");
+    }else{
+      add("💧","Watering context",water,"calm");
+    }
+  }
+
+  const hardiness=String(care?.hardiness||"").trim();
+  if(["autumn","winter"].includes(season) && /tender|frost[- ]?free|indoors|protect.*frost|minimum temperature/i.test(hardiness)){
+    add("❄","Cold protection",hardiness,"attention");
+  }
+
+  const pruning=String(care?.pruning||"").trim();
+  if(pruning){
+    if(bloom.includes(month) && /after flowering|once flowering|post-flowering/i.test(pruning)){
+      add("✂","Hold off pruning","The stored pruning guidance says to wait until flowering has finished.","attention");
+    }else if(/autumn|winter|spring|summer|after flowering|prune/i.test(pruning)){
+      add("✂","Pruning note",pruning,"calm");
+    }
+  }
+
+  const seasonal=care?.seasonal?.[season];
+  if(seasonal) add("❧",`${season[0].toUpperCase()+season.slice(1)} guidance`,seasonal,"positive");
+
+  const limited=items.slice(0,3);
+  if(!limited.length){
+    limited.push({icon:"✓",title:"Nothing urgent flagged",detail:"FloraLens has no time-sensitive care signal for this plant today.",tone:"positive"});
+  }
+
+  const hasAttention=limited.some(x=>x.tone==="attention");
+  const hasPositive=limited.some(x=>x.tone==="positive");
+  const headline=hasAttention?"A little attention is useful":hasPositive?"Looking settled today":"A quiet day for this plant";
+  return {headline,items:limited,isDiscovery,date:now.toLocaleDateString("en-GB",{day:"numeric",month:"short"})};
+}
+function renderPlantTodayCard(model,p){
+  const title=model.isDiscovery?"Care snapshot":"Your plant today";
+  const sub=model.isDiscovery?"A practical preview from the care record":"What FloraLens can say from the record you already have";
+  return `<section class="plant-today-card"><div class="plant-today-head"><div><div class="eyebrow">${esc(model.date)} · ${model.isDiscovery?"preview":"today"}</div><h2>${title}</h2><p>${esc(sub)}</p></div><span class="plant-today-mark">${model.items.some(x=>x.tone==="attention")?"!":"❧"}</span></div><div class="plant-today-status">${esc(model.headline)}</div><div class="plant-today-list">${model.items.map(item=>`<div class="plant-today-item ${item.tone}"><span>${item.icon}</span><div><b>${esc(item.title)}</b><p>${esc(item.detail)}</p></div></div>`).join("")}</div>${model.isDiscovery?"":`<div class="plant-today-actions"><button class="mini-action" onclick="openCareComposer('${p.id}')">＋ Add care job</button><button class="mini-action" onclick="setRoute('care')">Open Care Calendar →</button></div>`}</section>`;
+}
 
 async function renderProfile(id,isNew=false){
   currentRoute="profile";
@@ -2333,6 +2425,7 @@ async function renderProfile(id,isNew=false){
   const bloomStatus=profileBloomStatus(bloom);
   const backRoute=isDiscovery?"discover":"garden";
   const backLabel=isDiscovery?"Discover":"My Garden";
+  const plantToday=plantTodayModel(p,care,isDiscovery);
 
   const botanicalRows=(care.growthHabit||care.growthRate||care.traitGrowthFormDetailed||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||care.traitVegetation||care.traitClimate||care.traitEllenberg||care.traitSubstrate||care.traitNutrientContext||care.traitSoilMoistureContext||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="dossier-facts">
       ${care.traitGrowthFormDetailed?`<div class="dossier-fact"><span>❧</span><div><small>Growth form</small><b>${esc(care.traitGrowthFormDetailed)}</b></div></div>`:care.growthHabit?`<div class="dossier-fact"><span>❧</span><div><small>Growth form</small><b>${esc(care.growthHabit)}</b></div></div>`:""}
@@ -2382,6 +2475,7 @@ async function renderProfile(id,isNew=false){
 
     <section class="profile-panel active" data-profile-panel="care">
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
+      ${renderPlantTodayCard(plantToday,p)}
       ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>AT A GLANCE</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
       <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
@@ -2979,7 +3073,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.15 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.16 · private botanical journal</div>`);
 });
 
 renderHome();
