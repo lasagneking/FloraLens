@@ -1146,15 +1146,67 @@ function tryV7ShardLetter(scientificName=""){
   const c=normaliseScientificName(scientificName).charAt(0).toLowerCase();
   return /^[a-z]$/.test(c)?c:null;
 }
-function cachedTryV7Record(scientificName=""){
-  const letter=tryV7ShardLetter(scientificName), promise=letter&&tryV7Shards.get(letter);
-  if(!promise?.__resolved) return null;
-  const wanted=normaliseScientificName(scientificName).toLowerCase();
-  for(const [name,row] of Object.entries(promise.__resolved||{})) if(normaliseScientificName(name).toLowerCase()===wanted) return row;
+function tryV7LookupCandidates(scientificName=""){
+  const exact=normaliseScientificName(scientificName);
+  if(!exact) return [];
+  const exactParts=exact.split(/\s+/).filter(Boolean);
+  const out=[{name:exact,matchLevel:exactParts.length===1?"genus":"species"}];
+  const withoutCultivar=exact.replace(/\s+['"“”][^'"“”]+['"“”](?:\s.*)?$/u,"").trim();
+  const parts=withoutCultivar.split(/\s+/).filter(Boolean);
+  let binomial=null;
+  if(parts.length>=2 && /^[A-Za-z][A-Za-z.-]*$/.test(parts[0])){
+    if(parts[1].toLowerCase()==="x" && parts[2] && /^[A-Za-z][A-Za-z.-]*$/.test(parts[2])) binomial=`${parts[0]} x ${parts[2]}`;
+    else if(/^[a-z][A-Za-z.-]*$/.test(parts[1])) binomial=`${parts[0]} ${parts[1]}`;
+  }
+  if(binomial && normaliseScientificName(binomial).toLowerCase()!==exact.toLowerCase()) out.push({name:binomial,matchLevel:"species"});
+  const genus=parts[0]||exact.split(/\s+/)[0];
+  if(genus && /^[A-Za-z][A-Za-z.-]*$/.test(genus)) out.push({name:genus,matchLevel:"genus"});
+  const seen=new Set();
+  return out.filter(x=>{const k=normaliseScientificName(x.name).toLowerCase();if(seen.has(k))return false;seen.add(k);return true;});
+}
+function findTryV7Match(db,scientificName=""){
+  if(!db) return null;
+  const index=new Map(Object.entries(db).map(([name,row])=>[normaliseScientificName(name).toLowerCase(),{name,row}]));
+  for(const candidate of tryV7LookupCandidates(scientificName)){
+    const hit=index.get(normaliseScientificName(candidate.name).toLowerCase());
+    if(hit) return {data:hit.row,matchedName:hit.name,matchLevel:candidate.matchLevel,dataset:"TRY v7"};
+  }
   return null;
 }
+function persistedTryV7Match(scientificName="",speciesKey=null){
+  const keys=[speciesKey,slug(scientificName)].filter(Boolean);
+  for(const key of keys){
+    const hit=state?.speciesCache?.[key]?.tryV7;
+    if(hit?.data) return hit;
+  }
+  const wanted=normaliseScientificName(scientificName).toLowerCase();
+  for(const entry of Object.values(state?.speciesCache||{})){
+    if(normaliseScientificName(entry?.scientific||"").toLowerCase()===wanted && entry?.tryV7?.data) return entry.tryV7;
+  }
+  return null;
+}
+function cachedTryV7Record(scientificName="",speciesKey=null){
+  const persisted=persistedTryV7Match(scientificName,speciesKey);
+  if(persisted) return persisted;
+  const letter=tryV7ShardLetter(scientificName), promise=letter&&tryV7Shards.get(letter);
+  if(!promise?.__resolved) return null;
+  return findTryV7Match(promise.__resolved,scientificName);
+}
+function persistTryV7Match(scientificName,speciesKey,match){
+  if(!match?.data) return false;
+  const key=speciesKey||slug(scientificName);
+  const current=state.speciesCache[key]||{scientific:scientificName};
+  const next={data:match.data,matchedName:match.matchedName,matchLevel:match.matchLevel,dataset:"TRY v7",cachedAt:new Date().toISOString()};
+  const old=current.tryV7;
+  const same=old && old.matchedName===next.matchedName && old.matchLevel===next.matchLevel && JSON.stringify(old.data)===JSON.stringify(next.data);
+  if(same) return false;
+  state.speciesCache[key]={...current,scientific:current.scientific||scientificName,tryV7:next};
+  return true;
+}
 // Wrap shard promises so synchronous care rendering can reuse already-loaded data.
-async function preloadTryV7(scientificName=""){
+async function preloadTryV7(scientificName="",speciesKey=null){
+  const persisted=persistedTryV7Match(scientificName,speciesKey);
+  if(persisted) return persisted;
   const letter=tryV7ShardLetter(scientificName);
   if(!letter) return null;
   if(!tryV7Shards.has(letter)){
@@ -1164,20 +1216,21 @@ async function preloadTryV7(scientificName=""){
   }
   const promise=tryV7Shards.get(letter), db=await promise;
   promise.__resolved=db;
-  const wanted=normaliseScientificName(scientificName).toLowerCase();
-  for(const [name,row] of Object.entries(db||{})) if(normaliseScientificName(name).toLowerCase()===wanted) return row;
-  return null;
+  const match=findTryV7Match(db,scientificName);
+  if(match && persistTryV7Match(scientificName,speciesKey,match)) saveState();
+  return match;
 }
-function traitRecordFor(scientificName=""){
-  const v7=cachedTryV7Record(scientificName);
-  if(v7) return {
-    ...v7,
-    heightM:v7.heightEstimateM??null,
-    habitat:v7.habitat||v7.vegetation||null,
-    matchLevel:"species",
+function traitRecordFor(scientificName="",speciesKey=null){
+  const v7=cachedTryV7Record(scientificName,speciesKey);
+  if(v7?.data) return {
+    ...v7.data,
+    heightM:v7.data.heightEstimateM??null,
+    habitat:v7.data.habitat||v7.data.vegetation||null,
+    matchLevel:v7.matchLevel||"species",
+    matchedName:v7.matchedName||v7.data.name||scientificName,
     dataset:"TRY v7"
   };
-  // Legacy TRY Archive 81 remains a genus/species fallback if v7 has no exact record.
+  // Legacy TRY Archive 81 remains a genus/species fallback if v7 has no usable record.
   const db=window.FLORALENS_TRAITS;
   if(!db) return null;
   const n=normaliseScientificName(scientificName).toLowerCase();
@@ -1189,20 +1242,38 @@ function traitRecordFor(scientificName=""){
 function prettyTrait(v){
   if(!usable(v)) return null;
   const raw=String(v).trim();
-  if(raw.toUpperCase()==="W") return "Woody";
-  if(raw.toUpperCase()==="NW") return "Non-woody";
-  if(/^[A-Z]$/.test(raw)) return null; // suppress opaque one-letter source codes
-  return raw.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+  const upper=raw.toUpperCase();
+  if(upper==="W") return "Woody";
+  if(upper==="NW") return "Non-woody";
+  if(/^[A-Z]$/.test(raw) || /^\d+(?:\.\d+)?$/.test(raw) || ["TMP","BOR","FREEZINGEXPOSED"].includes(upper)) return null;
+  return raw.replaceAll("_"," ").replace(/([a-z])([A-Z])/g,"$1 $2").replace(/\b\w/g,c=>c.toUpperCase());
+}
+function prettyObjectValues(obj,labelMap={}){
+  if(!obj || typeof obj!=="object" || Array.isArray(obj)) return null;
+  const bits=[];
+  for(const [k,v] of Object.entries(obj)){
+    const pv=prettyTrait(v);
+    if(!pv) continue;
+    const label=labelMap[k]||k.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+    bits.push(`${label}: ${pv}`);
+  }
+  return bits.length?bits.join(" · "):null;
+}
+function formatEllenberg(v){
+  if(!v || typeof v!=="object") return null;
+  const labels={light:"Light",moisture:"Moisture",reaction:"Soil reaction",temperature:"Temperature",nitrogen:"Nitrogen",continentality:"Continentality",salinity:"Salinity"};
+  const bits=Object.entries(v).filter(([,x])=>Number.isFinite(Number(x))).map(([k,x])=>`${labels[k]||k}: ${Number(x)}`);
+  return bits.length?bits.join(" · "):null;
 }
 function traitHeight(tr){
   if(!tr?.heightM) return null;
   const h=Number(tr.heightM); if(!Number.isFinite(h)||h<=0) return null;
-  if(h<1) return `Typical TRY vegetative height about ${Math.round(h*100)} cm`;
-  return `Typical TRY vegetative height about ${h.toFixed(h<10?1:0)} m`;
+  if(h<1) return `TRY height estimate about ${Math.round(h*100)} cm`;
+  return `TRY height estimate about ${h.toFixed(h<10?1:0)} m`;
 }
 function traitCareInference(tr){
   if(!tr) return {};
-  const gf=String(tr.growthForm||"").toLowerCase(), succ=String(tr.succulence||"").toLowerCase(), hab=String(tr.habitat||"").toLowerCase();
+  const gf=String(tr.growthFormDetailed||tr.growthForm||"").toLowerCase(), succ=String(tr.succulence||"").toLowerCase(), hab=String(tr.habitat||"").toLowerCase();
   let water=null,soil=null;
   if(hab.includes("aquatic")){ water="Moisture-loving / aquatic growth strategy indicated by TRY traits."; soil="Keep consistently wet or aquatic as appropriate to the identified species."; }
   else if(succ){ water="Succulent growth suggests conservative watering; let the growing medium drain well between waterings."; soil="A free-draining growing medium is a sensible starting point for this succulent growth form."; }
@@ -1211,9 +1282,9 @@ function traitCareInference(tr){
   else if(gf.includes("herbaceous")){ water="Moderate, even moisture during active growth is a general starting point; adjust for the species and weather."; soil="A reasonably fertile, well-drained garden soil suits many herbaceous plants; verify species-specific exceptions."; }
   return {water,soil};
 }
-function resolvedCare(scientificName,t,pn){
+function resolvedCare(scientificName,t,pn,speciesKey=null){
   const pa=plantAtlasPhenology(scientificName);
-  const tr=traitRecordFor(scientificName);
+  const tr=traitRecordFor(scientificName,speciesKey);
   const inferred=traitCareInference(tr);
   const localMatches=floralensCareMatches(scientificName);
   const exactLocal=localMatches.exact;
@@ -1222,64 +1293,44 @@ function resolvedCare(scientificName,t,pn){
   const trefleSoil = t ? usable(soilLabel(t)) : null;
 
   const pCare={
-    light: usable(perenualSun(pn)),
-    water: usable(perenualWater(pn)),
-    soil: usable(perenualSoil(pn)),
-    height: usable(perenualHeight(pn)),
-    bloomMonths: floweringSeasonMonths(pn?.floweringSeason),
-    growthHabit: usable(pn?.type),
-    growthRate: usable(pn?.growthRate),
-    hardiness: usable(perenualHardiness(pn)),
-    safety: pn?.poisonousToHumans===true || pn?.poisonousToPets===true
-      ? `Recorded as poisonous${pn.poisonousToHumans===true?" to humans":""}${pn.poisonousToHumans===true&&pn.poisonousToPets===true?" and":""}${pn.poisonousToPets===true?" to pets":""}.`
-      : null
+    light: usable(perenualSun(pn)), water: usable(perenualWater(pn)), soil: usable(perenualSoil(pn)), height: usable(perenualHeight(pn)),
+    bloomMonths: floweringSeasonMonths(pn?.floweringSeason), growthHabit: usable(pn?.type), growthRate: usable(pn?.growthRate), hardiness: usable(perenualHardiness(pn)),
+    safety: pn?.poisonousToHumans===true || pn?.poisonousToPets===true ? `Recorded as poisonous${pn.poisonousToHumans===true?" to humans":""}${pn.poisonousToHumans===true&&pn.poisonousToPets===true?" and":""}${pn.poisonousToPets===true?" to pets":""}.` : null
   };
-
   const tCare={
     light: t?.light!==null && t?.light!==undefined ? usable(lightLabel(t.light)) : null,
     water: t?.soilHumidity!==null && t?.soilHumidity!==undefined ? usable(moistureLabel(t.soilHumidity)) : null,
     soil: trefleSoil,
     height: t && (t.averageHeightCm||t.maximumHeightCm) ? usable(formatHeight(t.averageHeightCm,t.maximumHeightCm)) : null,
     bloomMonths: t?.bloomMonths?.length ? monthsToNumbers(t.bloomMonths) : [],
-    growthHabit: usable(t?.growthHabit),
-    growthRate: usable(t?.growthRate),
+    growthHabit: usable(t?.growthHabit), growthRate: usable(t?.growthRate),
     hardiness: t?.minimumTemperatureC!==null && t?.minimumTemperatureC!==undefined ? `Recorded minimum temperature ${t.minimumTemperatureC}°C` : null,
     safety: toxicityCopy(t)
   };
-
   const traitFields={
     water:usable(inferred.water), soil:usable(inferred.soil), height:usable(traitHeight(tr)),
-    growthHabit:usable(prettyTrait(tr?.growthForm))
+    growthHabit:usable(prettyTrait(tr?.growthFormDetailed)||prettyTrait(tr?.growthForm))
   };
   const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || usable(traitFields[k]) || null;
-  const bloom = pa?.bloomMonths?.length ? pa.bloomMonths :
-                exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
-                pCare.bloomMonths?.length ? pCare.bloomMonths :
-                tCare.bloomMonths?.length ? tCare.bloomMonths :
-                genusLocal?.bloomMonths?.length ? genusLocal.bloomMonths :
-                tr?.floweringMonths?.length ? monthsToNumbers(tr.floweringMonths) : [];
-
+  const bloom = pa?.bloomMonths?.length ? pa.bloomMonths : exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths : pCare.bloomMonths?.length ? pCare.bloomMonths : tCare.bloomMonths?.length ? tCare.bloomMonths : genusLocal?.bloomMonths?.length ? genusLocal.bloomMonths : tr?.floweringMonths?.length ? monthsToNumbers(tr.floweringMonths) : [];
   return {
-    light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"),
-    bloomMonths:bloom,
-    growthHabit:pick("growthHabit"), growthRate:pick("growthRate"),
-    pruning:usable(exactLocal?.pruning)||usable(genusLocal?.pruning),
-    propagation:usable(exactLocal?.propagation)||usable(genusLocal?.propagation),
-    hardiness:pick("hardiness"),
-    safety:usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety),
-    seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
-    plantAtlas:pa,
-    localSource:local?.source||null,
-    localMatchLevel:local?.matchLevel||null,
-    usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v),
-    usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v),
-    usedLocal:!!local,
-    usedTraits:!!tr, traitMatchLevel:tr?.matchLevel||null,
-    traitWoodiness:prettyTrait(tr?.woodiness), traitLeafType:prettyTrait(tr?.leafType), traitHabitat:prettyTrait(tr?.habitat), traitSucculence:prettyTrait(tr?.succulence),
+    light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"), bloomMonths:bloom,
+    growthHabit:pick("growthHabit"), growthRate:pick("growthRate"), pruning:usable(exactLocal?.pruning)||usable(genusLocal?.pruning), propagation:usable(exactLocal?.propagation)||usable(genusLocal?.propagation), hardiness:pick("hardiness"),
+    safety:usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety), seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
+    plantAtlas:pa, localSource:local?.source||null, localMatchLevel:local?.matchLevel||null,
+    usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v), usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v), usedLocal:!!local,
+    usedTraits:!!tr, traitMatchLevel:tr?.matchLevel||null, traitMatchedName:tr?.matchedName||null,
+    traitGrowthFormDetailed:prettyTrait(tr?.growthFormDetailed), traitWoodiness:prettyTrait(tr?.woodiness), traitLeafType:prettyTrait(tr?.leafType), traitHabitat:prettyTrait(tr?.habitat), traitSucculence:prettyTrait(tr?.succulence),
     traitLifeHistory:prettyTrait(tr?.lifeHistory), traitLeafPhenology:prettyTrait(tr?.leafPhenology), traitFlowerColour:prettyTrait(tr?.flowerColour),
-    traitSoilPH:tr?.soilPH||null, traitTolerances:tr?.tolerances||null, traitClimate:prettyTrait(tr?.climate), traitVegetation:prettyTrait(tr?.vegetation),
+    traitSoilPH:tr?.soilPH||null, traitTolerances:prettyObjectValues(tr?.tolerances), traitClimate:prettyTrait(tr?.climate), traitVegetation:prettyTrait(tr?.vegetation),
+    traitEllenberg:formatEllenberg(tr?.ellenberg), traitSubstrate:prettyTrait(tr?.substrate), traitNutrientContext:prettyTrait(tr?.nutrientContext), traitSoilMoistureContext:prettyTrait(tr?.soilMoistureContext),
     traitDataset:tr?.dataset||null
   };
+}
+function botanicalCoverage(care){
+  const fields=[care.growthHabit,care.traitGrowthFormDetailed,care.traitWoodiness,care.traitLifeHistory,care.traitLeafPhenology,care.bloomMonths?.length?"yes":null,care.traitFlowerColour,care.height,care.traitSoilPH,care.traitTolerances,care.traitHabitat,care.traitVegetation,care.traitClimate,care.traitEllenberg,care.traitSubstrate,care.traitNutrientContext,care.traitSoilMoistureContext];
+  const available=fields.filter(Boolean).length;
+  return Math.round((available/fields.length)*100);
 }
 
 
@@ -1925,7 +1976,7 @@ function syncPlantsFromSpecies(speciesKey){
   if(!cache) return;
   const intel=cache.enrichment||{};
   state.plants.filter(p=>p.speciesKey===speciesKey).forEach(p=>{
-    const care=resolvedCare(p.scientific,intel.trefle||null,intel.perenual||null);
+    const care=resolvedCare(p.scientific,intel.trefle||null,intel.perenual||null,p.speciesKey);
     if(care.bloomMonths?.length) p.bloom=care.bloomMonths;
     if(care.height) p.height=care.height;
     if(care.light) p.sun=care.light;
@@ -2041,17 +2092,18 @@ async function renderProfile(id,isNew=false){
   const p=gardenPlant||discovery;
   const isDiscovery=!!discovery&&!gardenPlant;
   if(!p) return setRoute("home");
-  await preloadTryV7(p.scientific);
+  await preloadTryV7(p.scientific,p.speciesKey);
   const cached=state.speciesCache[p.speciesKey]||{};
   const intel=cached.enrichment||null;
+  const hasBotanicalIntel=!!(intel||cached.tryV7);
   const t=intel?.trefle||null;
   const pn=intel?.perenual||null;
   const g=intel?.gbif||null;
-  const care=resolvedCare(p.scientific,t,pn);
+  const care=resolvedCare(p.scientific,t,pn,p.speciesKey);
   const sourceNames=[...(intel?.sources||[])];
   if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
-  if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel}`);
+  if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel==="genus"?"genus context":"species"}`);
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
@@ -2062,10 +2114,11 @@ async function renderProfile(id,isNew=false){
   const taxonConfirmed=!!(g||t);
   const careAvailable=[care.light,care.water,care.soil,care.height,care.growthHabit,care.pruning,care.hardiness].filter(Boolean).length;
   const careCoverage=Math.round((careAvailable/7)*100);
+  const botanicalRecordCoverage=botanicalCoverage(care);
 
   let intelTitle="Gathering botanical notes…";
   let intelText="FloraLens is building a reusable species record so this only has to happen once.";
-  if(intel){
+  if(hasBotanicalIntel){
     if(careAvailable>=4){
       intelTitle="Growing guide ready";
       intelText=care.usedPerenual
@@ -2073,9 +2126,11 @@ async function renderProfile(id,isNew=false){
         :care.usedLocal
           ?"FloraLens matched this plant to its curated UK-garden care library and filled gaps left by the botanical APIs."
           :"Connected botanical sources supplied useful growing information for this species.";
-    }else if(taxonConfirmed){
+    }else if(taxonConfirmed||care.usedTraits){
       intelTitle="Botanical record found";
-      intelText="The species is confirmed, but detailed horticultural care information is still limited for this plant.";
+      intelText=care.traitMatchLevel==="genus"
+        ?"FloraLens found useful genus-level botanical context. Detailed species-specific horticultural care information is still limited for this plant."
+        :"The species is confirmed, but detailed horticultural care information is still limited for this plant.";
     }
   }
 
@@ -2088,12 +2143,14 @@ async function renderProfile(id,isNew=false){
   view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
     <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family||"")}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">${heroLabel}</span></div></div>
 
-    <div class="intel-banner ${!intel?"loading":""}">
+    <div class="intel-banner ${!hasBotanicalIntel?"loading":""}">
       <div class="eyebrow">Botanical intelligence</div>
       <h2 style="font-size:24px;margin:5px 0">${esc(intelTitle)}</h2>
       <p class="small">${esc(intelText)}</p>
-      ${intel?`<div class="coverage"><span style="width:${careCoverage}%"></span></div>
-      <div class="small" style="margin-top:6px">${careCoverage}% of core care fields available</div>
+      ${hasBotanicalIntel?`<div class="coverage-label"><span>Practical care</span><b>${careCoverage}%</b></div><div class="coverage"><span style="width:${careCoverage}%"></span></div>
+      <div class="small" style="margin-top:5px">Practical growing guidance currently available.</div>
+      <div class="coverage-label" style="margin-top:11px"><span>Botanical record</span><b>${botanicalRecordCoverage}%</b></div><div class="coverage"><span style="width:${botanicalRecordCoverage}%"></span></div>
+      <div class="small" style="margin-top:5px">Species traits and ecological context currently available.</div>
       <div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div>
       <div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div>`:""}
     </div>
@@ -2115,17 +2172,24 @@ async function renderProfile(id,isNew=false){
 
     <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
 
-    ${(care.growthHabit||care.growthRate||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
+    ${(care.growthHabit||care.growthRate||care.traitGrowthFormDetailed||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||care.traitVegetation||care.traitClimate||care.traitEllenberg||care.traitSubstrate||care.traitNutrientContext||care.traitSoilMoistureContext||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
       ${care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Habit</b><div class="small">${esc(care.growthHabit)}</div></div></div>`:""}
+      ${care.traitGrowthFormDetailed && care.traitGrowthFormDetailed!==care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Detailed growth form</b><div class="small">${esc(care.traitGrowthFormDetailed)}</div></div></div>`:""}
       ${care.growthRate?`<div class="fact-row"><span class="fact-icon">↗</span><div><b>Growth rate</b><div class="small">${esc(care.growthRate)}</div></div></div>`:""}
       ${care.traitWoodiness?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Woodiness</b><div class="small">${esc(care.traitWoodiness)}</div></div></div>`:""}
       ${care.traitLifeHistory?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Life history</b><div class="small">${esc(care.traitLifeHistory)}</div></div></div>`:""}
       ${care.traitLeafPhenology?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf phenology</b><div class="small">${esc(care.traitLeafPhenology)}</div></div></div>`:""}
       ${care.traitFlowerColour?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colour</b><div class="small">${esc(care.traitFlowerColour)}</div></div></div>`:""}
       ${care.traitSoilPH?`<div class="fact-row"><span class="fact-icon">◇</span><div><b>Recorded soil pH</b><div class="small">${esc(care.traitSoilPH.min??"?")}–${esc(care.traitSoilPH.max??"?")}</div></div></div>`:""}
-      ${care.traitTolerances?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Recorded tolerances</b><div class="small">${esc(Object.entries(care.traitTolerances).map(([k,v])=>`${k}: ${v}`).join(" · "))}</div></div></div>`:""}
+      ${care.traitTolerances?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Recorded tolerances</b><div class="small">${esc(care.traitTolerances)}</div></div></div>`:""}
       ${care.traitLeafType?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf type</b><div class="small">${esc(care.traitLeafType)}</div></div></div>`:""}
-      ${care.traitHabitat?`<div class="fact-row"><span class="fact-icon">⌂</span><div><b>Habitat strategy</b><div class="small">${esc(care.traitHabitat)}</div></div></div>`:""}
+      ${care.traitHabitat?`<div class="fact-row"><span class="fact-icon">⌂</span><div><b>Habitat context</b><div class="small">${esc(care.traitHabitat)}</div></div></div>`:""}
+      ${care.traitVegetation?`<div class="fact-row"><span class="fact-icon">❦</span><div><b>Vegetation context</b><div class="small">${esc(care.traitVegetation)}</div></div></div>`:""}
+      ${care.traitClimate?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Climate context</b><div class="small">${esc(care.traitClimate)}</div></div></div>`:""}
+      ${care.traitSubstrate?`<div class="fact-row"><span class="fact-icon">◇</span><div><b>Recorded substrate</b><div class="small">${esc(care.traitSubstrate)}</div></div></div>`:""}
+      ${care.traitNutrientContext?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Nutrient context</b><div class="small">${esc(care.traitNutrientContext)}</div></div></div>`:""}
+      ${care.traitSoilMoistureContext?`<div class="fact-row"><span class="fact-icon">💧</span><div><b>Soil-moisture context</b><div class="small">${esc(care.traitSoilMoistureContext)}</div></div></div>`:""}
+      ${care.traitEllenberg?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Ellenberg ecological indicators</b><div class="small">${esc(care.traitEllenberg)} · ecological indicators, not direct care instructions</div></div></div>`:""}
       ${t?.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
       ${t?.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}</div></div></div>`:""}
     </div></div>`:""}
@@ -2134,7 +2198,7 @@ async function renderProfile(id,isNew=false){
 
     ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated UK-garden care library because the connected botanical APIs often omit practical growing information. Species guidance is preferred where available; genus guidance is used as a cautious fallback.</p></div>`:""}
 
-    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Botanical traits can come from the expanded TRY v7 species dataset, with the earlier TRY Archive 81 index retained as a fallback. TRY ecological indicators are shown as botanical context and are not presented as direct horticultural instructions.</p></div>`:""}
+    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Botanical traits can come from the expanded TRY v7 species dataset, with the earlier TRY Archive 81 index retained as a fallback. TRY ecological indicators are shown as botanical context and are not presented as direct horticultural instructions.${care.traitMatchLevel==="genus"?" This record uses genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
 
     ${isDiscovery?`
       <div class="profile-card discovery-profile-actions">
@@ -2299,7 +2363,7 @@ function careTaskIcon(type){
 }
 function careForPlant(p){
   const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
-  return resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null);
+  return resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
 }
 function smartCareSuggestions(){
   const season=careSeason(), month=new Date().getMonth()+1;
@@ -2603,7 +2667,7 @@ async function runPlantDoctor(){
     doctorModelPrediction(p)
   ]);
   const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
-  const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null);
+  const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
   doctorLastResult={visual,modelResult,care};
   renderDoctorResult();
 }
@@ -2685,17 +2749,40 @@ function refreshStoredCareFields(){
   let changed=false;
   for(const p of state.plants){
     const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
-    const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null);
+    const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
     const set=(k,v)=>{ if(usable(v) && p[k]!==v){p[k]=v;changed=true;} };
     set("sun",care.light); set("water",care.water); set("soil",care.soil); set("height",care.height);
     if(care.bloomMonths?.length && JSON.stringify(p.bloom)!==JSON.stringify(care.bloomMonths)){p.bloom=care.bloomMonths;changed=true;}
   }
   if(changed) saveState();
+  return changed;
 }
 
+async function backgroundEnrichTryV7SavedRecords(){
+  const records=[...state.plants,...state.discoveries].filter(p=>p?.scientific);
+  if(!records.length) return;
+  const unique=new Map();
+  for(const p of records){
+    const key=p.speciesKey||slug(p.scientific);
+    if(!unique.has(key)) unique.set(key,p);
+  }
+  try{
+    await Promise.all([...unique.values()].map(p=>preloadTryV7(p.scientific,p.speciesKey||slug(p.scientific))));
+    const changed=refreshStoredCareFields();
+    if(changed){
+      if(currentRoute==="home") renderHome();
+      else if(currentRoute==="garden") renderGarden();
+      else if(currentRoute==="discover") renderDiscover();
+    }
+  }catch(err){
+    console.warn("TRY v7 background enrichment failed",err);
+  }
+}
+
+
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.4 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.5 · private botanical journal</div>`);
 });
 
-refreshStoredCareFields();
 renderHome();
+backgroundEnrichTryV7SavedRecords();

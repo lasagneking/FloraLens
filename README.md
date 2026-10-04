@@ -309,6 +309,16 @@ No Cloudflare or API-secret changes are required.
 - TensorFlow.js and model files load only when Plant Doctor is used.
 - No paid API and no Cloudflare changes.
 
+## v1.2.5 — TRY v7 completion
+
+- Adds safe TRY v7 matching for exact species, cleaned binomials and clearly labelled genus-level context for cultivar-only names.
+- Persists only matched TRY records in the existing species cache so saved plants retain botanical intelligence across reloads and backups.
+- Background-enriches existing Garden and Discover records using only the A–Z shards their scientific names require.
+- Separates Practical care coverage from Botanical record coverage.
+- Prefers `growthFormDetailed` and surfaces additional human-readable TRY ecological context while suppressing opaque source codes.
+- Keeps Plant Atlas 2020 first for Britain/Ireland flowering phenology and retains TRY Archive 81 as the compatibility fallback.
+- Bumps browser cache-busting references to v1.2.5; no Worker or storage-key changes.
+
 ## v1.2.4 — TRY v7 integration
 
 - Integrates the completed TRY request 52199 dataset (278,672 species; 44,573,736 raw rows processed).
