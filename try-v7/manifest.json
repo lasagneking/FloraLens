@@ -1,0 +1,165 @@
+{
+  "dataset": "TRY v7",
+  "request": 52199,
+  "rawRowsProcessed": 44573736,
+  "acceptedSpeciesSeen": 295979,
+  "speciesWritten": 278672,
+  "generatedUTC": "2026-10-03T19:50:03Z",
+  "shards": {
+    "A": {
+      "file": "try-a.json",
+      "species": 27594,
+      "bytes": 4437656
+    },
+    "B": {
+      "file": "try-b.json",
+      "species": 13156,
+      "bytes": 1989393
+    },
+    "C": {
+      "file": "try-c.json",
+      "species": 36257,
+      "bytes": 5571836
+    },
+    "D": {
+      "file": "try-d.json",
+      "species": 14535,
+      "bytes": 2174158
+    },
+    "E": {
+      "file": "try-e.json",
+      "species": 17311,
+      "bytes": 2761774
+    },
+    "F": {
+      "file": "try-f.json",
+      "species": 4678,
+      "bytes": 737971
+    },
+    "G": {
+      "file": "try-g.json",
+      "species": 11065,
+      "bytes": 1802533
+    },
+    "H": {
+      "file": "try-h.json",
+      "species": 11638,
+      "bytes": 1880338
+    },
+    "I": {
+      "file": "try-i.json",
+      "species": 5096,
+      "bytes": 739757
+    },
+    "J": {
+      "file": "try-j.json",
+      "species": 2202,
+      "bytes": 354860
+    },
+    "K": {
+      "file": "try-k.json",
+      "species": 1756,
+      "bytes": 276226
+    },
+    "L": {
+      "file": "try-l.json",
+      "species": 12960,
+      "bytes": 2052964
+    },
+    "M": {
+      "file": "try-m.json",
+      "species": 18059,
+      "bytes": 2721614
+    },
+    "N": {
+      "file": "try-n.json",
+      "species": 3992,
+      "bytes": 607656
+    },
+    "O": {
+      "file": "try-o.json",
+      "species": 7441,
+      "bytes": 1101908
+    },
+    "P": {
+      "file": "try-p.json",
+      "species": 32428,
+      "bytes": 4966354
+    },
+    "Q": {
+      "file": "try-q.json",
+      "species": 724,
+      "bytes": 123469
+    },
+    "R": {
+      "file": "try-r.json",
+      "species": 8601,
+      "bytes": 1370520
+    },
+    "S": {
+      "file": "try-s.json",
+      "species": 26401,
+      "bytes": 4113521
+    },
+    "T": {
+      "file": "try-t.json",
+      "species": 11883,
+      "bytes": 1868143
+    },
+    "U": {
+      "file": "try-u.json",
+      "species": 1051,
+      "bytes": 172592
+    },
+    "V": {
+      "file": "try-v.json",
+      "species": 5026,
+      "bytes": 808206
+    },
+    "W": {
+      "file": "try-w.json",
+      "species": 1608,
+      "bytes": 252547
+    },
+    "X": {
+      "file": "try-x.json",
+      "species": 1562,
+      "bytes": 237572
+    },
+    "Y": {
+      "file": "try-y.json",
+      "species": 179,
+      "bytes": 24790
+    },
+    "Z": {
+      "file": "try-z.json",
+      "species": 1469,
+      "bytes": 228003
+    }
+  },
+  "fieldCoverage": {
+    "growthFormDetailed": 159995,
+    "growthForm": 272420,
+    "woodiness": 80071,
+    "lifeHistory": 48783,
+    "leafPhenology": 34190,
+    "flowerColour": 16078,
+    "heightEstimateM": 22071,
+    "soilPH": 2436,
+    "tolerances": 33104,
+    "floweringMonths": 22154,
+    "ellenberg": 4580,
+    "climate": 9866,
+    "nutrientContext": 2341,
+    "soilMoistureContext": 451,
+    "vegetation": 12752,
+    "habitat": 1347,
+    "substrate": 714
+  },
+  "notes": [
+    "Plant Atlas 2020 should remain preferred for UK/Ireland phenology where available.",
+    "TRY Ellenberg values are ecological indicators, not direct horticultural care instructions.",
+    "heightEstimateM is a cautious derived estimate from upper vegetative-height observations.",
+    "Ambiguous numeric tolerance scales were not converted without secure semantics."
+  ]
+}
