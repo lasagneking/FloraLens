@@ -1137,16 +1137,63 @@ function plantAtlasSeasonText(pa){
   return `Plant Atlas records this species flowering in Britain and Ireland from ${range}. Its next recorded flowering month is ${monthNameShort(next)}.${pa.flowerNote?` ${pa.flowerNote}`:""}`;
 }
 
+const TRY_V7_BASE="try-v7";
+const tryV7Shards=new Map();
+function normaliseScientificName(name=""){
+  return String(name||"").replace(/[×]/g,"x").replace(/\s+/g," ").trim();
+}
+function tryV7ShardLetter(scientificName=""){
+  const c=normaliseScientificName(scientificName).charAt(0).toLowerCase();
+  return /^[a-z]$/.test(c)?c:null;
+}
+function cachedTryV7Record(scientificName=""){
+  const letter=tryV7ShardLetter(scientificName), promise=letter&&tryV7Shards.get(letter);
+  if(!promise?.__resolved) return null;
+  const wanted=normaliseScientificName(scientificName).toLowerCase();
+  for(const [name,row] of Object.entries(promise.__resolved||{})) if(normaliseScientificName(name).toLowerCase()===wanted) return row;
+  return null;
+}
+// Wrap shard promises so synchronous care rendering can reuse already-loaded data.
+async function preloadTryV7(scientificName=""){
+  const letter=tryV7ShardLetter(scientificName);
+  if(!letter) return null;
+  if(!tryV7Shards.has(letter)){
+    const promise=(async()=>{try{const res=await fetch(`${TRY_V7_BASE}/try-${letter}.json`);if(!res.ok)throw new Error(`TRY v7 shard ${letter.toUpperCase()} failed (${res.status})`);return await res.json();}catch(err){console.warn("TRY v7 load failed",err);return {};}})();
+    tryV7Shards.set(letter,promise);
+    promise.then(db=>{promise.__resolved=db;});
+  }
+  const promise=tryV7Shards.get(letter), db=await promise;
+  promise.__resolved=db;
+  const wanted=normaliseScientificName(scientificName).toLowerCase();
+  for(const [name,row] of Object.entries(db||{})) if(normaliseScientificName(name).toLowerCase()===wanted) return row;
+  return null;
+}
 function traitRecordFor(scientificName=""){
+  const v7=cachedTryV7Record(scientificName);
+  if(v7) return {
+    ...v7,
+    heightM:v7.heightEstimateM??null,
+    habitat:v7.habitat||v7.vegetation||null,
+    matchLevel:"species",
+    dataset:"TRY v7"
+  };
+  // Legacy TRY Archive 81 remains a genus/species fallback if v7 has no exact record.
   const db=window.FLORALENS_TRAITS;
   if(!db) return null;
-  const n=String(scientificName).toLowerCase().trim().replace(/\s+/g," ");
+  const n=normaliseScientificName(scientificName).toLowerCase();
   let row=db.species?.[n]; let level="species";
   if(!row){ const genus=n.split(" ")[0]; row=db.genera?.[genus]; level="genus"; }
   if(!row) return null;
-  return {growthForm:row[0]||null,woodiness:row[1]||null,succulence:row[2]||null,habitat:row[3]||null,leafType:row[4]||null,heightM:row[5]??null,matchLevel:level};
+  return {growthForm:row[0]||null,woodiness:row[1]||null,succulence:row[2]||null,habitat:row[3]||null,leafType:row[4]||null,heightM:row[5]??null,matchLevel:level,dataset:"TRY Archive 81"};
 }
-function prettyTrait(v){ return usable(v)?String(v).replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase()):null; }
+function prettyTrait(v){
+  if(!usable(v)) return null;
+  const raw=String(v).trim();
+  if(raw.toUpperCase()==="W") return "Woody";
+  if(raw.toUpperCase()==="NW") return "Non-woody";
+  if(/^[A-Z]$/.test(raw)) return null; // suppress opaque one-letter source codes
+  return raw.replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase());
+}
 function traitHeight(tr){
   if(!tr?.heightM) return null;
   const h=Number(tr.heightM); if(!Number.isFinite(h)||h<=0) return null;
@@ -1209,7 +1256,8 @@ function resolvedCare(scientificName,t,pn){
                 exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths :
                 pCare.bloomMonths?.length ? pCare.bloomMonths :
                 tCare.bloomMonths?.length ? tCare.bloomMonths :
-                genusLocal?.bloomMonths || [];
+                genusLocal?.bloomMonths?.length ? genusLocal.bloomMonths :
+                tr?.floweringMonths?.length ? monthsToNumbers(tr.floweringMonths) : [];
 
   return {
     light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"),
@@ -1227,7 +1275,10 @@ function resolvedCare(scientificName,t,pn){
     usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v),
     usedLocal:!!local,
     usedTraits:!!tr, traitMatchLevel:tr?.matchLevel||null,
-    traitWoodiness:prettyTrait(tr?.woodiness), traitLeafType:prettyTrait(tr?.leafType), traitHabitat:prettyTrait(tr?.habitat), traitSucculence:prettyTrait(tr?.succulence)
+    traitWoodiness:prettyTrait(tr?.woodiness), traitLeafType:prettyTrait(tr?.leafType), traitHabitat:prettyTrait(tr?.habitat), traitSucculence:prettyTrait(tr?.succulence),
+    traitLifeHistory:prettyTrait(tr?.lifeHistory), traitLeafPhenology:prettyTrait(tr?.leafPhenology), traitFlowerColour:prettyTrait(tr?.flowerColour),
+    traitSoilPH:tr?.soilPH||null, traitTolerances:tr?.tolerances||null, traitClimate:prettyTrait(tr?.climate), traitVegetation:prettyTrait(tr?.vegetation),
+    traitDataset:tr?.dataset||null
   };
 }
 
@@ -1990,6 +2041,7 @@ async function renderProfile(id,isNew=false){
   const p=gardenPlant||discovery;
   const isDiscovery=!!discovery&&!gardenPlant;
   if(!p) return setRoute("home");
+  await preloadTryV7(p.scientific);
   const cached=state.speciesCache[p.speciesKey]||{};
   const intel=cached.enrichment||null;
   const t=intel?.trefle||null;
@@ -1999,7 +2051,7 @@ async function renderProfile(id,isNew=false){
   const sourceNames=[...(intel?.sources||[])];
   if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
-  if(care.usedTraits) sourceNames.push(`TRY traits · ${care.traitMatchLevel}`);
+  if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel}`);
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
@@ -2063,10 +2115,15 @@ async function renderProfile(id,isNew=false){
 
     <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
 
-    ${(care.growthHabit||care.growthRate||care.traitWoodiness||care.traitLeafType||care.traitHabitat||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
+    ${(care.growthHabit||care.growthRate||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
       ${care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Habit</b><div class="small">${esc(care.growthHabit)}</div></div></div>`:""}
       ${care.growthRate?`<div class="fact-row"><span class="fact-icon">↗</span><div><b>Growth rate</b><div class="small">${esc(care.growthRate)}</div></div></div>`:""}
       ${care.traitWoodiness?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Woodiness</b><div class="small">${esc(care.traitWoodiness)}</div></div></div>`:""}
+      ${care.traitLifeHistory?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Life history</b><div class="small">${esc(care.traitLifeHistory)}</div></div></div>`:""}
+      ${care.traitLeafPhenology?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf phenology</b><div class="small">${esc(care.traitLeafPhenology)}</div></div></div>`:""}
+      ${care.traitFlowerColour?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colour</b><div class="small">${esc(care.traitFlowerColour)}</div></div></div>`:""}
+      ${care.traitSoilPH?`<div class="fact-row"><span class="fact-icon">◇</span><div><b>Recorded soil pH</b><div class="small">${esc(care.traitSoilPH.min??"?")}–${esc(care.traitSoilPH.max??"?")}</div></div></div>`:""}
+      ${care.traitTolerances?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Recorded tolerances</b><div class="small">${esc(Object.entries(care.traitTolerances).map(([k,v])=>`${k}: ${v}`).join(" · "))}</div></div></div>`:""}
       ${care.traitLeafType?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf type</b><div class="small">${esc(care.traitLeafType)}</div></div></div>`:""}
       ${care.traitHabitat?`<div class="fact-row"><span class="fact-icon">⌂</span><div><b>Habitat strategy</b><div class="small">${esc(care.traitHabitat)}</div></div></div>`:""}
       ${t?.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
@@ -2077,7 +2134,7 @@ async function renderProfile(id,isNew=false){
 
     ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated UK-garden care library because the connected botanical APIs often omit practical growing information. Species guidance is preferred where available; genus guidance is used as a cautious fallback.</p></div>`:""}
 
-    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Growth form, woodiness, leaf type and measured height can come from the TRY File Archive ID 81 dataset. Where FloraLens derives a general watering or soil starting point from those traits, it is labelled as general guidance rather than species-specific API data.</p></div>`:""}
+    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Botanical traits can come from the expanded TRY v7 species dataset, with the earlier TRY Archive 81 index retained as a fallback. TRY ecological indicators are shown as botanical context and are not presented as direct horticultural instructions.</p></div>`:""}
 
     ${isDiscovery?`
       <div class="profile-card discovery-profile-actions">
@@ -2637,7 +2694,7 @@ function refreshStoredCareFields(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.3 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.4 · private botanical journal</div>`);
 });
 
 refreshStoredCareFields();
