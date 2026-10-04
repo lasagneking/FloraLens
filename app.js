@@ -2085,6 +2085,21 @@ function saveMoveArea(id){
   saveState();closeModal();toast(`${p?.common||"Plant"} moved to ${actual}`);renderProfile(id);
 }
 
+function profileBloomStatus(bloom=[]){
+  const now=new Date().getMonth()+1;
+  if(bloom.includes(now)) return "Flowering now";
+  if(!bloom.length) return "Seasonal record building";
+  const next=bloom.find(m=>m>now) ?? bloom[0];
+  const names=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `Next flowers ${names[next-1]}`;
+}
+function setProfileTab(tab){
+  document.querySelectorAll('.profile-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.profileTab===tab));
+  document.querySelectorAll('.profile-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.profilePanel===tab));
+  const active=document.querySelector(`.profile-panel[data-profile-panel="${tab}"]`);
+  if(active) active.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
 async function renderProfile(id,isNew=false){
   currentRoute="profile";
   const gardenPlant=state.plants.find(x=>x.id===id);
@@ -2104,6 +2119,7 @@ async function renderProfile(id,isNew=false){
   if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
   if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel==="genus"?"genus context":"species"}`);
+  const uniqueSources=[...new Set(sourceNames)];
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
   const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
   const currentSeason=seasonKey();
@@ -2111,124 +2127,99 @@ async function renderProfile(id,isNew=false){
   const atlasSeasonal=plantAtlasSeasonText(care.plantAtlas);
   const seasonalText=atlasSeasonal||seasonalLocal||null;
   const seasonalTitle=atlasSeasonal?"Flowering season":seasonalLocal?"Seasonal care":null;
-  const taxonConfirmed=!!(g||t);
   const careAvailable=[care.light,care.water,care.soil,care.height,care.growthHabit,care.pruning,care.hardiness].filter(Boolean).length;
   const careCoverage=Math.round((careAvailable/7)*100);
   const botanicalRecordCoverage=botanicalCoverage(care);
-
-  let intelTitle="Gathering botanical notes…";
-  let intelText="FloraLens is building a reusable species record so this only has to happen once.";
-  if(hasBotanicalIntel){
-    if(careAvailable>=4){
-      intelTitle="Growing guide ready";
-      intelText=care.usedPerenual
-        ?"FloraLens found horticultural care data for this species and combined it with the botanical record."
-        :care.usedLocal
-          ?"FloraLens matched this plant to its curated UK-garden care library and filled gaps left by the botanical APIs."
-          :"Connected botanical sources supplied useful growing information for this species.";
-    }else if(taxonConfirmed||care.usedTraits){
-      intelTitle="Botanical record found";
-      intelText=care.traitMatchLevel==="genus"
-        ?"FloraLens found useful genus-level botanical context. Detailed species-specific horticultural care information is still limited for this plant."
-        :"The species is confirmed, but detailed horticultural care information is still limited for this plant.";
-    }
-  }
-
+  const confidence=p.score?`${Math.round(Number(p.score))}% match`:"Identified";
+  const placeLabel=isDiscovery?(p.wishlist?"Wishlist":"Discover"):(p.area||"My Garden");
+  const bloomStatus=profileBloomStatus(bloom);
   const backRoute=isDiscovery?"discover":"garden";
   const backLabel=isDiscovery?"Discover":"My Garden";
-  const heroLabel=isDiscovery
-    ? (p.wishlist?"♥ Wishlist":"♡ Spotted")
-    : `♡ ${esc(p.area||"My Garden")}`;
 
-  view.innerHTML=`<section class="page-head"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
-    <div class="result-hero" id="profileHero" style="min-height:390px"><div class="plant-art ${p.art||""}" style="position:absolute;inset:0"></div><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(p.family||"")}</div><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><br><span class="confidence">${heroLabel}</span></div></div>
+  const botanicalRows=(care.growthHabit||care.growthRate||care.traitGrowthFormDetailed||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||care.traitVegetation||care.traitClimate||care.traitEllenberg||care.traitSubstrate||care.traitNutrientContext||care.traitSoilMoistureContext||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="dossier-facts">
+      ${care.traitGrowthFormDetailed?`<div class="dossier-fact"><span>❧</span><div><small>Growth form</small><b>${esc(care.traitGrowthFormDetailed)}</b></div></div>`:care.growthHabit?`<div class="dossier-fact"><span>❧</span><div><small>Growth form</small><b>${esc(care.growthHabit)}</b></div></div>`:""}
+      ${care.traitWoodiness?`<div class="dossier-fact"><span>♧</span><div><small>Woodiness</small><b>${esc(care.traitWoodiness)}</b></div></div>`:""}
+      ${care.traitLifeHistory?`<div class="dossier-fact"><span>◌</span><div><small>Life history</small><b>${esc(care.traitLifeHistory)}</b></div></div>`:""}
+      ${care.traitLeafPhenology?`<div class="dossier-fact"><span>❧</span><div><small>Leaf phenology</small><b>${esc(care.traitLeafPhenology)}</b></div></div>`:""}
+      ${care.traitFlowerColour?`<div class="dossier-fact"><span>✿</span><div><small>Flower colour</small><b>${esc(care.traitFlowerColour)}</b></div></div>`:""}
+      ${care.height?`<div class="dossier-fact"><span>↕</span><div><small>Height / size</small><b>${esc(care.height)}</b></div></div>`:""}
+      ${care.traitHabitat?`<div class="dossier-fact"><span>⌂</span><div><small>Habitat</small><b>${esc(care.traitHabitat)}</b></div></div>`:""}
+      ${care.traitVegetation?`<div class="dossier-fact"><span>❦</span><div><small>Vegetation</small><b>${esc(care.traitVegetation)}</b></div></div>`:""}
+      ${care.traitClimate?`<div class="dossier-fact"><span>◌</span><div><small>Climate context</small><b>${esc(care.traitClimate)}</b></div></div>`:""}
+      ${care.traitSoilPH?`<div class="dossier-fact"><span>◇</span><div><small>Recorded soil pH</small><b>${esc(care.traitSoilPH.min??"?")}–${esc(care.traitSoilPH.max??"?")}</b></div></div>`:""}
+      ${care.traitTolerances?`<div class="dossier-fact"><span>⌁</span><div><small>Tolerances</small><b>${esc(care.traitTolerances)}</b></div></div>`:""}
+      ${care.traitSubstrate?`<div class="dossier-fact"><span>◇</span><div><small>Substrate</small><b>${esc(care.traitSubstrate)}</b></div></div>`:""}
+      ${care.traitNutrientContext?`<div class="dossier-fact"><span>♧</span><div><small>Nutrient context</small><b>${esc(care.traitNutrientContext)}</b></div></div>`:""}
+      ${care.traitSoilMoistureContext?`<div class="dossier-fact"><span>💧</span><div><small>Soil-moisture context</small><b>${esc(care.traitSoilMoistureContext)}</b></div></div>`:""}
+      ${care.traitEllenberg?`<div class="dossier-fact dossier-fact-wide"><span>⌁</span><div><small>Ellenberg ecological indicators</small><b>${esc(care.traitEllenberg)}</b><em>Ecological context, not direct care instructions.</em></div></div>`:""}
+      ${care.growthRate?`<div class="dossier-fact"><span>↗</span><div><small>Growth rate</small><b>${esc(care.growthRate)}</b></div></div>`:""}
+      ${care.traitLeafType?`<div class="dossier-fact"><span>❧</span><div><small>Leaf type</small><b>${esc(care.traitLeafType)}</b></div></div>`:""}
+      ${t?.foliageColors?.length?`<div class="dossier-fact"><span>❧</span><div><small>Foliage</small><b>${esc(t.foliageColors.join(", "))}</b></div></div>`:""}
+    </div>`:`<div class="profile-empty"><span>❧</span><b>Botanical record still growing</b><p>FloraLens has not yet found additional species traits for this plant.</p></div>`;
 
-    <div class="intel-banner ${!hasBotanicalIntel?"loading":""}">
-      <div class="eyebrow">Botanical intelligence</div>
-      <h2 style="font-size:24px;margin:5px 0">${esc(intelTitle)}</h2>
-      <p class="small">${esc(intelText)}</p>
-      ${hasBotanicalIntel?`<div class="coverage-label"><span>Practical care</span><b>${careCoverage}%</b></div><div class="coverage"><span style="width:${careCoverage}%"></span></div>
-      <div class="small" style="margin-top:5px">Practical growing guidance currently available.</div>
-      <div class="coverage-label" style="margin-top:11px"><span>Botanical record</span><b>${botanicalRecordCoverage}%</b></div><div class="coverage"><span style="width:${botanicalRecordCoverage}%"></span></div>
-      <div class="small" style="margin-top:5px">Species traits and ecological context currently available.</div>
-      <div class="source-row">${sourceNames.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div>
-      <div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh notes</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div>`:""}
-    </div>
-
-    <section style="padding:10px 2px 0"><div class="eyebrow">Meet ${esc(p.common)}</div><h2 style="margin-top:6px">A little about this plant</h2><p class="sub">${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p><div class="species-cache">Species record: ${esc(p.speciesKey||"")} · ${cached.fetchedAt?new Date(cached.fetchedAt).toLocaleDateString("en-GB"):"local"}</div></section>
-
-    ${seasonalText?`<div class="season-card"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
-
-    <div class="care-grid">
-      ${care.light?`<div class="care-tile"><span class="care-icon">☀</span><b>Light</b><small>${esc(care.light)}</small></div>`:""}
-      ${care.water?`<div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water)}</small></div>`:""}
-      ${care.soil?`<div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil)}</small></div>`:""}
-      ${care.height?`<div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
-      ${care.growthHabit?`<div class="care-tile"><span class="care-icon">❧</span><b>Growth habit</b><small>${esc(care.growthHabit)}</small></div>`:""}
-      ${care.hardiness?`<div class="care-tile"><span class="care-icon">❄</span><b>Hardiness</b><small>${esc(care.hardiness)}</small></div>`:""}
-      ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
-      ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
-    </div>
-
-    <div class="profile-card"><div class="eyebrow">In bloom</div><h2 style="font-size:25px;margin-top:6px">Flowering year</h2><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
-
-    ${(care.growthHabit||care.growthRate||care.traitGrowthFormDetailed||care.traitWoodiness||care.traitLifeHistory||care.traitLeafPhenology||care.traitFlowerColour||care.traitSoilPH||care.traitTolerances||care.traitLeafType||care.traitHabitat||care.traitVegetation||care.traitClimate||care.traitEllenberg||care.traitSubstrate||care.traitNutrientContext||care.traitSoilMoistureContext||t?.flowerColors?.length||t?.foliageColors?.length)?`<div class="profile-card"><div class="eyebrow">How it grows</div><h2 style="font-size:25px;margin-top:6px">Botanical details</h2><div class="fact-list">
-      ${care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Habit</b><div class="small">${esc(care.growthHabit)}</div></div></div>`:""}
-      ${care.traitGrowthFormDetailed && care.traitGrowthFormDetailed!==care.growthHabit?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Detailed growth form</b><div class="small">${esc(care.traitGrowthFormDetailed)}</div></div></div>`:""}
-      ${care.growthRate?`<div class="fact-row"><span class="fact-icon">↗</span><div><b>Growth rate</b><div class="small">${esc(care.growthRate)}</div></div></div>`:""}
-      ${care.traitWoodiness?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Woodiness</b><div class="small">${esc(care.traitWoodiness)}</div></div></div>`:""}
-      ${care.traitLifeHistory?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Life history</b><div class="small">${esc(care.traitLifeHistory)}</div></div></div>`:""}
-      ${care.traitLeafPhenology?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf phenology</b><div class="small">${esc(care.traitLeafPhenology)}</div></div></div>`:""}
-      ${care.traitFlowerColour?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colour</b><div class="small">${esc(care.traitFlowerColour)}</div></div></div>`:""}
-      ${care.traitSoilPH?`<div class="fact-row"><span class="fact-icon">◇</span><div><b>Recorded soil pH</b><div class="small">${esc(care.traitSoilPH.min??"?")}–${esc(care.traitSoilPH.max??"?")}</div></div></div>`:""}
-      ${care.traitTolerances?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Recorded tolerances</b><div class="small">${esc(care.traitTolerances)}</div></div></div>`:""}
-      ${care.traitLeafType?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Leaf type</b><div class="small">${esc(care.traitLeafType)}</div></div></div>`:""}
-      ${care.traitHabitat?`<div class="fact-row"><span class="fact-icon">⌂</span><div><b>Habitat context</b><div class="small">${esc(care.traitHabitat)}</div></div></div>`:""}
-      ${care.traitVegetation?`<div class="fact-row"><span class="fact-icon">❦</span><div><b>Vegetation context</b><div class="small">${esc(care.traitVegetation)}</div></div></div>`:""}
-      ${care.traitClimate?`<div class="fact-row"><span class="fact-icon">◌</span><div><b>Climate context</b><div class="small">${esc(care.traitClimate)}</div></div></div>`:""}
-      ${care.traitSubstrate?`<div class="fact-row"><span class="fact-icon">◇</span><div><b>Recorded substrate</b><div class="small">${esc(care.traitSubstrate)}</div></div></div>`:""}
-      ${care.traitNutrientContext?`<div class="fact-row"><span class="fact-icon">♧</span><div><b>Nutrient context</b><div class="small">${esc(care.traitNutrientContext)}</div></div></div>`:""}
-      ${care.traitSoilMoistureContext?`<div class="fact-row"><span class="fact-icon">💧</span><div><b>Soil-moisture context</b><div class="small">${esc(care.traitSoilMoistureContext)}</div></div></div>`:""}
-      ${care.traitEllenberg?`<div class="fact-row"><span class="fact-icon">⌁</span><div><b>Ellenberg ecological indicators</b><div class="small">${esc(care.traitEllenberg)} · ecological indicators, not direct care instructions</div></div></div>`:""}
-      ${t?.flowerColors?.length?`<div class="fact-row"><span class="fact-icon">✿</span><div><b>Flower colours</b><div class="small">${esc(t.flowerColors.join(", "))}</div></div></div>`:""}
-      ${t?.foliageColors?.length?`<div class="fact-row"><span class="fact-icon">❧</span><div><b>Foliage</b><div class="small">${esc(t.foliageColors.join(", "))}</div></div></div>`:""}
-    </div></div>`:""}
-
-    ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2 style="font-size:25px;margin:5px 0 7px">Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
-
-    ${care.usedLocal?`<div class="good-know"><div class="eyebrow">About these care notes</div><p class="sub" style="margin:0">Some horticultural details come from FloraLens' curated UK-garden care library because the connected botanical APIs often omit practical growing information. Species guidance is preferred where available; genus guidance is used as a cautious fallback.</p></div>`:""}
-
-    ${care.usedTraits?`<div class="good-know"><div class="eyebrow">Plant trait record</div><p class="sub" style="margin:0">Botanical traits can come from the expanded TRY v7 species dataset, with the earlier TRY Archive 81 index retained as a fallback. TRY ecological indicators are shown as botanical context and are not presented as direct horticultural instructions.${care.traitMatchLevel==="genus"?" This record uses genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
-
-    ${isDiscovery?`
-      <div class="profile-card discovery-profile-actions">
-        <div class="eyebrow">Saved inspiration</div>
-        <h2 style="font-size:25px;margin:6px 0 8px">${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2>
-        <p class="sub">Keep it here for reference, add it to your wishlist, or bring it into My Garden if it comes home with you.</p>
-        <div class="actions">
-          <button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button>
-          <button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button>
-        </div>
-        <button class="link-btn discovery-delete-link" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>
-      </div>
-      <div class="section-title"><h3>Discovery story</h3></div>
+  const storyHtml=isDiscovery?`
       <div class="profile-card">
         <div class="timeline-item"><div class="timeline-icon">⌾</div><div><b>Spotted by FloraLens</b><div class="small">${p.spotted?new Date(p.spotted).toLocaleDateString("en-GB"):"Saved discovery"}</div></div></div>
         <div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Identification photo saved</b><div class="small">${p.score?`${p.score}% identification match`:"Original identification photo stored on this device."}</div></div></div>
-        ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
-      </div>`
-      :`
+        ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${uniqueSources.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
+      </div>`:`
       <div class="profile-location-card"><div><div class="eyebrow">Lives in</div><h3>${esc(p.area||"Unplaced")}</h3></div><button class="link-btn" onclick="movePlantPrompt('${p.id}')">Move area</button></div>
-      <div class="section-title"><h3>Our story</h3><div style="display:flex;gap:10px"><button class="link-btn" onclick="openCareComposer('${p.id}')">＋ Care</button><button class="link-btn" onclick="addJournalForPlant('${p.id}')">＋ Moment</button></div></div>
-      <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${sourceNames.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>
-      `}`;
+      <div class="history-actions"><button class="mini-action" onclick="openCareComposer('${p.id}')">＋ Care record</button><button class="mini-action" onclick="addJournalForPlant('${p.id}')">＋ Garden moment</button></div>
+      <div class="profile-card"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${uniqueSources.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
+
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
+    <div class="profile-dossier-hero" id="profileHero">
+      <div class="plant-art ${p.art||""}"></div><div class="profile-dossier-shade"></div>
+      <div class="profile-dossier-top"><span class="profile-family">${esc(p.family||"Botanical profile")}</span><span class="profile-season-badge">${esc(bloomStatus)}</span></div>
+      <div class="profile-dossier-copy"><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><div class="profile-meta-row"><span>◎ ${esc(confidence)}</span><span>⌂ ${esc(placeLabel)}</span></div></div>
+    </div>
+
+    <nav class="profile-tabs" aria-label="Plant profile sections">
+      <button class="profile-tab active" data-profile-tab="care" onclick="setProfileTab('care')"><span>☀</span>Care</button>
+      <button class="profile-tab" data-profile-tab="botany" onclick="setProfileTab('botany')"><span>❧</span>Botany</button>
+      <button class="profile-tab" data-profile-tab="history" onclick="setProfileTab('history')"><span>◷</span>History</button>
+    </nav>
+
+    <section class="profile-panel active" data-profile-panel="care">
+      <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-score"><b>${careCoverage}%</b><span>guide</span></div></div>
+      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
+      ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
+      <div class="care-grid dossier-care-grid">
+        ${care.light?`<div class="care-tile"><span class="care-icon">☀</span><b>Sunlight</b><small>${esc(care.light)}</small></div>`:""}
+        ${care.water?`<div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water)}</small></div>`:""}
+        ${care.soil?`<div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil)}</small></div>`:""}
+        ${care.hardiness?`<div class="care-tile"><span class="care-icon">❄</span><b>Hardiness</b><small>${esc(care.hardiness)}</small></div>`:""}
+        ${care.height?`<div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
+        ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
+        ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
+      </div>
+      <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
+      ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
+      ${isDiscovery?`<div class="profile-card discovery-profile-actions"><div class="eyebrow">Saved inspiration</div><h2>${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2><p class="sub">Keep it for reference or bring it into My Garden when it comes home with you.</p><div class="actions"><button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button><button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button></div></div>`:""}
+    </section>
+
+    <section class="profile-panel" data-profile-panel="botany">
+      <div class="profile-section-intro"><div><div class="eyebrow">Botanical dossier</div><h2>What FloraLens knows</h2></div><div class="profile-score botanical"><b>${botanicalRecordCoverage}%</b><span>record</span></div></div>
+      <div class="record-meter"><div><span>Practical care</span><b>${careCoverage}%</b></div><div class="coverage"><span style="width:${careCoverage}%"></span></div><div><span>Botanical record</span><b>${botanicalRecordCoverage}%</b></div><div class="coverage botanical-coverage"><span style="width:${botanicalRecordCoverage}%"></span></div></div>
+      ${botanicalRows}
+      <div class="source-dossier"><div class="eyebrow">Provenance</div><h3>Where this record comes from</h3><div class="source-row">${uniqueSources.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh record</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>
+      ${care.usedLocal?`<div class="good-know compact-note"><div class="eyebrow">Care-source note</div><p class="sub">FloraLens prefers species-level practical guidance and uses curated genus guidance only as a cautious fallback.</p></div>`:""}
+      ${care.usedTraits?`<div class="good-know compact-note"><div class="eyebrow">TRY v7</div><p class="sub">TRY traits are botanical and ecological context rather than direct growing instructions.${care.traitMatchLevel==="genus"?" This record uses clearly labelled genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
+    </section>
+
+    <section class="profile-panel" data-profile-panel="history">
+      <div class="profile-section-intro"><div><div class="eyebrow">Plant history</div><h2>${isDiscovery?"Discovery story":"Your story together"}</h2></div><div class="profile-score history"><b>${isDiscovery?"⌾":state.journal.filter(j=>j.plantId===p.id).length}</b><span>${isDiscovery?"saved":"moments"}</span></div></div>
+      ${storyHtml}
+      ${isDiscovery?`<button class="link-btn discovery-delete-link history-delete" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>`:""}
+    </section>`;
 
   if(p.photoKey){
     const url=await getPhotoUrl(p.photoKey);
-    if(url){ document.querySelector("#profileHero .plant-art")?.remove(); profileHero.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
+    if(url){ const hero=document.getElementById("profileHero"); hero?.querySelector(".plant-art")?.remove(); hero?.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
   }
   hydratePhotos();
 }
+
 async function exportBackup(){
   try{
     const photos={};
@@ -2781,7 +2772,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.5 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.6 · private botanical journal</div>`);
 });
 
 renderHome();
