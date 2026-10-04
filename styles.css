@@ -688,3 +688,43 @@ main:has(.profile-dossier-hero) .profile-panel{
     padding-bottom:calc(var(--profile-dock-h) + 58px + env(safe-area-inset-bottom));
   }
 }
+
+
+/* v1.2.10 — true profile scrollport + in-flow dock reserve */
+#app:has(.profile-dossier-hero){
+  --profile-topbar-h:76px;
+  --profile-dock-zone:calc(var(--profile-dock-h) + 22px + env(safe-area-inset-bottom));
+  height:100dvh;
+  min-height:100dvh;
+  overflow:hidden;
+  padding-bottom:0;
+}
+main:has(.profile-dossier-hero){
+  height:calc(100dvh - var(--profile-topbar-h) - var(--profile-dock-zone));
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior-y:contain;
+  padding-bottom:18px;
+  scroll-padding-bottom:24px;
+}
+main:has(.profile-dossier-hero) .profile-panel{
+  padding-bottom:0;
+  scroll-margin-bottom:0;
+}
+main:has(.profile-dossier-hero) .profile-dock-reserve{
+  display:block;
+  height:calc(var(--profile-dock-h) + 38px + env(safe-area-inset-bottom));
+  width:100%;
+  flex:none;
+  pointer-events:none;
+}
+@media(max-width:390px){
+  #app:has(.profile-dossier-hero){
+    --profile-dock-zone:calc(var(--profile-dock-h) + 20px + env(safe-area-inset-bottom));
+  }
+  main:has(.profile-dossier-hero) .profile-dock-reserve{
+    height:calc(var(--profile-dock-h) + 42px + env(safe-area-inset-bottom));
+  }
+}

@@ -2199,6 +2199,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
       ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
       ${isDiscovery?`<div class="profile-card discovery-profile-actions"><div class="eyebrow">Saved inspiration</div><h2>${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2><p class="sub">Keep it for reference or bring it into My Garden when it comes home with you.</p><div class="actions"><button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button><button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button></div></div>`:""}
+      <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>
 
     <section class="profile-panel" data-profile-panel="botany">
@@ -2209,12 +2210,14 @@ async function renderProfile(id,isNew=false){
       <div class="source-dossier"><div class="eyebrow">Provenance</div><h3>Where this record comes from</h3><div class="source-row">${uniqueSources.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh record</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>
       ${care.usedLocal?`<div class="good-know compact-note"><div class="eyebrow">Care-source note</div><p class="sub">FloraLens prefers species-level practical guidance and uses curated genus guidance only as a cautious fallback.</p></div>`:""}
       ${care.usedTraits?`<div class="good-know compact-note"><div class="eyebrow">TRY v7</div><p class="sub">TRY traits are botanical and ecological context rather than direct growing instructions.${care.traitMatchLevel==="genus"?" This record uses clearly labelled genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
+      <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>
 
     <section class="profile-panel" data-profile-panel="history">
       <div class="profile-section-intro"><div><div class="eyebrow">Plant history</div><h2>${isDiscovery?"Discovery story":"Your story together"}</h2></div><div class="profile-completeness history"><span>◷</span><div><b>${isDiscovery?"Saved":state.journal.filter(j=>j.plantId===p.id).length}</b><small>${isDiscovery?"discovery":"garden moments"}</small></div></div></div>
       ${storyHtml}
       ${isDiscovery?`<button class="link-btn discovery-delete-link history-delete" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>`:""}
+      <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>`;
 
   if(p.photoKey){
@@ -2776,7 +2779,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.9 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.10 · private botanical journal</div>`);
 });
 
 renderHome();
