@@ -631,3 +631,20 @@ h2{font-size:35px;letter-spacing:-.025em}
 .plant-life-timeline{position:relative;overflow:hidden}.plant-life-timeline:before{content:"";position:absolute;left:28px;top:29px;bottom:29px;width:1px;background:linear-gradient(180deg,rgba(98,120,91,.12),rgba(98,120,91,.30),rgba(98,120,91,.08))}.plant-life-timeline .timeline-item{position:relative;z-index:1}.plant-life-timeline .timeline-icon{box-shadow:0 0 0 5px rgba(255,251,245,.94);background:#edf0e6;color:var(--green)}
 
 @media(max-width:390px){.profile-completeness{min-width:94px;padding-right:9px}.profile-completeness>span{width:34px;height:34px}.profile-completeness b{font-size:18px}.care-glance{padding:14px}.care-glance-grid>div{padding:10px;min-height:80px}.botany-identity{grid-template-columns:48px 1fr}.botany-seal{width:48px;height:48px}.profile-panel{padding-bottom:calc(var(--nav-h) + 60px + env(safe-area-inset-bottom))}}
+
+/* v1.2.8 — profile spacing + floating dock correction */
+main:has(.profile-dossier-hero) .profile-back{padding-top:10px;padding-bottom:6px}
+main:has(.profile-dossier-hero) .profile-dossier-hero{min-height:405px}
+main:has(.profile-dossier-hero) .profile-tabs{margin-top:11px;margin-bottom:14px}
+main:has(.profile-dossier-hero) .profile-section-intro{margin-bottom:18px}
+main:has(.profile-dossier-hero) .profile-panel{padding-bottom:calc(var(--nav-h) + 86px + env(safe-area-inset-bottom))}
+#app:has(.profile-dossier-hero) .bottom-nav{height:78px;bottom:7px;padding-top:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));border-radius:26px}
+#app:has(.profile-dossier-hero) .bottom-nav .nav-item span{font-size:19px}
+#app:has(.profile-dossier-hero) .bottom-nav .nav-item small{font-size:8px}
+#app:has(.profile-dossier-hero) .bottom-nav .lens-nav{width:58px;height:58px;border-radius:21px;margin-top:-27px}
+@media(max-width:430px){
+  main:has(.profile-dossier-hero) .profile-dossier-hero{min-height:392px}
+  main:has(.profile-dossier-hero) .profile-section-intro h2{font-size:29px}
+  main:has(.profile-dossier-hero) .profile-section-intro{gap:10px;margin-bottom:18px}
+  main:has(.profile-dossier-hero) .profile-completeness{min-width:96px;min-height:54px;padding:8px 10px 8px 8px}
+}
