@@ -747,3 +747,11 @@ main:has(.profile-dossier-hero) .profile-dock-reserve{
 .plant-today-item.attention{background:rgba(249,239,228,.80)}.plant-today-item.attention>span{background:rgba(165,120,82,.10);color:#8c684f}.plant-today-item.positive{background:rgba(237,244,233,.80)}.plant-today-item.positive>span{background:rgba(74,112,77,.10);color:var(--green)}
 .plant-today-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.plant-today-actions .mini-action{flex:1;min-width:130px;text-align:center}
 @media(max-width:390px){.plant-today-card{padding:16px}.plant-today-head h2{font-size:27px}.plant-today-actions{flex-direction:column}.plant-today-actions .mini-action{width:100%}}
+
+/* v1.2.17 — Pruning Assistant */
+.pruning-assistant{margin:0 0 14px;padding:17px;border-radius:26px;background:linear-gradient(145deg,rgba(249,246,239,.96),rgba(238,244,235,.94));border:1px solid rgba(255,255,255,.8);box-shadow:0 12px 28px rgba(60,57,48,.055)}
+.pruning-assistant-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.pruning-assistant-head h2{margin:4px 0 0;font-family:var(--serif);font-size:26px;line-height:1.05;font-weight:600}.pruning-assistant-head>span{width:42px;height:42px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(77,105,78,.09);color:var(--green);font-size:18px;font-weight:800}
+.pruning-verdict{margin:14px 0 7px;font-family:var(--serif);font-size:19px;font-weight:650;color:var(--green)}.pruning-assistant>p{margin:0;font-size:10px;line-height:1.5;color:var(--muted)}.pruning-actions{margin-top:12px}
+.pruning-assistant.attention{background:linear-gradient(145deg,rgba(249,240,231,.96),rgba(248,245,237,.95))}.pruning-assistant.attention .pruning-assistant-head>span{background:rgba(159,114,76,.10);color:#8c684f}.pruning-assistant.attention .pruning-verdict{color:#7d5b43}
+.pruning-assistant.positive{background:linear-gradient(145deg,rgba(235,244,232,.97),rgba(247,244,236,.95))}.pruning-assistant.muted{background:rgba(248,246,240,.86)}.pruning-assistant.muted .pruning-assistant-head>span{color:var(--sage)}
+@media(max-width:390px){.pruning-assistant{padding:15px}.pruning-assistant-head h2{font-size:24px}.pruning-assistant-head>span{width:39px;height:39px}}
