@@ -695,41 +695,36 @@ main:has(.profile-dossier-hero) .profile-panel{
 }
 
 
-/* v1.2.11 — Botany distribution map card */
+/* v1.2.12 — native page scrolling + GBIF occurrence map */
 #app:has(.profile-dossier-hero){
-  --profile-topbar-h:76px;
-  --profile-dock-zone:calc(var(--profile-dock-h) + 22px + env(safe-area-inset-bottom));
-  height:100dvh;
-  min-height:100dvh;
-  overflow:hidden;
-  padding-bottom:0;
+  height:auto;
+  min-height:100vh;
+  overflow:visible;
+  padding-bottom:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom));
 }
 main:has(.profile-dossier-hero){
-  height:calc(100dvh - var(--profile-topbar-h) - var(--profile-dock-zone));
+  height:auto;
   min-height:0;
-  overflow-y:auto;
-  overflow-x:hidden;
-  -webkit-overflow-scrolling:touch;
-  overscroll-behavior-y:contain;
-  padding-bottom:18px;
-  scroll-padding-bottom:24px;
+  overflow:visible;
+  padding-bottom:calc(var(--profile-dock-h) + 76px + env(safe-area-inset-bottom));
+  scroll-padding-bottom:calc(var(--profile-dock-h) + 60px + env(safe-area-inset-bottom));
 }
 main:has(.profile-dossier-hero) .profile-panel{
   padding-bottom:0;
-  scroll-margin-bottom:0;
 }
 main:has(.profile-dossier-hero) .profile-dock-reserve{
   display:block;
-  height:calc(var(--profile-dock-h) + 38px + env(safe-area-inset-bottom));
+  height:calc(var(--profile-dock-h) + 86px + env(safe-area-inset-bottom));
   width:100%;
-  flex:none;
   pointer-events:none;
 }
+.distribution-live-map{position:relative;min-height:190px;display:grid;place-items:center}
+.distribution-loading{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}
+.distribution-map-svg .occurrence-dot{fill:#405f43;fill-opacity:.55;stroke:#fff;stroke-opacity:.5;stroke-width:.7}
+.distribution-map-svg .occurrence-dot.cluster{fill:#2f5037;fill-opacity:.72}
+.distribution-map-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:9px;color:var(--muted)}
+.distribution-map-note b{font-family:var(--sans);font-size:9px;color:var(--green);letter-spacing:.04em}
 @media(max-width:390px){
-  #app:has(.profile-dossier-hero){
-    --profile-dock-zone:calc(var(--profile-dock-h) + 20px + env(safe-area-inset-bottom));
-  }
-  main:has(.profile-dossier-hero) .profile-dock-reserve{
-    height:calc(var(--profile-dock-h) + 42px + env(safe-area-inset-bottom));
-  }
+  #app:has(.profile-dossier-hero){padding-bottom:calc(var(--profile-dock-h) + 98px + env(safe-area-inset-bottom))}
+  main:has(.profile-dossier-hero) .profile-dock-reserve{height:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom))}
 }
