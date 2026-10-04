@@ -648,3 +648,43 @@ main:has(.profile-dossier-hero) .profile-panel{padding-bottom:calc(var(--nav-h) 
   main:has(.profile-dossier-hero) .profile-section-intro{gap:10px;margin-bottom:18px}
   main:has(.profile-dossier-hero) .profile-completeness{min-width:96px;min-height:54px;padding:8px 10px 8px 8px}
 }
+
+/* v1.2.9 — structural profile dock safe-zone fix */
+main:has(.profile-dossier-hero){
+  --profile-dock-h:64px;
+  scroll-padding-bottom:calc(var(--profile-dock-h) + 34px + env(safe-area-inset-bottom));
+}
+#app:has(.profile-dossier-hero){
+  padding-bottom:calc(var(--profile-dock-h) + 26px + env(safe-area-inset-bottom));
+}
+#app:has(.profile-dossier-hero) .bottom-nav{
+  height:var(--profile-dock-h);
+  bottom:3px;
+  padding:6px 15px calc(6px + env(safe-area-inset-bottom));
+  border-radius:23px;
+}
+#app:has(.profile-dossier-hero) .bottom-nav .nav-item{gap:2px}
+#app:has(.profile-dossier-hero) .bottom-nav .nav-item span{font-size:17px}
+#app:has(.profile-dossier-hero) .bottom-nav .nav-item small{font-size:7.5px;line-height:1}
+#app:has(.profile-dossier-hero) .bottom-nav .lens-nav{
+  width:50px;
+  height:50px;
+  border-radius:18px;
+  margin-top:-18px;
+  font-size:24px;
+}
+main:has(.profile-dossier-hero) .profile-panel{
+  padding-bottom:calc(var(--profile-dock-h) + 54px + env(safe-area-inset-bottom));
+  scroll-margin-bottom:calc(var(--profile-dock-h) + 34px + env(safe-area-inset-bottom));
+}
+@media(max-width:390px){
+  #app:has(.profile-dossier-hero) .bottom-nav{
+    width:calc(100% - 10px);
+    bottom:2px;
+    padding-left:12px;
+    padding-right:12px;
+  }
+  main:has(.profile-dossier-hero) .profile-panel{
+    padding-bottom:calc(var(--profile-dock-h) + 58px + env(safe-area-inset-bottom));
+  }
+}
