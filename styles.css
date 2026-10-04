@@ -729,3 +729,11 @@ main:has(.profile-dossier-hero) .profile-dock-reserve{
   #app:has(.profile-dossier-hero){padding-bottom:calc(var(--profile-dock-h) + 98px + env(safe-area-inset-bottom))}
   main:has(.profile-dossier-hero) .profile-dock-reserve{height:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom))}
 }
+
+/* v1.2.15 — expanded GBIF occurrence map */
+.distribution-modal-live{margin:14px 0 12px;min-height:260px;border-radius:26px;overflow:hidden;background:#e6efe7;border:1px solid rgba(80,103,82,.10)}
+.distribution-modal-live .distribution-map-svg{width:100%;height:auto;display:block}
+.distribution-modal-live .distribution-map-note{padding:0 4px 8px;margin-top:6px}
+.distribution-modal-live .distribution-map-caveat{padding:0 4px 10px}
+.distribution-modal-copy{margin-top:10px}
+@media(max-width:390px){.distribution-modal-live{min-height:210px}}

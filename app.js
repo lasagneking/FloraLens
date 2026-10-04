@@ -1400,7 +1400,7 @@ function buildDistributionRecord({g=null,p=null}={}){
   };
 }
 function distributionBaseSvg(regions=[]){
-  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.14" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
+  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.15" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
 }
 
 function renderDistributionCard(record){
@@ -1411,7 +1411,8 @@ function renderDistributionCard(record){
   const textArg=encodeURIComponent(record.text||record.short||'');
   const sourceArg=encodeURIComponent(record.source||'Botanical record');
   const keyAttr=record.key?` data-gbif-key="${record.key}"`:'';
-  return `<div class="distribution-card profile-card"><div class="profile-card-head"><div><div class="eyebrow">Biogeography</div><h2>${esc(record.label)}</h2></div><span>${esc(regionText)}</span></div><div class="distribution-map-wrap"><div class="distribution-live-map"${keyAttr}>${distributionBaseSvg(record.regions)}${record.key?`<div class="distribution-loading">Loading recorded locations…</div>`:''}</div></div><div class="distribution-caption"><div><b>${esc(record.short)}</b><small>${esc(record.source)}</small></div><button class="mini-action" type="button" onclick="showDistributionDetail(decodeURIComponent('${textArg}'), decodeURIComponent('${sourceArg}'))">Expand</button></div></div>`;
+  const gbifKey=record.key||0;
+  return `<div class="distribution-card profile-card"><div class="profile-card-head"><div><div class="eyebrow">Biogeography</div><h2>${esc(record.label)}</h2></div><span>${esc(regionText)}</span></div><div class="distribution-map-wrap"><div class="distribution-live-map"${keyAttr}>${distributionBaseSvg(record.regions)}${record.key?`<div class="distribution-loading">Loading recorded locations…</div>`:''}</div></div><div class="distribution-caption"><div><b>${esc(record.short)}</b><small>${esc(record.source)}</small></div><button class="mini-action" type="button" onclick="showDistributionDetail(decodeURIComponent('${textArg}'), decodeURIComponent('${sourceArg}'), ${gbifKey})">Expand</button></div></div>`;
 }
 function lonLatToMap(lon,lat){
   const x=((Number(lon)+180)/360)*420;
@@ -1439,7 +1440,7 @@ function getWorldMapMask(){
       }catch(err){ reject(err); }
     };
     img.onerror=()=>reject(new Error('Map mask failed to load'));
-    img.src='world-map.svg?v=1.2.14';
+    img.src='world-map.svg?v=1.2.15';
   });
   return worldMapMaskPromise;
 }
@@ -1523,8 +1524,10 @@ async function hydrateDistributionMaps(){
     }
   }));
 }
-function showDistributionDetail(text='',source='Botanical record'){
-  modal(`<div class="eyebrow">Distribution map</div><h2>Species range</h2><p class="sub">${esc(text||'FloraLens is using georeferenced GBIF occurrence records to show where this species has been recorded.')}</p><div class="small" style="margin-top:8px">Source: ${esc(source)}</div><p class="small" style="margin-top:10px">Mapped points are filtered for obviously invalid coordinates and large uncertainty, then snapped only onto visible land on the FloraLens map.</p><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
+function showDistributionDetail(text='',source='Botanical record',gbifKey=0){
+  const keyAttr=Number(gbifKey)?` data-gbif-key="${Number(gbifKey)}"`:'';
+  modal(`<div class="eyebrow">Distribution map</div><h2>Recorded occurrences</h2><div class="distribution-modal-live distribution-live-map"${keyAttr}>${distributionBaseSvg([])}${Number(gbifKey)?`<div class="distribution-loading">Loading recorded locations…</div>`:''}</div><p class="sub distribution-modal-copy">${esc(text||'FloraLens is using georeferenced GBIF occurrence records to show where this species has been recorded.')}</p><div class="small" style="margin-top:8px">Source: ${esc(source)}</div><p class="small" style="margin-top:10px">Mapped points are filtered for obviously invalid coordinates and large uncertainty, then snapped only onto visible land on the FloraLens map.</p><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
+  if(Number(gbifKey)) setTimeout(()=>hydrateDistributionMaps(),0);
 }
 
 
@@ -2976,7 +2979,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.14 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.15 · private botanical journal</div>`);
 });
 
 renderHome();
