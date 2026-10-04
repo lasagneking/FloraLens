@@ -1400,7 +1400,7 @@ function buildDistributionRecord({g=null,p=null}={}){
   };
 }
 function distributionBaseSvg(regions=[]){
-  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.13" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
+  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.14" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
 }
 
 function renderDistributionCard(record){
@@ -1418,19 +1418,87 @@ function lonLatToMap(lon,lat){
   const y=((90-Number(lat))/180)*210;
   return {x:Math.max(0,Math.min(420,x)),y:Math.max(0,Math.min(210,y))};
 }
-function occurrenceDots(records=[]){
+let worldMapMaskPromise = null;
+function landLikePixel(r,g,b,a){
+  if(a < 10) return false;
+  const brightness=(r+g+b)/3;
+  return brightness < 221 && g < 232;
+}
+function getWorldMapMask(){
+  if(worldMapMaskPromise) return worldMapMaskPromise;
+  worldMapMaskPromise = new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const canvas=document.createElement('canvas');
+        canvas.width=420; canvas.height=210;
+        const ctx=canvas.getContext('2d', {willReadFrequently:true});
+        ctx.drawImage(img,0,0,420,210);
+        const imageData=ctx.getImageData(0,0,420,210);
+        resolve(imageData);
+      }catch(err){ reject(err); }
+    };
+    img.onerror=()=>reject(new Error('Map mask failed to load'));
+    img.src='world-map.svg?v=1.2.14';
+  });
+  return worldMapMaskPromise;
+}
+function snapPointToVisibleLand(mask,x,y,maxRadius=6){
+  const w=mask.width, h=mask.height, data=mask.data;
+  const scoreAt=(px,py)=>{
+    if(px<0||py<0||px>=w||py>=h) return -1;
+    const idx=(py*w+px)*4;
+    return landLikePixel(data[idx],data[idx+1],data[idx+2],data[idx+3]) ? 2 : 0;
+  };
+  const cx=Math.round(x), cy=Math.round(y);
+  if(scoreAt(cx,cy) > 0) return {x:cx, y:cy};
+  let best=null;
+  for(let radius=1; radius<=maxRadius; radius++){
+    for(let py=cy-radius; py<=cy+radius; py++){
+      for(let px=cx-radius; px<=cx+radius; px++){
+        if(Math.max(Math.abs(px-cx), Math.abs(py-cy)) !== radius) continue;
+        const base=scoreAt(px,py);
+        if(base <= 0) continue;
+        const dist=Math.hypot(px-cx, py-cy);
+        const coastalBonus=(scoreAt(px+1,py)+scoreAt(px-1,py)+scoreAt(px,py+1)+scoreAt(px,py-1));
+        const score=(12-dist)+coastalBonus;
+        if(!best || score > best.score) best={x:px, y:py, score};
+      }
+    }
+    if(best) break;
+  }
+  return best ? {x:best.x, y:best.y} : null;
+}
+function acceptableOccurrenceRecord(r){
+  const lon=Number(r?.decimalLongitude), lat=Number(r?.decimalLatitude);
+  if(!Number.isFinite(lon)||!Number.isFinite(lat)) return false;
+  const uncertainty=Number(r?.coordinateUncertaintyInMeters);
+  if(Number.isFinite(uncertainty) && uncertainty > 100000) return false;
+  const issueText=Array.isArray(r?.issues) ? r.issues.join(',') : String(r?.issues||'');
+  if(/COUNTRY_COORDINATE_MISMATCH|ZERO_COORDINATE|COORDINATE_INVALID|COORDINATE_OUT_OF_RANGE/i.test(issueText)) return false;
+  const basis=String(r?.basisOfRecord||'');
+  if(/FOSSIL_SPECIMEN|LIVING_SPECIMEN/i.test(basis)) return false;
+  return true;
+}
+async function occurrenceDots(records=[]){
+  const mask=await getWorldMapMask();
   const seen=new Set();
   const dots=[];
+  let plotted=0;
+  let filteredAtSea=0;
   for(const r of records){
-    if(!Number.isFinite(Number(r?.decimalLongitude))||!Number.isFinite(Number(r?.decimalLatitude))) continue;
+    if(!acceptableOccurrenceRecord(r)) continue;
     const {x,y}=lonLatToMap(r.decimalLongitude,r.decimalLatitude);
-    const key=`${Math.round(x/5)}:${Math.round(y/5)}`;
+    const snapped=snapPointToVisibleLand(mask,x,y,6);
+    if(!snapped){ filteredAtSea++; continue; }
+    const key=`${Math.round(snapped.x/5)}:${Math.round(snapped.y/5)}`;
     if(seen.has(key)) continue;
     seen.add(key);
-    dots.push(`<circle class="occurrence-dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"/>`);
+    dots.push(`<circle class="occurrence-dot" cx="${snapped.x.toFixed(1)}" cy="${snapped.y.toFixed(1)}" r="3.1"/>`);
+    plotted++;
     if(dots.length>=120) break;
   }
-  return dots.join('');
+  return { svg:dots.join(''), plotted, filteredAtSea };
 }
 async function hydrateDistributionMaps(){
   const maps=[...document.querySelectorAll('.distribution-live-map[data-gbif-key]')];
@@ -1445,10 +1513,10 @@ async function hydrateDistributionMaps(){
       if(!res.ok) throw new Error(`GBIF ${res.status}`);
       const data=await res.json();
       const rows=Array.isArray(data?.results)?data.results:[];
-      const dots=occurrenceDots(rows);
+      const rendered=await occurrenceDots(rows);
       const group=el.querySelector('.distribution-occurrences');
-      if(group) group.innerHTML=dots;
-      if(loader) loader.outerHTML=`<div class="distribution-map-note"><span>${rows.length?`${Math.min(rows.length,200)} recent GBIF records sampled`:'No georeferenced GBIF records found'}</span><b>GBIF</b></div>`;
+      if(group) group.innerHTML=rendered.svg;
+      if(loader) loader.outerHTML=`<div class="distribution-map-note"><span>${rendered.plotted?`${rendered.plotted} mapped from ${Math.min(rows.length,200)} GBIF records`:'No mappable GBIF land records found'}</span><b>GBIF</b></div><div class="distribution-map-caveat">Recorded occurrences may include cultivated or approximate observations. Offshore points are hidden.</div>`;
     }catch(err){
       console.warn('GBIF occurrence map failed',err);
       if(loader) loader.textContent='Occurrence map unavailable offline';
@@ -1456,7 +1524,7 @@ async function hydrateDistributionMaps(){
   }));
 }
 function showDistributionDetail(text='',source='Botanical record'){
-  modal(`<div class="eyebrow">Distribution map</div><h2>Species range</h2><p class="sub">${esc(text||'FloraLens is using georeferenced GBIF occurrence records to show where this species has been recorded.')}</p><div class="small" style="margin-top:8px">Source: ${esc(source)}</div><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
+  modal(`<div class="eyebrow">Distribution map</div><h2>Species range</h2><p class="sub">${esc(text||'FloraLens is using georeferenced GBIF occurrence records to show where this species has been recorded.')}</p><div class="small" style="margin-top:8px">Source: ${esc(source)}</div><p class="small" style="margin-top:10px">Mapped points are filtered for obviously invalid coordinates and large uncertainty, then snapped only onto visible land on the FloraLens map.</p><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
 }
 
 
@@ -2908,7 +2976,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.13 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.14 · private botanical journal</div>`);
 });
 
 renderHome();

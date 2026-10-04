@@ -695,7 +695,7 @@ main:has(.profile-dossier-hero) .profile-panel{
 }
 
 
-/* v1.2.13 — native page scrolling + GBIF occurrence map */
+/* v1.2.14 — filtered land-only occurrence map */
 #app:has(.profile-dossier-hero){
   height:auto;
   min-height:100vh;
@@ -720,10 +720,11 @@ main:has(.profile-dossier-hero) .profile-dock-reserve{
 }
 .distribution-live-map{position:relative;min-height:190px;display:grid;place-items:center}
 .distribution-loading{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}
-.distribution-map-svg .occurrence-dot{fill:#405f43;fill-opacity:.55;stroke:#fff;stroke-opacity:.5;stroke-width:.7}
-.distribution-map-svg .occurrence-dot.cluster{fill:#2f5037;fill-opacity:.72}
+.distribution-map-svg .occurrence-dot{fill:#35563a;fill-opacity:.92;stroke:#f8f3ea;stroke-opacity:1;stroke-width:1.2;filter:drop-shadow(0 0 1px rgba(34,49,35,.22))}
+.distribution-map-svg .occurrence-dot.cluster{fill:#274a31;fill-opacity:.95}
 .distribution-map-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:9px;color:var(--muted)}
 .distribution-map-note b{font-family:var(--sans);font-size:9px;color:var(--green);letter-spacing:.04em}
+.distribution-map-caveat{margin-top:4px;font-size:8px;line-height:1.45;color:var(--sage)}
 @media(max-width:390px){
   #app:has(.profile-dossier-hero){padding-bottom:calc(var(--profile-dock-h) + 98px + env(safe-area-inset-bottom))}
   main:has(.profile-dossier-hero) .profile-dock-reserve{height:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom))}
