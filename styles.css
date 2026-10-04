@@ -695,7 +695,7 @@ main:has(.profile-dossier-hero) .profile-panel{
 }
 
 
-/* v1.2.12 — native page scrolling + GBIF occurrence map */
+/* v1.2.13 — native page scrolling + GBIF occurrence map */
 #app:has(.profile-dossier-hero){
   height:auto;
   min-height:100vh;

@@ -1400,9 +1400,9 @@ function buildDistributionRecord({g=null,p=null}={}){
   };
 }
 function distributionBaseSvg(regions=[]){
-  const on=set=>regions.includes(set)?'on':'';
-  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><rect x="0" y="0" width="420" height="210" rx="24" class="map-sea"/><path class="map-land ${on('north-america')}" d="M40 72c12-17 40-30 66-31 19-1 33 2 48 9 11 5 14 11 18 22l-10 8-9-3-12 10-14 1-9 16-24 12-8 21-24 2-10-13-8-1-9-20 10-10-5-12 0-11z"/><path class="map-land ${on('south-america')}" d="M140 129l18 8 12 22-7 11 8 15-10 21-15 5-9-11-4-23-8-16 6-12-4-20z"/><path class="map-land ${on('europe')}" d="M219 62l20-11 21 3 11 10-3 10-19 1-7 6-18-4-8-8z"/><path class="map-land ${on('africa')}" d="M245 86l19 8 12 20-6 17 7 23-15 26-25-8-7-28 3-28 12-18z"/><path class="map-land ${on('asia')}" d="M259 65l25-14 40-3 24 7 23 13 1 16-23 12-11 16-20 4-16-8-14 9-21-9-10-15 3-14-9-14z"/><path class="map-land ${on('oceania')}" d="M333 148l24-3 21 11 7 18-14 9-25-2-16-10-3-12z"/><circle cx="300" cy="164" r="5" class="map-land ${on('oceania')}"/><g class="distribution-occurrences"></g></svg>`;
+  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><image href="world-map.svg?v=1.2.13" x="0" y="0" width="420" height="210" preserveAspectRatio="none"/><g class="distribution-occurrences"></g></svg>`;
 }
+
 function renderDistributionCard(record){
   if(!record) return '';
   const regionText=record.regions.length
@@ -2908,7 +2908,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.12 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.13 · private botanical journal</div>`);
 });
 
 renderHome();
