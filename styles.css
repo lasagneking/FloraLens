@@ -626,11 +626,16 @@ h2{font-size:35px;letter-spacing:-.025em}
 .botany-identity small{font-size:7px;letter-spacing:.13em;color:var(--sage);font-weight:900}.botany-identity h3{margin:3px 0 2px;font-family:var(--serif);font-size:19px;line-height:1.05;font-style:italic;font-weight:600}.botany-identity p{margin:0;font-size:9px;line-height:1.35;color:var(--muted)}
 .knowledge-meter{padding:15px 16px 16px}.knowledge-meter .knowledge-row{display:flex!important;align-items:center!important;justify-content:space-between!important;margin:0 0 7px!important}.knowledge-row>span{display:grid;grid-template-columns:28px auto;grid-template-rows:auto auto;column-gap:8px;align-items:center}.knowledge-row i{grid-row:1/3;width:27px;height:27px;border-radius:50%;display:grid;place-items:center;background:rgba(83,109,82,.08);font-style:normal}.knowledge-row b{font-size:10px!important}.knowledge-row small{font-size:8px;color:var(--muted)}.knowledge-row strong{font-family:var(--serif);font-size:16px;color:var(--green);font-weight:650}
 .knowledge-meter .coverage{height:5px;margin-bottom:13px;background:rgba(82,97,76,.08)}.knowledge-meter .coverage:last-child{margin-bottom:0}
+.distribution-card{margin:0 0 14px;padding:16px 16px 14px;background:linear-gradient(180deg,rgba(252,249,242,.95),rgba(245,241,231,.92));border:1px solid rgba(83,101,79,.08);box-shadow:0 10px 24px rgba(60,57,48,.05)}
+.distribution-map-wrap{margin:10px 0 12px;border-radius:24px;overflow:hidden;background:linear-gradient(180deg,rgba(232,242,238,.9),rgba(248,244,236,.9));border:1px solid rgba(80,103,82,.08)}
+.distribution-map-svg{display:block;width:100%;height:auto}.map-sea{fill:#e6efe7}.map-land{fill:rgba(108,126,107,.28);stroke:rgba(78,99,79,.16);stroke-width:2}.map-land.on{fill:#7c9d75;stroke:#58724f}
+.distribution-caption{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.distribution-caption b{display:block;font-family:var(--serif);font-size:17px;line-height:1.28;font-weight:600;color:var(--ink)}.distribution-caption small{display:block;margin-top:4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}
+.distribution-modal-map{margin-top:12px;border-radius:24px;overflow:hidden;border:1px solid rgba(80,103,82,.09);background:linear-gradient(180deg,rgba(232,242,238,.9),rgba(248,244,236,.9))}
 
 .history-lead{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:start;padding:15px 16px;margin-bottom:12px;border-radius:24px;background:linear-gradient(145deg,rgba(246,236,229,.78),rgba(240,241,224,.78));border:1px solid rgba(255,255,255,.72)}.history-lead>span{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(105,117,89,.09);font-size:20px;color:var(--green)}.history-lead small{display:block;font-size:7px;letter-spacing:.13em;font-weight:900;color:var(--sage);margin:2px 0 3px}.history-lead b{font-family:var(--serif);font-size:18px;font-weight:600}.history-lead p{margin:5px 0 0;font-size:9px;line-height:1.45;color:var(--muted)}
 .plant-life-timeline{position:relative;overflow:hidden}.plant-life-timeline:before{content:"";position:absolute;left:28px;top:29px;bottom:29px;width:1px;background:linear-gradient(180deg,rgba(98,120,91,.12),rgba(98,120,91,.30),rgba(98,120,91,.08))}.plant-life-timeline .timeline-item{position:relative;z-index:1}.plant-life-timeline .timeline-icon{box-shadow:0 0 0 5px rgba(255,251,245,.94);background:#edf0e6;color:var(--green)}
 
-@media(max-width:390px){.profile-completeness{min-width:94px;padding-right:9px}.profile-completeness>span{width:34px;height:34px}.profile-completeness b{font-size:18px}.care-glance{padding:14px}.care-glance-grid>div{padding:10px;min-height:80px}.botany-identity{grid-template-columns:48px 1fr}.botany-seal{width:48px;height:48px}.profile-panel{padding-bottom:calc(var(--nav-h) + 60px + env(safe-area-inset-bottom))}}
+@media(max-width:390px){.profile-completeness{min-width:94px;padding-right:9px}.profile-completeness>span{width:34px;height:34px}.profile-completeness b{font-size:18px}.care-glance{padding:14px}.care-glance-grid>div{padding:10px;min-height:80px}.botany-identity{grid-template-columns:48px 1fr}.botany-seal{width:48px;height:48px}.distribution-caption{flex-direction:column;align-items:flex-start}.profile-panel{padding-bottom:calc(var(--nav-h) + 60px + env(safe-area-inset-bottom))}}
 
 /* v1.2.8 — profile spacing + floating dock correction */
 main:has(.profile-dossier-hero) .profile-back{padding-top:10px;padding-bottom:6px}
@@ -690,7 +695,7 @@ main:has(.profile-dossier-hero) .profile-panel{
 }
 
 
-/* v1.2.10 — true profile scrollport + in-flow dock reserve */
+/* v1.2.11 — Botany distribution map card */
 #app:has(.profile-dossier-hero){
   --profile-topbar-h:76px;
   --profile-dock-zone:calc(var(--profile-dock-h) + 22px + env(safe-area-inset-bottom));

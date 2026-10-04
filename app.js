@@ -1332,6 +1332,87 @@ function botanicalCoverage(care){
   const available=fields.filter(Boolean).length;
   return Math.round((available/fields.length)*100);
 }
+function isDistributionLikeText(text=""){
+  const v=String(text||"").trim();
+  if(!v) return false;
+  const lower=v.toLowerCase();
+  if(/^(native|introduced|range|distribution|occurs|found)\b/.test(lower)) return true;
+  if(/\b(canada|u\.?s\.?a?\.?|united states|mexico|europe|asia|africa|australia|new zealand|britain|ireland|uk|north america|south america|mediterranean)\b/i.test(v)) return true;
+  if((/[;,]|\bto\b|\bthrough\b|\bfrom\b/.test(lower)) && /\b(n\.?|s\.?|e\.?|w\.?|north|south|east|west)\b/i.test(v)) return true;
+  return false;
+}
+function chooseProfileDescription({pn=null,t=null,g=null,p=null}={}){
+  const candidates=[pn?.description,t?.growthDescription,t?.observations,...(Array.isArray(g?.descriptions)?g.descriptions.map(d=>d?.description):[]),p?.notes].filter(Boolean);
+  const clean=candidates.map(v=>String(v).trim()).filter(Boolean);
+  return clean.find(v=>!isDistributionLikeText(v)) || usable(p?.notes) || null;
+}
+function normaliseRangeLabel(text=""){
+  return String(text||"")
+    .replace(/\s+/g,' ')
+    .replace(/\bE\. U\.S\.A\.\b/g,'eastern U.S.A.')
+    .replace(/\bNC\.\b/g,'North Carolina')
+    .replace(/\bE\. Canada\b/g,'eastern Canada')
+    .trim();
+}
+function distributionSourceLabel(g){
+  if(Array.isArray(g?.descriptions) && g.descriptions.length) return 'GBIF description';
+  if(Array.isArray(g?.profiles) && g.profiles.length) return 'GBIF profile';
+  return 'Botanical record';
+}
+function distributionTextFor(g=null){
+  const descriptions=(Array.isArray(g?.descriptions)?g.descriptions:[])
+    .map(x=>String(x?.description||'').trim())
+    .filter(Boolean);
+  const ranked=descriptions.sort((a,b)=>(isDistributionLikeText(b)?1:0)-(isDistributionLikeText(a)?1:0) || a.length-b.length);
+  const picked=ranked.find(isDistributionLikeText) || null;
+  return picked?normaliseRangeLabel(picked):null;
+}
+function detectDistributionRegions(text=""){
+  const lower=String(text||'').toLowerCase();
+  const regions=[];
+  const add=r=>{ if(!regions.includes(r)) regions.push(r); };
+  if(/canada|u\.?s\.?a?\.?|united states|mexico|north america|north carolina|eastern u\.?s\.?/.test(lower)) add('north-america');
+  if(/south america|argentina|brazil|chile|peru|colombia|ecuador|uruguay|bolivia/.test(lower)) add('south-america');
+  if(/europe|britain|ireland|uk|france|germany|spain|italy|mediterranean|scandinavia|balkans|portugal|netherlands/.test(lower)) add('europe');
+  if(/africa|morocco|algeria|tunisia|south africa|kenya|ethiopia|madagascar/.test(lower)) add('africa');
+  if(/asia|china|japan|korea|india|himalaya|indonesia|thailand|vietnam|malaysia|philippines/.test(lower)) add('asia');
+  if(/australia|new zealand|oceania|tasmania/.test(lower)) add('oceania');
+  return regions;
+}
+function buildDistributionRecord({g=null,p=null}={}){
+  const text=distributionTextFor(g);
+  if(!text) return null;
+  const regions=detectDistributionRegions(text);
+  const short=text.length>92 ? `${text.slice(0,89)}…` : text;
+  let label='Distribution';
+  if(/\bnative\b/i.test(text)) label='Native range';
+  else if(/\bintroduced\b/i.test(text)) label='Introduced range';
+  else if(/canada|u\.?s\.?a?\.?|united states|north america/i.test(text)) label='Native range';
+  return {
+    label,
+    text,
+    short,
+    regions,
+    source:distributionSourceLabel(g),
+    fallbackTitle:p?.common ? `${p.common} distribution` : 'Species distribution'
+  };
+}
+function distributionMapSvg(regions=[]){
+  const on=set=>regions.includes(set)?'on':'';
+  return `<svg viewBox="0 0 420 210" class="distribution-map-svg" role="img" aria-label="Distribution map preview"><rect x="0" y="0" width="420" height="210" rx="24" class="map-sea"/><path class="map-land ${on('north-america')}" d="M40 72c12-17 40-30 66-31 19-1 33 2 48 9 11 5 14 11 18 22l-10 8-9-3-12 10-14 1-9 16-24 12-8 21-24 2-10-13-8-1-9-20 10-10-5-12 0-11z"/><path class="map-land ${on('south-america')}" d="M140 129l18 8 12 22-7 11 8 15-10 21-15 5-9-11-4-23-8-16 6-12-4-20z"/><path class="map-land ${on('europe')}" d="M219 62l20-11 21 3 11 10-3 10-19 1-7 6-18-4-8-8z"/><path class="map-land ${on('africa')}" d="M245 86l19 8 12 20-6 17 7 23-15 26-25-8-7-28 3-28 12-18z"/><path class="map-land ${on('asia')}" d="M259 65l25-14 40-3 24 7 23 13 1 16-23 12-11 16-20 4-16-8-14 9-21-9-10-15 3-14-9-14z"/><path class="map-land ${on('oceania')}" d="M333 148l24-3 21 11 7 18-14 9-25-2-16-10-3-12z"/><circle cx="300" cy="164" r="5" class="map-land ${on('oceania')}"/></svg>`;
+}
+function renderDistributionCard(record){
+  if(!record) return '';
+  const regionText=record.regions.length
+    ? record.regions.map(r=>({"north-america":"North America","south-america":"South America","europe":"Europe","africa":"Africa","asia":"Asia","oceania":"Australia / Oceania"}[r]||r)).join(' · ')
+    : 'Map preview';
+  const textArg=encodeURIComponent(record.text||'');
+  const sourceArg=encodeURIComponent(record.source||'Botanical record');
+  return `<div class="distribution-card profile-card"><div class="profile-card-head"><div><div class="eyebrow">Biogeography</div><h2>${esc(record.label)}</h2></div><span>${esc(regionText)}</span></div><div class="distribution-map-wrap">${distributionMapSvg(record.regions)}</div><div class="distribution-caption"><div><b>${esc(record.short)}</b><small>${esc(record.source)}</small></div><button class="mini-action" type="button" onclick="showDistributionDetail(decodeURIComponent('${textArg}'), decodeURIComponent('${sourceArg}'))">Expand</button></div></div>`;
+}
+function showDistributionDetail(text='',source='Botanical record'){
+  modal(`<div class="eyebrow">Distribution map</div><h2>Species range</h2><p class="sub">${esc(text)}</p><div class="distribution-modal-map">${distributionMapSvg(detectDistributionRegions(text))}</div><div class="small" style="margin-top:8px">Source: ${esc(source)}</div><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
+}
 
 
 const defaultState = {
@@ -2121,7 +2202,8 @@ async function renderProfile(id,isNew=false){
   if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel==="genus"?"genus context":"species"}`);
   const uniqueSources=[...new Set(sourceNames)];
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
-  const desc=pn?.description||t?.growthDescription||t?.observations||g?.descriptions?.find(d=>d.description)?.description||p.notes;
+  const desc=chooseProfileDescription({pn,t,g,p});
+  const distributionRecord=buildDistributionRecord({g,p});
   const currentSeason=seasonKey();
   const seasonalLocal=care.seasonal?.[currentSeason]||null;
   const atlasSeasonal=plantAtlasSeasonText(care.plantAtlas);
@@ -2206,6 +2288,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Botanical dossier</div><h2>What FloraLens knows</h2></div><div class="profile-completeness botanical"><span>⌘</span><div><b>${botanicalRecordCoverage}%</b><small>species record</small></div></div></div>
       <div class="botany-identity"><div class="botany-seal">❧</div><div><small>FLORALENS BOTANICAL RECORD</small><h3>${esc(p.scientific)}</h3><p>${care.traitDataset?`${esc(care.traitDataset)} · ${care.traitMatchLevel==="genus"?"genus context":"species-level match"}`:"Curated botanical context"}${care.plantAtlas?" · Plant Atlas phenology":""}</p></div></div>
       <div class="record-meter knowledge-meter"><div class="knowledge-row"><span><i>☀</i><b>Practical care</b><small>Growing guidance</small></span><strong>${careCoverage}%</strong></div><div class="coverage"><span style="width:${careCoverage}%"></span></div><div class="knowledge-row"><span><i>❧</i><b>Botanical record</b><small>Traits & ecological context</small></span><strong>${botanicalRecordCoverage}%</strong></div><div class="coverage botanical-coverage"><span style="width:${botanicalRecordCoverage}%"></span></div></div>
+      ${renderDistributionCard(distributionRecord)}
       ${botanicalRows}
       <div class="source-dossier"><div class="eyebrow">Provenance</div><h3>Where this record comes from</h3><div class="source-row">${uniqueSources.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh record</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>
       ${care.usedLocal?`<div class="good-know compact-note"><div class="eyebrow">Care-source note</div><p class="sub">FloraLens prefers species-level practical guidance and uses curated genus guidance only as a cautious fallback.</p></div>`:""}
@@ -2779,7 +2862,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.10 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.11 · private botanical journal</div>`);
 });
 
 renderHome();
