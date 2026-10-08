@@ -1408,8 +1408,8 @@ function renderDistributionCard(record){
   const regionText=record.regions.length
     ? record.regions.map(r=>({"north-america":"North America","south-america":"South America","europe":"Europe","africa":"Africa","asia":"Asia","oceania":"Australia / Oceania"}[r]||r)).join(' · ')
     : 'Occurrence map';
-  const textArg=encodeURIComponent(record.text||record.short||'');
-  const sourceArg=encodeURIComponent(record.source||'Botanical record');
+  const textArg=jsArg(record.text||record.short||'');
+  const sourceArg=jsArg(record.source||'Botanical record');
   const keyAttr=record.key?` data-gbif-key="${record.key}"`:'';
   const gbifKey=record.key||0;
   return `<div class="distribution-card profile-card"><div class="profile-card-head"><div><div class="eyebrow">Biogeography</div><h2>${esc(record.label)}</h2></div><span>${esc(regionText)}</span></div><div class="distribution-map-wrap"><div class="distribution-live-map"${keyAttr}>${distributionBaseSvg(record.regions)}${record.key?`<div class="distribution-loading">Loading recorded locations…</div>`:''}</div></div><div class="distribution-caption"><div><b>${esc(record.short)}</b><small>${esc(record.source)}</small></div><button class="mini-action" type="button" onclick="showDistributionDetail(decodeURIComponent('${textArg}'), decodeURIComponent('${sourceArg}'), ${gbifKey})">Expand</button></div></div>`;
@@ -1571,6 +1571,16 @@ function loadState(){
   } catch { return structuredClone(defaultState); }
 }
 function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+// Plain-English message when a request fails for lack of signal
+function friendlyNetError(err,what="This"){
+  const msg=String(err?.message||err||"");
+  if(!navigator.onLine || /failed to fetch|load failed|networkerror|network connection/i.test(msg))
+    return `You're offline. ${what} needs a signal. Your photos are still here, so try again once you're connected.`;
+  return msg;
+}
+
+// Safe for a JS string inside an onclick attribute (handles apostrophes too)
+function jsArg(s=""){ return encodeURIComponent(String(s)).replace(/'/g,"%27"); }
 function esc(s=""){ return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m])); }
 function slug(s=""){ return s.toLowerCase().normalize("NFKD").replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"-"); }
 function toast(msg){ document.body.insertAdjacentHTML("beforeend",`<div class="toast" id="toast">${esc(msg)}</div>`); setTimeout(()=>document.getElementById("toast")?.remove(),2200); }
@@ -1820,7 +1830,7 @@ function setGardenView(mode){
 }
 function gardenGalleryMarkup(){
   return `<input class="search" id="gardenSearch" placeholder="Search your plants…" oninput="filterGarden(this.value)">
-    <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea(decodeURIComponent('${encodeURIComponent(a)}'),this)">${esc(a)}</button>`).join("")}</div>
+    <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
     <section class="masonry" id="gardenPins">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>`;
 }
 function areaMood(area){
@@ -1851,8 +1861,8 @@ function gardenZone(area,index){
   const plants=state.plants.filter(p=>p.area===area);
   const mood=areaMood(area);
   const limit=5;
-  return `<article class="garden-zone ${mood.cls}" onclick="openAreaMap(decodeURIComponent('${encodeURIComponent(area)}'))">
-    <div class="zone-top"><span class="zone-icon">${mood.icon}</span><button class="zone-menu" onclick="event.stopPropagation();areaMenu(decodeURIComponent('${encodeURIComponent(area)}'))">•••</button></div>
+  return `<article class="garden-zone ${mood.cls}" onclick="openAreaMap(decodeURIComponent('${jsArg(area)}'))">
+    <div class="zone-top"><span class="zone-icon">${mood.icon}</span><button class="zone-menu" onclick="event.stopPropagation();areaMenu(decodeURIComponent('${jsArg(area)}'))">•••</button></div>
     <div class="zone-copy"><div class="eyebrow">${esc(mood.note)}</div><h2>${esc(area)}</h2><p>${plants.length} ${plants.length===1?"plant":"plants"}</p></div>
     <div class="zone-plants">
       ${plants.slice(0,limit).map((p,pi)=>`<button class="map-plant map-plant-${pi+1}" onclick="event.stopPropagation();setRoute('profile',{id:'${p.id}'})" title="${esc(p.common)}"><span class="map-plant-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><small>${esc(p.common)}</small></button>`).join("")}
@@ -1882,12 +1892,12 @@ function saveMapArea(){
 function areaMenu(area){
   const plants=state.plants.filter(p=>p.area===area);
   modal(`<div class="eyebrow">Garden area</div><h2>${esc(area)}</h2>
-    <button class="destination-choice" onclick="renameAreaPrompt(decodeURIComponent('${encodeURIComponent(area)}'))"><span>✎</span><div><b>Rename area</b><small>Update this name everywhere in My Garden.</small></div></button>
+    <button class="destination-choice" onclick="renameAreaPrompt(decodeURIComponent('${jsArg(area)}'))"><span>✎</span><div><b>Rename area</b><small>Update this name everywhere in My Garden.</small></div></button>
     ${area!=="Unplaced"?`<button class="destination-choice" onclick="closeModal();startCamera('identify')"><span>⌾</span><div><b>Add another plant</b><small>Identify something and save it to this space.</small></div></button>`:""}
-    ${area!=="Unplaced"?`<button class="link-btn discovery-delete-link" style="width:100%" onclick="deleteAreaPrompt(decodeURIComponent('${encodeURIComponent(area)}'))">Remove area${plants.length?` (${plants.length} plants move to Unplaced)`:""}</button>`:""}`);
+    ${area!=="Unplaced"?`<button class="link-btn discovery-delete-link" style="width:100%" onclick="deleteAreaPrompt(decodeURIComponent('${jsArg(area)}'))">Remove area${plants.length?` (${plants.length} plants move to Unplaced)`:""}</button>`:""}`);
 }
 function renameAreaPrompt(area){
-  modal(`<div class="eyebrow">Garden area</div><h2>Rename ${esc(area)}</h2><input id="renameArea" class="search" value="${esc(area)}"><button class="btn primary" style="width:100%" onclick="saveAreaRename(decodeURIComponent('${encodeURIComponent(area)}'))">Save name</button>`);
+  modal(`<div class="eyebrow">Garden area</div><h2>Rename ${esc(area)}</h2><input id="renameArea" class="search" value="${esc(area)}"><button class="btn primary" style="width:100%" onclick="saveAreaRename(decodeURIComponent('${jsArg(area)}'))">Save name</button>`);
 }
 function saveAreaRename(oldName){
   const name=(document.getElementById("renameArea")?.value||"").trim();
@@ -1899,7 +1909,7 @@ function saveAreaRename(oldName){
 }
 function deleteAreaPrompt(area){
   const count=state.plants.filter(p=>p.area===area).length;
-  modal(`<div class="eyebrow">Garden Map</div><h2>Remove ${esc(area)}?</h2><p class="sub">${count?`${count} ${count===1?"plant":"plants"} will be kept safely and moved to Unplaced.`:"This removes the empty area from your map."}</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deleteGardenArea(decodeURIComponent('${encodeURIComponent(area)}'))">Remove area</button></div>`);
+  modal(`<div class="eyebrow">Garden Map</div><h2>Remove ${esc(area)}?</h2><p class="sub">${count?`${count} ${count===1?"plant":"plants"} will be kept safely and moved to Unplaced.`:"This removes the empty area from your map."}</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deleteGardenArea(decodeURIComponent('${jsArg(area)}'))">Remove area</button></div>`);
 }
 function deleteGardenArea(area){
   if(area==="Unplaced")return;
@@ -2005,7 +2015,7 @@ async function identifyPlant(){
     if(!pendingResults.length) throw new Error("No plant match was returned");
     renderResult();
   }catch(err){
-    view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens</div><h1>Couldn’t settle on a match</h1><p class="sub">${esc(err.message)}</p></section><button class="btn primary" style="width:100%" onclick="renderCaptureReview()">Try these photos again</button>`;
+    view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens</div><h1>Couldn’t settle on a match</h1><p class="sub">${esc(friendlyNetError(err,"Identifying a plant"))}</p></section><button class="btn primary" style="width:100%" onclick="renderCaptureReview()">Try these photos again</button>`;
   }
 }
 
@@ -2047,7 +2057,7 @@ function finishWithoutSaving(){
 
 function chooseSaveArea(){
   chosenArea="Unplaced";
-  modal(`<div class="eyebrow">Add to My Garden</div><h2>Where does it live?</h2><div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea('${esc(a)}',this)">${esc(a)}</button>`).join("")}</div><button class="btn primary" style="width:100%" onclick="confirmPlant()">Save this plant</button><button class="link-btn" style="width:100%;margin-top:12px" onclick="addAreaPrompt()">＋ Create an area</button>`);
+  modal(`<div class="eyebrow">Add to My Garden</div><h2>Where does it live?</h2><div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div><button class="btn primary" style="width:100%" onclick="confirmPlant()">Save this plant</button><button class="link-btn" style="width:100%;margin-top:12px" onclick="addAreaPrompt()">＋ Create an area</button>`);
 }
 function selectArea(a,btn){ chosenArea=a; document.querySelectorAll(".area-choice").forEach(x=>x.classList.remove("active"));btn.classList.add("active"); }
 function addAreaPrompt(){
@@ -2117,7 +2127,7 @@ function addDiscoveryToGarden(id){
   chosenArea="Unplaced";
   modal(`<div class="eyebrow">Bring it home</div><h2>Add ${esc(d.common)} to My Garden?</h2>
     <p class="sub">Choose where it lives. The original discovery can stay in Discover as part of the story.</p>
-    <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea('${esc(a)}',this)">${esc(a)}</button>`).join("")}</div>
+    <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
     <button class="btn primary" style="width:100%" onclick="confirmDiscoveryToGarden('${id}')">Add to garden</button>`);
 }
 
@@ -2288,7 +2298,7 @@ async function refreshIntel(id){
 
 function movePlantPrompt(id){
   const p=state.plants.find(x=>x.id===id);if(!p)return;
-  modal(`<div class="eyebrow">Garden Map</div><h2>Move ${esc(p.common)}</h2><p class="sub">Where does this plant live now?</p><div class="area-grid">${state.areas.map(area=>`<button class="area-choice ${area===p.area?"active":""}" onclick="movePlantTo('${p.id}',decodeURIComponent('${encodeURIComponent(area)}'))">${esc(area)}</button>`).join("")}</div><button class="link-btn" style="width:100%;margin-top:12px" onclick="addAreaFromMove('${p.id}')">＋ Create a new area</button>`);
+  modal(`<div class="eyebrow">Garden Map</div><h2>Move ${esc(p.common)}</h2><p class="sub">Where does this plant live now?</p><div class="area-grid">${state.areas.map(area=>`<button class="area-choice ${area===p.area?"active":""}" onclick="movePlantTo('${p.id}',decodeURIComponent('${jsArg(area)}'))">${esc(area)}</button>`).join("")}</div><button class="link-btn" style="width:100%;margin-top:12px" onclick="addAreaFromMove('${p.id}')">＋ Create a new area</button>`);
 }
 function movePlantTo(id,area){
   const p=state.plants.find(x=>x.id===id);if(!p)return;
@@ -2445,13 +2455,26 @@ function buildPruningAssistant(care,p,bloom=[]){
 }
 function renderPruningAssistant(model,p){
   const tone={good:"positive",wait:"attention",light:"calm",caution:"calm",unknown:"muted"}[model.state]||"calm";
-  const encoded=encodeURIComponent(model.guidance||"");
+  const encoded=jsArg(model.guidance||"");
   return `<section class="pruning-assistant ${tone}"><div class="pruning-assistant-head"><div><div class="eyebrow">Pruning assistant</div><h2>Can I prune this now?</h2></div><span>${model.icon}</span></div><div class="pruning-verdict">${esc(model.label)}</div><p>${esc(model.detail)}</p>${model.guidance?`<div class="pruning-actions"><button class="mini-action" onclick="showPruningGuidance('${encoded}','${p.id}')">Why? / Full guidance</button></div>`:""}</section>`;
 }
 function showPruningGuidance(encoded='',plantId=''){
   const text=decodeURIComponent(encoded||'');
   const p=state.plants.find(x=>x.id===plantId)||state.discoveries.find(x=>x.id===plantId);
   modal(`<div class="eyebrow">Pruning assistant</div><h2>${esc(p?.common||"Plant")}</h2><p class="sub">${esc(text||"No detailed pruning guidance is available yet.")}</p><div class="good-know compact-note" style="margin-top:14px"><div class="eyebrow">FloraLens rule</div><p class="sub" style="margin:0">This answer uses the stored practical-care guidance, current month and recorded flowering window. It does not infer pruning instructions from TRY ecological traits.</p></div><button class="btn primary" style="width:100%;margin-top:14px" onclick="closeModal()">Close</button>`);
+}
+
+function toggleGlance(tile){
+  const open=tile.getAttribute("aria-expanded")!=="true";
+  tile.setAttribute("aria-expanded",String(open));
+  const more=tile.querySelector(".glance-more");
+  if(more) more.textContent=open?"Less":"More";
+}
+function markClampedGlance(scope=document){
+  scope.querySelectorAll(".glance-tile").forEach(tile=>{
+    const b=tile.querySelector("b");
+    tile.classList.toggle("clamped",!!b && b.scrollHeight>b.clientHeight+1);
+  });
 }
 
 async function renderProfile(id,isNew=false){
@@ -2543,15 +2566,11 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
-      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
+      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<button type="button" class="glance-tile" data-ico="sun" aria-expanded="false" onclick="toggleGlance(this)"><span>☀</span><small>Light</small><b>${esc(care.light)}</b><em class="glance-more">More</em></button>`:""}${care.water?`<button type="button" class="glance-tile" data-ico="drop" aria-expanded="false" onclick="toggleGlance(this)"><span>💧</span><small>Water</small><b>${esc(care.water)}</b><em class="glance-more">More</em></button>`:""}${care.soil?`<button type="button" class="glance-tile" data-ico="soil" aria-expanded="false" onclick="toggleGlance(this)"><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b><em class="glance-more">More</em></button>`:""}${care.hardiness?`<button type="button" class="glance-tile" data-ico="snow" aria-expanded="false" onclick="toggleGlance(this)"><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b><em class="glance-more">More</em></button>`:""}</div></div>`:""}
       <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
-        ${care.light?`<div class="care-tile"><span class="care-icon">☀</span><b>Sunlight</b><small>${esc(care.light)}</small></div>`:""}
-        ${care.water?`<div class="care-tile"><span class="care-icon">💧</span><b>Water</b><small>${esc(care.water)}</small></div>`:""}
-        ${care.soil?`<div class="care-tile"><span class="care-icon">♧</span><b>Soil</b><small>${esc(care.soil)}</small></div>`:""}
-        ${care.hardiness?`<div class="care-tile"><span class="care-icon">❄</span><b>Hardiness</b><small>${esc(care.hardiness)}</small></div>`:""}
-        ${care.height?`<div class="care-tile"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
+        ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
         ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
         ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
       </div>
@@ -2586,6 +2605,7 @@ async function renderProfile(id,isNew=false){
   }
   hydratePhotos();
   hydrateDistributionMaps();
+  requestAnimationFrame(()=>markClampedGlance());
 }
 
 async function exportBackup(){
@@ -2691,7 +2711,6 @@ function confirmDeleteJournal(id){
 async function deleteJournalMoment(id){
   const j=state.journal.find(x=>x.id===id);if(!j)return;state.journal=state.journal.filter(x=>x.id!==id);saveState();closeModal();if(j.photoKey)await deletePhoto(j.photoKey);toast("Journal moment removed");renderJournal();
 }
-function addJournalForPlant(id){const p=state.plants.find(x=>x.id===id);modal(`<div class="eyebrow">${esc(p.common)}</div><h2>Add to its story</h2><textarea id="journalText" class="search" style="min-height:110px" placeholder="What did you notice?"></textarea><button class="btn primary" style="width:100%" onclick="saveJournal()">Save moment</button>`)}
 
 
 function localISODate(d=new Date()){
@@ -3000,7 +3019,7 @@ async function runPlantDoctor(){
       results=Array.isArray(data.results)?data.results:[];
       if(Number.isFinite(data.remainingIdentificationRequests)){ state.lastQuota=data.remainingIdentificationRequests; saveState(); }
     }
-  }catch(err){ error=String(err.message||err); }
+  }catch(err){ error=friendlyNetError(err,"Plant Doctor"); }
   doctorLastResult={results,care,error,checkedAt:new Date().toISOString()};
   renderDoctorResult();
 }
@@ -3133,8 +3152,48 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.0 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.3 · made for our garden</div>`);
 });
 
 renderHome();
 backgroundEnrichTryV7SavedRecords();
+
+
+/* ===================== Home-screen app: offline + updates ===================== */
+function updateOnlineState(){
+  document.body.classList.toggle("is-offline",!navigator.onLine);
+  let pill=document.getElementById("offlinePill");
+  if(!navigator.onLine){
+    if(!pill){
+      document.querySelector(".topbar")?.insertAdjacentHTML("afterend",`<div id="offlinePill" class="offline-pill" role="status"><span></span>Offline. Your garden, journal and care still work.</div>`);
+    }
+  }else pill?.remove();
+}
+window.addEventListener("online",()=>{updateOnlineState();toast("Back online");});
+window.addEventListener("offline",updateOnlineState);
+updateOnlineState();
+
+function showUpdateReady(worker){
+  if(document.getElementById("updateBar")) return;
+  document.body.insertAdjacentHTML("beforeend",`<div id="updateBar" class="update-bar" role="status"><div><b>Update ready</b><small>A new version of FloraLens is available.</small></div><button id="updateNow">Update</button></div>`);
+  document.getElementById("updateNow").onclick=()=>{
+    document.getElementById("updateNow").textContent="Updating…";
+    worker.postMessage("SKIP_WAITING");
+  };
+}
+if("serviceWorker" in navigator && location.protocol!=="file:"){
+  let reloading=false;
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloading) return; reloading=true; location.reload(); });
+  window.addEventListener("load",async()=>{
+    try{
+      const reg=await navigator.serviceWorker.register("sw.js");
+      if(reg.waiting && navigator.serviceWorker.controller) showUpdateReady(reg.waiting);
+      reg.addEventListener("updatefound",()=>{
+        const w=reg.installing; if(!w) return;
+        w.addEventListener("statechange",()=>{ if(w.state==="installed" && navigator.serviceWorker.controller) showUpdateReady(w); });
+      });
+      // Home-screen apps can stay open for days; check for a new version whenever she comes back to it.
+      document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") reg.update().catch(()=>{}); });
+    }catch(err){ console.warn("Service worker registration failed",err); }
+  });
+}
