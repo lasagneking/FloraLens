@@ -1555,11 +1555,7 @@ let pendingResults = null;
 let chosenArea = "Unplaced";
 let captureIntent = "identify"; // identify | discover
 let doctorPlantId = null;
-let doctorPhotoFile = null;
-let doctorPhotoDataUrl = null;
 let doctorLastResult = null;
-let doctorModel = null;
-let doctorTfPromise = null;
 
 function loadState(){
   try {
@@ -1945,11 +1941,11 @@ function renderLens(){
       </button>
       <button class="lens-choice-card doctor-choice" onclick="openPlantDoctor()">
         <span class="lens-choice-mark">✚</span>
-        <span><small>Experimental</small><strong>Plant Doctor <i>Beta</i></strong><em>Photograph an unhealthy leaf and FloraLens will help you investigate.</em></span>
+        <span><small>Pl@ntNet</small><strong>Plant Doctor</strong><em>Photograph an unhealthy leaf to check for common plant diseases.</em></span>
         <b>→</b>
       </button>
     </section>
-    <div class="doctor-note"><span>❧</span><p><b>Plant Doctor is deliberately cautious.</b><br>Several plant problems can look alike, so it offers likely things to check rather than pretending a photograph is a laboratory diagnosis.</p></div>`;
+    <div class="doctor-note"><span>❧</span><p><b>Two photos work best.</b><br>One sharp close-up of the problem and one of the wider plant, in daylight.</p></div>`;
 }
 function beginCapture(organ="auto"){ window.captureOrgan=organ; multiPhotoInput.click(); }
 
@@ -2868,219 +2864,212 @@ function renderDiscover(){
   hydratePhotos();
 }
 
-const DOCTOR_MODEL_URL="https://raw.githubusercontent.com/rexsimiloluwah/PLANT-DISEASE-CLASSIFIER-WEB-APP-TENSORFLOWJS/master/tensorflowjs-model/model.json";
-const DOCTOR_CLASSES=[
-"Apple___Apple_scab","Apple___Black_rot","Apple___Cedar_apple_rust","Apple___healthy","Blueberry___healthy",
-"Cherry_(including_sour)___Powdery_mildew","Cherry_(including_sour)___healthy",
-"Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot","Corn_(maize)___Common_rust_","Corn_(maize)___Northern_Leaf_Blight","Corn_(maize)___healthy",
-"Grape___Black_rot","Grape___Esca_(Black_Measles)","Grape___Leaf_blight_(Isariopsis_Leaf_Spot)","Grape___healthy",
-"Orange___Haunglongbing_(Citrus_greening)","Peach___Bacterial_spot","Peach___healthy","Pepper,_bell___Bacterial_spot","Pepper,_bell___healthy",
-"Potato___Early_blight","Potato___Late_blight","Potato___healthy","Raspberry___healthy","Soybean___healthy","Squash___Powdery_mildew",
-"Strawberry___Leaf_scorch","Strawberry___healthy","Tomato___Bacterial_spot","Tomato___Early_blight","Tomato___Late_blight","Tomato___Leaf_Mold",
-"Tomato___Septoria_leaf_spot","Tomato___Spider_mites Two-spotted_spider_mite","Tomato___Target_Spot","Tomato___Tomato_Yellow_Leaf_Curl_Virus",
-"Tomato___Tomato_mosaic_virus","Tomato___healthy"
+/* ===================== Plant Doctor (Pl@ntNet disease identification) ===================== */
+const DOCTOR_MAX_PHOTOS=5;
+const DOCTOR_ORGANS=["leaf","flower","fruit","bark","auto"];
+
+// Pl@ntNet returns pathogen names (often scientific). Map common pathogen groups to
+// friendly names and practical checks so the result reads like garden advice.
+const DOCTOR_GROUPS=[
+  {match:/erysiph|podosphaera|oidium|golovinomyces|sphaerotheca|powdery/i,common:"Powdery mildew",kind:"fungus",
+    checks:["Look for a white or grey dusty coating that rubs off","Remove the worst-affected leaves","Improve airflow; water at the base, not over the leaves"]},
+  {match:/diplocarpon|black ?spot/i,common:"Black spot",kind:"fungus",
+    checks:["Look for black blotches with fringed edges and yellowing around them","Pick off and bin affected leaves (not the compost heap)","Clear fallen leaves from under the plant"]},
+  {match:/puccinia|phragmidium|uromyces|melampsora|gymnosporangium|coleosporium|\brust\b/i,common:"Rust",kind:"fungus",
+    checks:["Check leaf undersides for orange or brown powdery pustules","Remove affected leaves and clear fallen ones","Avoid wetting foliage when watering"]},
+  {match:/peronospora|plasmopara|bremia|downy/i,common:"Downy mildew",kind:"water mould",
+    checks:["Look for yellow patches on top with grey-purple fuzz underneath","Remove affected growth promptly","Give the plant more space and air"]},
+  {match:/botrytis|grey mou?ld|gray mold/i,common:"Grey mould (botrytis)",kind:"fungus",
+    checks:["Look for fluffy grey mould on soft or damaged tissue","Cut out affected parts back to healthy growth","Reduce humidity and remove dead flowers"]},
+  {match:/phytophthora|pythium|blight/i,common:"Blight / root rot",kind:"water mould",
+    checks:["Check whether the soil stays waterlogged","Look for dark, spreading lesions or collapsing stems","Remove badly affected plants and avoid overwatering"]},
+  {match:/septoria|alternaria|cercospora|colletotrichum|ascochyta|entomosporium|marssonina|leaf ?spot|anthracnose/i,common:"Leaf spot",kind:"fungus",
+    checks:["Look for brown or black spots, sometimes with pale halos","Remove spotted leaves and clear debris","Water at soil level and keep foliage dry"]},
+  {match:/venturia|scab/i,common:"Scab",kind:"fungus",
+    checks:["Look for olive-brown, velvety patches on leaves or fruit","Rake up and remove fallen leaves in autumn","Prune to open up the canopy"]},
+  {match:/xanthomonas|pseudomonas|erwinia|bacteri|canker|fire ?blight/i,common:"Bacterial disease",kind:"bacteria",
+    checks:["Look for water-soaked spots or oozing cankers","Prune out affected growth, cleaning tools between cuts","Avoid overhead watering"]},
+  {match:/virus|mosaic|curl|tospo|potyvirus/i,common:"Virus",kind:"virus",
+    checks:["Look for mottled, streaked or distorted new growth","Check for sap-sucking insects such as aphids","Viruses can't be cured; remove badly affected plants"]},
+  {match:/tetranychus|spider ?mite|mite/i,common:"Spider mite",kind:"pest",
+    checks:["Look for fine webbing and pale speckling","Check leaf undersides with a magnifier","Mist or rinse leaves; mites like hot, dry air"]},
+  {match:/aphid|aphis|myzus|macrosiphum/i,common:"Aphids",kind:"pest",
+    checks:["Look for clusters of small insects on shoot tips","Squash or rinse them off","Encourage ladybirds and other predators"]},
 ];
+function doctorFriendly(result){
+  const raw=[result?.label,result?.description,result?.name].filter(Boolean).join(" ");
+  const group=DOCTOR_GROUPS.find(g=>g.match.test(raw));
+  const title=doctorTitle(result);
+  return {title, common:group?.common||null, kind:group?.kind||null, checks:group?.checks||null};
+}
+function doctorTitle(r){
+  const d=String(r?.label||r?.description||"").trim();
+  if(d && d.length<=70) return d;
+  return String(r?.name||d||"Possible problem").trim();
+}
+function doctorDescription(r){
+  const d=String(r?.description||"").trim();
+  return d && d.length>70 ? d : "";
+}
+function doctorRefImages(r){
+  const imgs=Array.isArray(r?.images)?r.images:[];
+  return imgs.map(i=>typeof i==="string"?i:(i?.url?.m||i?.url?.s||i?.url?.o||i?.url||null)).filter(u=>typeof u==="string").slice(0,3);
+}
+function doctorConfidence(score){
+  const s=Number(score)||0;
+  if(s>=0.5) return {label:"Strong match",cls:"strong"};
+  if(s>=0.2) return {label:"Possible match",cls:"possible"};
+  return {label:"Weak match",cls:"weak"};
+}
+
+let doctorCaptures=[];
 
 function openPlantDoctor(){
   if(!state.plants.length){
-    modal(`<div class="eyebrow">Plant Doctor · Beta</div><h2>Tell FloraLens which plant you're checking</h2><p class="sub">Plant Doctor works best when FloraLens already knows the species, because the photograph can then be interpreted in context.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant first</button>`);
+    modal(`<div class="eyebrow">Plant Doctor</div><h2>Add the plant first</h2><p class="sub">Plant Doctor checks plants in My Garden, so it can show their usual care alongside the result.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant</button>`);
     return;
   }
-  modal(`<div class="eyebrow">Plant Doctor · Beta</div><h2>Which plant needs a closer look?</h2><p class="sub">Choose one from My Garden, then photograph the part that concerns you.</p>
-    <div class="doctor-plant-list">${state.plants.map(p=>`<button class="destination-choice" onclick="chooseDoctorPlant('${p.id}')"><span>❧</span><div><b>${esc(p.common)}</b><small>${esc(p.scientific)} · ${esc(p.area||"Unplaced")}</small></div></button>`).join("")}</div>`);
+  modal(`<div class="eyebrow">Plant Doctor</div><h2>Which plant looks unwell?</h2><p class="sub">Choose it, then photograph the leaves or flowers that worry you.</p>
+    <div class="doctor-plant-list">${state.plants.map(p=>`<button class="destination-choice" onclick="chooseDoctorPlant('${p.id}')"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><div><b>${esc(p.common)}</b><small>${esc(p.scientific)} · ${esc(p.area||"Unplaced")}</small></div></button>`).join("")}</div>`);
+  hydratePhotos();
 }
 function chooseDoctorPlant(id){
   doctorPlantId=id;
-  doctorPhotoFile=null;
-  doctorPhotoDataUrl=null;
+  doctorCaptures=[];
   doctorLastResult=null;
   closeModal();
   document.getElementById("doctorCameraInput")?.click();
 }
 async function handleDoctorPhoto(file){
-  if(!file)return;
-  doctorPhotoFile=file;
-  doctorPhotoDataUrl=await fileToDataUrl(file);
-  renderDoctorLoading();
-  await runPlantDoctor();
+  if(!file) return;
+  if(!["image/jpeg","image/png"].includes(file.type)){ toast("Use a JPG or PNG photo"); return; }
+  if(doctorCaptures.length>=DOCTOR_MAX_PHOTOS) return;
+  const dataUrl=await fileToDataUrl(file);
+  doctorCaptures.push({file,dataUrl,organ:"leaf"});
+  renderDoctorReview();
+}
+function setDoctorOrgan(i,organ){ if(doctorCaptures[i]){ doctorCaptures[i].organ=organ; renderDoctorReview(); } }
+function removeDoctorCapture(i){
+  doctorCaptures.splice(i,1);
+  if(doctorCaptures.length) renderDoctorReview(); else setRoute("lens");
+}
+function addDoctorPhoto(){ if(doctorCaptures.length<DOCTOR_MAX_PHOTOS) document.getElementById("doctorCameraInput")?.click(); }
+function renderDoctorReview(){
+  const p=state.plants.find(x=>x.id===doctorPlantId);
+  if(!p) return setRoute("lens");
+  currentRoute="lens";
+  const one=doctorCaptures.length===1;
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1><p class="sub">${one?"Add a second photo for a better result: one close-up of the problem and one of the wider plant.":"Tell FloraLens which part each photo shows, then check its health."}</p></section>
+    <div class="doctor-review-grid">${doctorCaptures.map((c,i)=>`<div class="doctor-review-card">
+      <div class="doctor-review-photo"><img src="${c.dataUrl}" alt="Photo ${i+1}"><button class="capture-remove" aria-label="Remove photo" onclick="removeDoctorCapture(${i})">×</button></div>
+      <div class="doctor-organ-row">${DOCTOR_ORGANS.map(o=>`<button class="${c.organ===o?"active":""}" onclick="setDoctorOrgan(${i},'${o}')">${o==="auto"?"Not sure":o[0].toUpperCase()+o.slice(1)}</button>`).join("")}</div>
+    </div>`).join("")}
+    ${doctorCaptures.length<DOCTOR_MAX_PHOTOS?`<button class="doctor-add-photo" onclick="addDoctorPhoto()"><span>📷</span><b>Add another photo</b><small>${doctorCaptures.length} of ${DOCTOR_MAX_PHOTOS}</small></button>`:""}</div>
+    <div class="doctor-tips"><b>For the best result</b><p>Daylight, no flash. Fill the frame with one affected leaf, in focus. Show both the top and underside if you can.</p></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="runPlantDoctor()">✚ Check health</button>
+    <button class="btn outline" style="width:100%;margin-top:10px" onclick="setRoute('lens')">Cancel</button>`;
 }
 function renderDoctorLoading(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor · Beta</div><h1>Looking closely…</h1><p class="sub">${p?`Checking ${esc(p.common)} in the context of its plant record.`:"Checking the photograph."}</p></section>
-    <div class="doctor-photo-hero"><img src="${doctorPhotoDataUrl}"><div class="identify-overlay"><div><div class="flower-loader">❧</div><h2 style="margin:12px 0 5px">Examining visible clues</h2><p style="opacity:.8">Colour patterns, species context and supported disease classes.</p></div></div></div>`;
-}
-function loadDoctorTf(){
-  if(window.tf)return Promise.resolve(window.tf);
-  if(doctorTfPromise)return doctorTfPromise;
-  doctorTfPromise=new Promise((resolve,reject)=>{
-    const s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js";
-    s.onload=()=>resolve(window.tf);
-    s.onerror=()=>reject(new Error("Plant Doctor couldn't load its on-device AI library."));
-    document.head.appendChild(s);
-  });
-  return doctorTfPromise;
-}
-async function loadDoctorModel(){
-  const tf=await loadDoctorTf();
-  if(doctorModel)return doctorModel;
-  doctorModel=await tf.loadLayersModel(DOCTOR_MODEL_URL);
-  return doctorModel;
-}
-function doctorCropGroup(p){
-  const sci=String(p?.scientific||"").toLowerCase();
-  const common=String(p?.common||"").toLowerCase();
-  if(sci.includes("malus")||common.includes("apple"))return "Apple";
-  if(sci.includes("vaccinium")||common.includes("blueberry"))return "Blueberry";
-  if((sci.includes("prunus")||common.includes("cherry"))&&common.includes("cherry"))return "Cherry_(including_sour)";
-  if(sci.includes("zea mays")||common.includes("corn")||common.includes("maize"))return "Corn_(maize)";
-  if(sci.includes("vitis")||common.includes("grape"))return "Grape";
-  if(sci.includes("citrus")||common.includes("orange"))return "Orange";
-  if(common.includes("peach"))return "Peach";
-  if(sci.includes("capsicum")||common.includes("pepper"))return "Pepper,_bell";
-  if(common.includes("potato")||sci.includes("solanum tuberosum"))return "Potato";
-  if(sci.includes("rubus idaeus")||common.includes("raspberry"))return "Raspberry";
-  if(common.includes("soybean")||sci.includes("glycine max"))return "Soybean";
-  if(common.includes("squash")||sci.includes("cucurbita"))return "Squash";
-  if(common.includes("strawberry")||sci.includes("fragaria"))return "Strawberry";
-  if(common.includes("tomato")||sci.includes("solanum lycopersicum"))return "Tomato";
-  return null;
-}
-function doctorLabelParts(label){
-  const parts=String(label||"").split("___");
-  return {plant:(parts[0]||"Plant").replaceAll("_"," "),condition:(parts[1]||"").replaceAll("_"," ").replace(/\s+/g," ").trim()};
-}
-function doctorActionFor(condition){
-  const c=String(condition||"").toLowerCase();
-  if(c.includes("healthy"))return {
-    title:"No supported disease pattern stood out",
-    checks:["Compare new growth with older leaves","Keep an eye on whether the symptom spreads","Retake a close photo if the plant changes"]
-  };
-  if(c.includes("powdery mildew"))return {
-    title:"A powdery-mildew pattern is possible",
-    checks:["Look for a white or grey powdery coating","Improve airflow around crowded foliage","Avoid leaving foliage wet for long periods"]
-  };
-  if(c.includes("mite"))return {
-    title:"Mite-like damage is worth checking",
-    checks:["Inspect the underside of leaves closely","Look for fine webbing or pale speckling","Check nearby leaves for the same pattern"]
-  };
-  if(c.includes("rust"))return {
-    title:"A rust-like leaf pattern is possible",
-    checks:["Look for orange, brown or rusty spots","Remove badly affected fallen leaves","Keep foliage dry when watering where practical"]
-  };
-  if(c.includes("virus")||c.includes("mosaic")||c.includes("curl"))return {
-    title:"A virus-like pattern is one possibility",
-    checks:["Check for distorted or unusually mottled new growth","Inspect for sap-feeding pests","Keep pruning tools clean between plants"]
-  };
-  if(c.includes("blight")||c.includes("spot")||c.includes("rot")||c.includes("scab")||c.includes("mold")||c.includes("scorch")||c.includes("esca"))return {
-    title:"A leaf-damage or fungal pattern is possible",
-    checks:["Check whether marks are spreading onto new leaves","Remove fallen damaged foliage from around the plant","Improve airflow and water at soil level where practical"]
-  };
-  return {
-    title:"The model noticed an unusual leaf pattern",
-    checks:["Compare healthy and affected leaves side by side","Check soil moisture and recent weather exposure","Retake a closer photo if the pattern develops"]
-  };
-}
-async function doctorVisualScan(dataUrl){
-  const img=new Image();
-  img.src=dataUrl;
-  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;});
-  const canvas=document.createElement("canvas"),ctx=canvas.getContext("2d",{willReadFrequently:true});
-  const max=220,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
-  canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
-  ctx.drawImage(img,0,0,canvas.width,canvas.height);
-  const d=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-  let green=0,yellow=0,brown=0,total=0;
-  for(let i=0;i<d.length;i+=16){
-    const r=d[i],g=d[i+1],b=d[i+2];
-    const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
-    if(mx<35||mn>235)continue;
-    total++;
-    if(g>r*1.08&&g>b*1.08)green++;
-    if(r>115&&g>95&&b<100&&Math.abs(r-g)<85)yellow++;
-    if(r>70&&r>g*1.05&&g>b*1.05&&b<120)brown++;
-  }
-  const pct=x=>total?Math.round(x/total*100):0;
-  return {green:pct(green),yellow:pct(yellow),brown:pct(brown)};
-}
-async function doctorModelPrediction(p){
-  const group=doctorCropGroup(p);
-  if(!group)return {supported:false,reason:"This experimental disease model does not yet include this plant type."};
-  try{
-    const tf=await loadDoctorTf();
-    const model=await loadDoctorModel();
-    const img=new Image();img.crossOrigin="anonymous";img.src=doctorPhotoDataUrl;
-    await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;});
-    const tensor=tf.tidy(()=>tf.browser.fromPixels(img).resizeNearestNeighbor([224,224]).toFloat().div(255).expandDims());
-    const pred=model.predict(tensor);
-    const values=Array.from(await pred.data());
-    tensor.dispose();pred.dispose?.();
-    const options=values.map((score,i)=>({score,label:DOCTOR_CLASSES[i]})).filter(x=>x.label.startsWith(group+"___")).sort((x,y)=>y.score-x.score);
-    return {supported:true,group,top:options[0]||null,alternatives:options.slice(1,3)};
-  }catch(err){
-    console.warn("Plant Doctor AI model:",err);
-    return {supported:false,reason:"The experimental AI model could not load this time. FloraLens can still use the plant record and visible-photo scan."};
-  }
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>Checking ${p?esc(p.common):"your plant"}…</h1><p class="sub">Comparing your ${doctorCaptures.length===1?"photo":`${doctorCaptures.length} photos`} with known plant diseases.</p></section>
+    <div class="doctor-photo-hero"><img src="${doctorCaptures[0].dataUrl}" alt=""><div class="identify-overlay"><div><div class="flower-loader">✚</div><h2 style="margin:14px 0 5px">Looking for signs of disease</h2><p style="opacity:.85">This usually takes a few seconds.</p></div></div></div>`;
 }
 async function runPlantDoctor(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  if(!p)return;
-  const [visual,modelResult]=await Promise.all([
-    doctorVisualScan(doctorPhotoDataUrl).catch(()=>({green:0,yellow:0,brown:0})),
-    doctorModelPrediction(p)
-  ]);
+  if(!p||!doctorCaptures.length) return;
+  renderDoctorLoading();
   const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
   const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
-  doctorLastResult={visual,modelResult,care};
+  let results=[], error=null;
+  try{
+    if(!API_PROXY_URL) throw new Error("Plant Doctor needs the FloraLens Worker to be set up.");
+    const fd=new FormData();
+    doctorCaptures.forEach(c=>{ fd.append("images",c.file,c.file.name||"plant.jpg"); fd.append("organs",c.organ); });
+    fd.append("lang","en");
+    fd.append("nb-results","5");
+    fd.append("include-related-images","true");
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/diagnose`,{method:"POST",body:fd});
+    if(res.status===404){
+      // Pl@ntNet uses 404 when nothing matched; a missing Worker route returns non-JSON.
+      const body=await res.json().catch(()=>null);
+      if(!body) throw new Error("The Worker doesn't have a /diagnose route yet. Add the snippet from worker-diagnose.js and redeploy.");
+      results=[];
+    }else{
+      if(!res.ok) throw new Error(res.status===429?"Today's Pl@ntNet allowance has run out. Try again tomorrow.":`The health check failed (${res.status}). Try again in a moment.`);
+      const data=await res.json();
+      results=Array.isArray(data.results)?data.results:[];
+      if(Number.isFinite(data.remainingIdentificationRequests)){ state.lastQuota=data.remainingIdentificationRequests; saveState(); }
+    }
+  }catch(err){ error=String(err.message||err); }
+  doctorLastResult={results,care,error,checkedAt:new Date().toISOString()};
   renderDoctorResult();
+}
+function doctorGenericChecks(){
+  return ["Compare affected leaves with healthy new growth","Check whether the soil is soggy or bone dry before changing watering","Look under the leaves for insects, eggs or webbing","Think back: any frost, scorching sun or strong wind recently?"];
 }
 function renderDoctorResult(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  if(!p||!doctorLastResult)return;
-  const {visual,modelResult,care}=doctorLastResult;
-  const top=modelResult?.top;
-  const lp=top?doctorLabelParts(top.label):null;
-  const action=top?doctorActionFor(lp.condition):{
-    title:"FloraLens can still help you investigate",
-    checks:["Compare the affected leaf with healthy growth","Check soil moisture before changing the watering routine","Inspect both sides of the leaf for pests or residue"]
-  };
-  const visible=[];
-  if(visual.brown>=8)visible.push(`brown-toned areas (${visual.brown}% of sampled coloured pixels)`);
-  if(visual.yellow>=8)visible.push(`yellow-toned areas (${visual.yellow}% of sampled coloured pixels)`);
-  if(visual.green>=20)visible.push(`a substantial amount of green tissue`);
-  const aiScore=top?Math.round(top.score*100):null;
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor · Beta</div><h1>${esc(p.common)}</h1><p class="sub">A cautious image-based health check, combined with FloraLens's existing plant record.</p></section>
-    <div class="doctor-photo-hero compact"><img src="${doctorPhotoDataUrl}"><div class="doctor-photo-badge">Beta</div></div>
-    <section class="doctor-result-card ${top&&lp.condition.toLowerCase().includes("healthy")?"doctor-healthy":""}">
-      <div class="eyebrow">${modelResult.supported?"On-device disease model":"Species-aware review"}</div>
-      <h2>${esc(action.title)}</h2>
-      ${top?`<p class="sub">The experimental PlantVillage model's strongest match within its ${esc(modelResult.group.replaceAll("_"," "))} classes was <b>${esc(lp.condition)}</b>${aiScore!==null?` with a ${aiScore}% raw model score`:""}.</p>`:`<p class="sub">${esc(modelResult.reason||"This plant isn't covered by the experimental disease classifier yet.")}</p>`}
-      <div class="doctor-caution">This is not a confirmed diagnosis. Different plant problems can produce very similar-looking leaves.</div>
-    </section>
-    <section class="profile-card"><div class="eyebrow">What the photo scan noticed</div><h2 style="font-size:25px;margin-top:7px">Visible clues</h2><p class="sub">${visible.length?`The simple colour-pattern pre-screen found ${esc(visible.join(", "))}. This is only an observation, not a disease diagnosis.`:"The colour-pattern pre-screen did not find a strong brown or yellow signal in this photograph."}</p></section>
-    <section class="profile-card"><div class="eyebrow">Check next</div><h2 style="font-size:25px;margin-top:7px">A few useful checks</h2><div class="doctor-check-list">${action.checks.map(x=>`<div><span>✓</span><p>${esc(x)}</p></div>`).join("")}</div></section>
-    ${(usable(care.water)||usable(care.light)||usable(care.soil))?`<section class="profile-card"><div class="eyebrow">Known care context</div><h2 style="font-size:25px;margin-top:7px">${esc(p.common)}'s usual needs</h2>
-      <div class="doctor-context-grid">${usable(care.water)?`<div><b>Water</b><p>${esc(care.water)}</p></div>`:""}${usable(care.light)?`<div><b>Light</b><p>${esc(care.light)}</p></div>`:""}${usable(care.soil)?`<div><b>Soil</b><p>${esc(care.soil)}</p></div>`:""}</div></section>`:""}
-    <div class="actions"><button class="btn primary" onclick="saveDoctorToJournal()">Add to plant story</button><button class="btn secondary" onclick="retakeDoctorPhoto()">Take another photo</button></div>
-    <button class="btn outline" style="width:100%;margin-top:10px" onclick="setRoute('lens')">Done</button>
-    <p class="small doctor-source-note">Beta AI coverage currently comes from an open TensorFlow.js classifier trained on PlantVillage's 38 crop/health classes. FloraLens refuses to turn unsupported ornamental plants into made-up disease labels.</p>`;
+  if(!p||!doctorLastResult) return;
+  const {results,care,error}=doctorLastResult;
+  const top=results[0]||null;
+  const confident=top && Number(top.score)>=0.2;
+  const f=top?doctorFriendly(top):null;
+  const conf=top?doctorConfidence(top.score):null;
+  const refs=top?doctorRefImages(top):[];
+  const others=results.slice(1,4);
+  const checks=(confident&&f?.checks)||doctorGenericChecks();
+  const quota=state.lastQuota!==null&&state.lastQuota!==undefined?`<span class="quota-pill">${state.lastQuota} checks left today</span>`:"";
+
+  let headline;
+  if(error){
+    headline=`<section class="doctor-result-card doctor-error"><div class="eyebrow">Couldn't check this time</div><h2>Something went wrong</h2><p class="sub">${esc(error)}</p></section>`;
+  }else if(!top){
+    headline=`<section class="doctor-result-card doctor-healthy"><div class="eyebrow">No disease match</div><h2>Nothing in Pl@ntNet's disease list matched</h2><p class="sub">That's often good news. It can also mean the problem is a pest, watering or weather damage, which this check doesn't cover, or that the photo wasn't close enough.</p></section>`;
+  }else if(!confident){
+    headline=`<section class="doctor-result-card doctor-weak"><div class="eyebrow">Not confident</div><h2>No clear match</h2><p class="sub">The closest suggestion was <b>${esc(f.common||f.title)}</b>, but only at ${Math.round(top.score*100)}%. That's too low to rely on. Try a sharper close-up of one affected leaf in daylight.</p></section>`;
+  }else{
+    headline=`<section class="doctor-result-card doctor-${conf.cls}">
+      <div class="doctor-result-top"><span class="doctor-conf ${conf.cls}">${conf.label}</span><span class="doctor-score">${Math.round(top.score*100)}%</span></div>
+      <h2>${esc(f.common||f.title)}</h2>
+      ${f.common&&f.title!==f.common?`<p class="doctor-latin"><i>${esc(f.title)}</i>${f.kind?` · ${esc(f.kind)}`:""}</p>`:f.kind?`<p class="doctor-latin">${esc(f.kind)}</p>`:""}
+      ${doctorDescription(top)?`<p class="sub">${esc(doctorDescription(top))}</p>`:""}
+      <div class="doctor-meter"><span style="width:${Math.max(4,Math.round(top.score*100))}%"></span></div>
+    </section>`;
+  }
+
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1>${quota}</section>
+    ${headline}
+    ${confident&&refs.length?`<section class="profile-card"><h3 style="margin:0 0 4px">Does it look like this?</h3><p class="small" style="margin:0 0 12px">Your photo next to Pl@ntNet's reference images. If they don't look alike, don't treat for it.</p>
+      <div class="doctor-compare"><figure><img src="${doctorCaptures[0].dataUrl}" alt="Your photo"><figcaption>Yours</figcaption></figure>${refs.map((u,i)=>`<figure><img src="${esc(u)}" alt="Reference ${i+1}" loading="lazy" onerror="this.closest('figure').remove()"><figcaption>Reference</figcaption></figure>`).join("")}</div></section>`:""}
+    ${!error?`<section class="profile-card"><h3 style="margin:0 0 10px">What to check next</h3><div class="doctor-check-list">${checks.map(x=>`<div><span>✓</span><p>${esc(x)}</p></div>`).join("")}</div></section>`:""}
+    ${others.length&&!error?`<section class="profile-card"><h3 style="margin:0 0 10px">Other possibilities</h3><div class="doctor-others">${others.map(r=>{const o=doctorFriendly(r);return `<div><span><b>${esc(o.common||o.title)}</b>${o.common&&o.title!==o.common?`<small><i>${esc(o.title)}</i></small>`:""}</span><em>${Math.round((Number(r.score)||0)*100)}%</em></div>`}).join("")}</div></section>`:""}
+    ${(usable(care.water)||usable(care.light)||usable(care.soil))?`<section class="profile-card"><h3 style="margin:0 0 10px">${esc(p.common)}'s usual needs</h3><p class="small" style="margin:-4px 0 10px">Stress from the wrong conditions often looks like disease.</p>
+      <div class="doctor-context-grid">${usable(care.water)?`<div data-ico="drop"><b>Water</b><p>${esc(care.water)}</p></div>`:""}${usable(care.light)?`<div data-ico="sun"><b>Light</b><p>${esc(care.light)}</p></div>`:""}${usable(care.soil)?`<div data-ico="soil"><b>Soil</b><p>${esc(care.soil)}</p></div>`:""}</div></section>`:""}
+    <div class="actions">${error?`<button class="btn primary" onclick="runPlantDoctor()">↻ Try again</button>`:`<button class="btn primary" onclick="saveDoctorToJournal()">Save to plant story</button>`}<button class="btn secondary" onclick="retakeDoctorPhoto()">New photos</button></div>
+    <button class="btn outline" style="width:100%" onclick="setRoute('lens')">Done</button>
+    <p class="small doctor-source-note">Disease suggestions come from Pl@ntNet, which covers a limited list of plants and diseases. Always compare with the reference photos before treating.</p>`;
 }
 function retakeDoctorPhoto(){
-  doctorPhotoFile=null;doctorPhotoDataUrl=null;doctorLastResult=null;
+  doctorCaptures=[];doctorLastResult=null;
   document.getElementById("doctorCameraInput")?.click();
 }
 async function saveDoctorToJournal(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  if(!p||!doctorPhotoFile||!doctorLastResult)return;
+  if(!p||!doctorCaptures.length||!doctorLastResult) return;
   const id="journal-"+Date.now(),photoKey=`${id}-photo`;
-  try{await savePhoto(photoKey,doctorPhotoFile)}catch(e){console.warn(e)}
-  const top=doctorLastResult.modelResult?.top;
-  const lp=top?doctorLabelParts(top.label):null;
-  const text=top
-    ? `Plant Doctor Beta check. Experimental model match: ${lp.condition} (${Math.round(top.score*100)}% raw model score). Saved as an observation, not a confirmed diagnosis.`
-    : `Plant Doctor Beta check. This species was not covered by the experimental disease classifier; the photo was saved for comparison over time.`;
-  state.journal.unshift({id,plantId:p.id,date:new Date().toISOString().slice(0,10),type:"Problem",text,photoKey,createdAt:new Date().toISOString()});
-  saveState();toast(`Health check added to ${p.common}'s story`);setRoute("profile",{id:p.id});
+  try{await savePhoto(photoKey,doctorCaptures[0].file)}catch(e){console.warn(e)}
+  const top=doctorLastResult.results[0];
+  const confident=top&&Number(top.score)>=0.2;
+  const f=top?doctorFriendly(top):null;
+  const text=confident
+    ? `Plant Doctor: ${doctorConfidence(top.score).label.toLowerCase()} for ${f.common||f.title} (${Math.round(top.score*100)}%).`
+    : `Plant Doctor: no confident disease match. Photo saved to compare over time.`;
+  state.journal.unshift({id,plantId:p.id,date:localISODate(),type:"Problem",text,photoKey,createdAt:new Date().toISOString()});
+  const recheck=new Date(Date.now()+7*86400000);
+  state.careTasks.push({id:"care-"+Date.now(),plantId:p.id,title:`Re-check ${p.common}`,type:"Check",due:localISODate(recheck),notes:confident?`Is the ${(f.common||f.title).toLowerCase()} spreading or improving? Run Plant Doctor again to compare.`:"Has anything changed since the last health check?",completed:false,createdAt:new Date().toISOString()});
+  saveState();
+  toast(`Saved, re-check due in 7 days`);
+  setRoute("profile",{id:p.id});
 }
 
 function showLensTips(){modal(`<div class="eyebrow">Photo tips</div><h2>Help FloraLens see clearly</h2><p class="sub">Fill most of the frame with the plant, use good light and photograph a distinctive flower or leaf. All images in one request should show the same individual plant.</p><button class="btn primary" style="width:100%" onclick="closeModal()">Got it</button>`)}

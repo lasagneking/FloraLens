@@ -831,3 +831,58 @@ select.journal-field{appearance:none;-webkit-appearance:none;background-image:ur
 
 /* icon wrappers inserted by icons.js */
 .fl-ico-wrap{display:inline-flex;align-items:center}
+
+/* ======================================================================
+   PLANT DOCTOR 2.0 (Pl@ntNet diseases)
+   ====================================================================== */
+.doctor-plant-list .destination-choice>span.area-list-photo{width:46px;height:46px;border-radius:14px;box-shadow:none}
+.doctor-review-grid{display:grid;gap:12px}
+.doctor-review-card{background:var(--card);border-radius:var(--r-lg);padding:10px;box-shadow:var(--sh-1)}
+.doctor-review-photo{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;background:var(--bg-2)}
+.doctor-review-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.doctor-review-photo .capture-remove{top:10px;right:10px;width:32px;height:32px;font-size:14px}
+.doctor-organ-row{display:flex;gap:6px;overflow-x:auto;padding:10px 2px 2px;scrollbar-width:none}
+.doctor-organ-row button{flex:none;border:0;border-radius:999px;padding:8px 13px;font-size:13px;font-weight:700;background:var(--bg);color:var(--muted)}
+.doctor-organ-row button.active{background:var(--leaf);color:#fff}
+.doctor-add-photo{border:1.5px dashed rgba(18,179,111,.45);background:var(--leaf-soft);border-radius:var(--r-lg);padding:18px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;text-align:left;color:var(--canopy)}
+.doctor-add-photo>span{font-size:22px;display:grid}
+.doctor-add-photo b{font-size:15px}
+.doctor-add-photo small{font-size:12px;color:var(--leaf-2);font-weight:700}
+.doctor-tips{margin-top:12px;padding:14px 16px;border-radius:18px;background:var(--sun-bg)}
+.doctor-tips b{font-size:14px}
+.doctor-tips p{margin:3px 0 0;font-size:13px;line-height:1.5;color:var(--ink-2)}
+
+.doctor-result-card{position:relative;overflow:hidden}
+.doctor-result-card.doctor-strong{background:linear-gradient(135deg,#FFE7E8,#FFF1E0)}
+.doctor-result-card.doctor-possible{background:var(--warm-bg)}
+.doctor-result-card.doctor-weak{background:var(--card);box-shadow:var(--sh-1)}
+.doctor-result-card.doctor-weak .eyebrow{color:var(--muted)}
+.doctor-result-card.doctor-error{background:var(--alert-bg)}
+.doctor-result-card.doctor-error .eyebrow{color:var(--alert)}
+.doctor-result-card.doctor-healthy h2{color:var(--canopy)}
+.doctor-result-top{display:flex;justify-content:space-between;align-items:center}
+.doctor-conf{display:inline-flex;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:800;background:#fff}
+.doctor-conf.strong{color:var(--alert)}
+.doctor-conf.possible{color:#C26510}
+.doctor-score{font-family:var(--display);font-size:28px;font-weight:600;color:var(--ink)}
+.doctor-result-card h2{font-size:28px;margin:12px 0 2px}
+.doctor-latin{margin:0 0 8px;font-size:13.5px;color:var(--ink-2)}
+.doctor-meter{height:8px;border-radius:99px;background:rgba(255,255,255,.8);overflow:hidden;margin-top:12px}
+.doctor-meter span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#F79009,#E5484D)}
+.doctor-possible .doctor-meter span{background:linear-gradient(90deg,#FFC95C,#F79009)}
+
+.doctor-compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.doctor-compare figure{margin:0}
+.doctor-compare img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;display:block;background:var(--bg-2)}
+.doctor-compare figure:first-child img{box-shadow:0 0 0 3px var(--leaf)}
+.doctor-compare figcaption{font-size:11.5px;font-weight:700;color:var(--muted);text-align:center;margin-top:5px}
+.doctor-compare figure:first-child figcaption{color:var(--leaf-2)}
+
+.doctor-others{display:grid;gap:2px}
+.doctor-others>div{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.doctor-others>div:last-child{border-bottom:0}
+.doctor-others b{display:block;font-size:14px}
+.doctor-others small{display:block;font-size:12px;color:var(--muted)}
+.doctor-others em{font-style:normal;font-weight:800;font-size:13px;color:var(--muted);padding:5px 10px;border-radius:10px;background:var(--bg)}
+.doctor-context-grid>div{background:var(--ic-bg,var(--bg))}
+.doctor-context-grid>div b{color:var(--ic,var(--leaf-2))}
