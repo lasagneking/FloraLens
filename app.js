@@ -1697,7 +1697,7 @@ function seasonalHomeCard(){
   if(!parts.length) parts.push("A quieter month in the garden");
   return `<button class="season-home-card" onclick="openSeasonalView()">
     <span class="season-mark">${currentSeasonName()==="Autumn"?"❦":currentSeasonName()==="Winter"?"✦":currentSeasonName()==="Spring"?"❀":"✿"}</span>
-    <span><small>${currentSeasonName().toUpperCase()} · ${currentMonthName().toUpperCase()}</small><strong>${currentMonthName()} in your garden</strong><em>${parts.join(" · ")}</em></span><b>→</b>
+    <span><small>${currentSeasonName()} in the garden</small><strong>${currentMonthName()} in your garden</strong><em>${parts.join(" · ")}</em></span><b>→</b>
   </button>`;
 }
 function seasonalPlantCard(p,label){
@@ -1765,18 +1765,45 @@ function openGardenYear(){
     </div>
     <button class="btn secondary" style="width:100%;margin-top:14px" onclick="closeModal();openBloomMosaic()">View bloom mosaic</button>`);
 }
+function homeGreeting(){
+  const h=new Date().getHours();
+  return h<12?"Good morning":h<18?"Good afternoon":"Good evening";
+}
+function homeHeroLeaves(){
+  return `<div class="home-hero-leaves" aria-hidden="true"><svg viewBox="0 0 200 200">
+    <path d="M150 20c-48 6-86 40-92 96 54-4 90-40 92-96z" fill="rgba(255,255,255,.10)"/>
+    <path d="M150 20C120 52 96 82 58 116" stroke="rgba(255,255,255,.18)" stroke-width="2" fill="none"/>
+    <path d="M196 70c-40 2-70 26-80 66 42 2 74-24 80-66z" fill="rgba(31,203,130,.35)"/>
+    <path d="M110 150c-30-6-60 6-76 34 32 8 62-6 76-34z" fill="rgba(255,255,255,.07)"/>
+    <circle cx="176" cy="150" r="7" fill="#F77BB4"/><circle cx="176" cy="150" r="2.6" fill="#FFE0EC"/>
+    <circle cx="160" cy="168" r="5" fill="#FFC95C"/>
+  </svg></div>`;
+}
 function renderHome(){
-  const flowering=state.plants.filter(p=>p.status==="Flowering").length;
+  const flowering=plantsFloweringNow().length;
+  const recent=[...state.plants].slice(0,10);
   view.innerHTML=`
-    <section class="hero"><div class="eyebrow">Your botanical scrapbook</div><h1>Your little world<br>in bloom.</h1><p class="sub">Keep every flower, story and small garden discovery in one beautiful place.</p><div class="hero-bloom">❀</div></section>
-    <button class="lens-banner" onclick="startCamera()"><span class="lens-icon">⌾</span><span><strong>Identify something beautiful</strong><small>One photo is enough. Add up to five when a plant is tricky.</small></span></button>
-    <div class="stats-strip"><div class="stat"><b>${state.plants.length}</b><small>in your garden</small></div><div class="stat"><b>${flowering}</b><small>flowering now</small></div><div class="stat"><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
-    ${seasonalHomeCard()}
+    <section class="home-hero">
+      ${homeHeroLeaves()}
+      <p class="home-greeting">${homeGreeting()} · ${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</p>
+      <h1>What's growing today?</h1>
+      <button class="home-scan" onclick="startCamera()"><span class="home-scan-icon">⌾</span><span><b>Identify a plant</b><small>Snap a flower, leaf or bark</small></span><span class="go">→</span></button>
+      <div class="home-stats"><div><b>${state.plants.length}</b><small>in your garden</small></div><div><b>${flowering}</b><small>flowering now</small></div><div><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
+    </section>
+    <div class="quick-grid">
+      <button class="quick-tile t-identify" onclick="startCamera()"><span>⌾</span><small>Identify</small></button>
+      <button class="quick-tile t-doctor" onclick="openPlantDoctor()"><span>✚</span><small>Plant Doctor</small></button>
+      <button class="quick-tile t-care" onclick="setRoute('care')"><span>💧</span><small>Care</small></button>
+      <button class="quick-tile t-journal" onclick="openJournalComposer()"><span>✎</span><small>Add moment</small></button>
+    </div>
+    <div class="section-title"><h3>My plants</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
+    <div class="plant-rail">
+      ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
+      <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
+    </div>
+    <div class="section-title"><h3>Today in the garden</h3></div>
     ${careHomeCard()}
-    <div class="section-title"><h3>From your garden</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
-    <section class="masonry">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>
-    <div class="section-title"><h3>FloraLens memory</h3></div>
-    <div class="note-card"><div class="eyebrow">Species cache</div><h2 style="font-size:25px;margin-top:6px">${Object.keys(state.speciesCache).length} plant types remembered</h2><p class="sub" style="margin-bottom:0">Once FloraLens has enriched a species, future plants of the same species can reuse that botanical record.</p></div>`;
+    ${seasonalHomeCard()}`;
   hydratePhotos();
 }
 
@@ -1798,7 +1825,7 @@ function setGardenView(mode){
 function gardenGalleryMarkup(){
   return `<input class="search" id="gardenSearch" placeholder="Search your plants…" oninput="filterGarden(this.value)">
     <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea(decodeURIComponent('${encodeURIComponent(a)}'),this)">${esc(a)}</button>`).join("")}</div>
-    <section class="masonry" id="gardenPins">${state.plants.map(pin).join("")}</section>`;
+    <section class="masonry" id="gardenPins">${state.plants.map(p=>pin(p,{canDelete:true})).join("")}</section>`;
 }
 function areaMood(area){
   const s=String(area).toLowerCase();
@@ -1887,13 +1914,13 @@ function deleteGardenArea(area){
 }
 function filterGarden(q){
   const list=state.plants.filter(p=>(p.common+p.scientific+p.area).toLowerCase().includes(q.toLowerCase()));
-  gardenPins.innerHTML=list.map(pin).join("") || `<div class="empty-card">No plants matched that search.</div>`;
+  gardenPins.innerHTML=list.map(p=>pin(p,{canDelete:true})).join("") || `<div class="empty-card">No plants matched that search.</div>`;
   hydratePhotos(gardenPins);
 }
 function filterByArea(area,btn){
   document.querySelectorAll(".filter").forEach(x=>x.classList.remove("active")); btn.classList.add("active");
   const list=area==="All"?state.plants:state.plants.filter(p=>p.area===area);
-  gardenPins.innerHTML=list.map(pin).join("") || `<div class="empty-card">Nothing saved in ${esc(area)} yet.</div>`;
+  gardenPins.innerHTML=list.map(p=>pin(p,{canDelete:true})).join("") || `<div class="empty-card">Nothing saved in ${esc(area)} yet.</div>`;
   hydratePhotos(gardenPins);
 }
 
@@ -2492,13 +2519,13 @@ async function renderProfile(id,isNew=false){
     </div>`:`<div class="profile-empty"><span>❧</span><b>Botanical record still growing</b><p>FloraLens has not yet found additional species traits for this plant.</p></div>`;
 
   const storyHtml=isDiscovery?`
-      <div class="history-lead"><span>⌾</span><div><small>DISCOVERY RECORD</small><b>A saved moment worth remembering</b><p>Identification, botanical enrichment and future garden decisions stay together here.</p></div></div>
+      <div class="history-lead"><span>⌾</span><div><small>Discovery record</small><b>A saved moment worth remembering</b><p>Identification, botanical enrichment and future garden decisions stay together here.</p></div></div>
       <div class="profile-card plant-life-timeline">
         <div class="timeline-item"><div class="timeline-icon">⌾</div><div><b>Spotted by FloraLens</b><div class="small">${p.spotted?new Date(p.spotted).toLocaleDateString("en-GB"):"Saved discovery"}</div></div></div>
         <div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Identification photo saved</b><div class="small">${p.score?`${p.score}% identification match`:"Original identification photo stored on this device."}</div></div></div>
         ${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${uniqueSources.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}
       </div>`:`
-      <div class="history-lead"><span>✿</span><div><small>LIVING RECORD</small><b>${esc(p.common)} in your garden</b><p>Care, observations and seasonal changes build into one continuous plant story.</p></div></div>
+      <div class="history-lead"><span>✿</span><div><small>Living record</small><b>${esc(p.common)} in your garden</b><p>Care, observations and seasonal changes build into one continuous plant story.</p></div></div>
       <div class="profile-location-card"><div><div class="eyebrow">Lives in</div><h3>${esc(p.area||"Unplaced")}</h3></div><button class="link-btn" onclick="movePlantPrompt('${p.id}')">Move area</button></div>
       <div class="history-actions"><button class="mini-action" onclick="openCareComposer('${p.id}')">＋ Care record</button><button class="mini-action" onclick="addJournalForPlant('${p.id}')">＋ Garden moment</button></div>
       <div class="profile-card plant-life-timeline"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${uniqueSources.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
@@ -2520,7 +2547,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
-      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>AT A GLANCE</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
+      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
       <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
@@ -2540,7 +2567,7 @@ async function renderProfile(id,isNew=false){
 
     <section class="profile-panel" data-profile-panel="botany">
       <div class="profile-section-intro"><div><div class="eyebrow">Botanical dossier</div><h2>What FloraLens knows</h2></div><div class="profile-completeness botanical"><span>⌘</span><div><b>${botanicalRecordCoverage}%</b><small>species record</small></div></div></div>
-      <div class="botany-identity"><div class="botany-seal">❧</div><div><small>FLORALENS BOTANICAL RECORD</small><h3>${esc(p.scientific)}</h3><p>${care.traitDataset?`${esc(care.traitDataset)} · ${care.traitMatchLevel==="genus"?"genus context":"species-level match"}`:"Curated botanical context"}${care.plantAtlas?" · Plant Atlas phenology":""}</p></div></div>
+      <div class="botany-identity"><div class="botany-seal">❧</div><div><small>Botanical record</small><h3>${esc(p.scientific)}</h3><p>${care.traitDataset?`${esc(care.traitDataset)} · ${care.traitMatchLevel==="genus"?"genus context":"species-level match"}`:"Curated botanical context"}${care.plantAtlas?" · Plant Atlas phenology":""}</p></div></div>
       <div class="record-meter knowledge-meter"><div class="knowledge-row"><span><i>☀</i><b>Practical care</b><small>Growing guidance</small></span><strong>${careCoverage}%</strong></div><div class="coverage"><span style="width:${careCoverage}%"></span></div><div class="knowledge-row"><span><i>❧</i><b>Botanical record</b><small>Traits & ecological context</small></span><strong>${botanicalRecordCoverage}%</strong></div><div class="coverage botanical-coverage"><span style="width:${botanicalRecordCoverage}%"></span></div></div>
       ${renderDistributionCard(distributionRecord)}
       ${botanicalRows}
@@ -2603,7 +2630,7 @@ async function deletePlant(id){
   closeModal();
   await deletePhoto(p.photoKey);
   toast(`${p.common} removed`);
-  renderHome();
+  if(currentRoute==="garden") renderGarden(); else renderHome();
 }
 
 function journalTypeIcon(type){
@@ -2728,7 +2755,7 @@ function careHomeCard(){
   const suggestions=smartCareSuggestions();
   const headline=due?`${due} ${due===1?"job":"jobs"} need attention`:tasks.length?`${tasks.length} care jobs coming up`:`${suggestions.length} seasonal suggestions`;
   const sub=due?"A little garden care is waiting for you.":tasks.length?"Your next jobs are already organised.":"FloraLens has looked across your garden for useful seasonal care.";
-  return `<button class="care-home-card" onclick="setRoute('care')"><span class="care-home-icon">❧</span><span><small>CARE CALENDAR</small><strong>${headline}</strong><em>${sub}</em></span><b>→</b></button>`;
+  return `<button class="care-home-card" onclick="setRoute('care')"><span class="care-home-icon">❧</span><span><small>Care calendar</small><strong>${headline}</strong><em>${sub}</em></span><b>→</b></button>`;
 }
 function renderCareCalendar(){
   const tasks=activeCareTasks();
@@ -3117,7 +3144,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens v1.2.17 · private botanical journal</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.0 · made for our garden</div>`);
 });
 
 renderHome();

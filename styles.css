@@ -1,757 +1,833 @@
+/* ==========================================================================
+   FloraLens 2.0 — "Canopy" visual system
+   Bright, colourful, premium. Single stylesheet (replaces v0.1–v1.2.17 layers).
+   ========================================================================== */
+
 :root{
-  --paper:#f7f1e7;
-  --paper-2:#fffaf2;
-  --ink:#2e302b;
-  --muted:#78776f;
-  --sage:#8fa58b;
-  --deep:#415942;
-  --moss:#647b61;
-  --rose:#d7a4aa;
-  --rose-soft:#eed7d8;
-  --lilac:#d7cce1;
-  --sun:#dfc27a;
-  --line:rgba(65,89,66,.13);
-  --shadow:0 16px 45px rgba(69,57,42,.10);
-  --shadow-soft:0 8px 24px rgba(69,57,42,.08);
-  --radius:26px;
-  --nav-h:86px;
+  color-scheme: light;
+
+  /* Core palette */
+  --bg:#F3F7F4;
+  --bg-2:#E9F1EC;
+  --card:#FFFFFF;
+  --ink:#10201A;
+  --ink-2:#2D3E36;
+  --muted:#6A7B72;
+  --faint:#9AA9A1;
+  --line:rgba(16,32,26,.08);
+  --line-2:rgba(16,32,26,.13);
+
+  --leaf:#12B36F;
+  --leaf-2:#0E9A5E;
+  --canopy:#0B6E47;
+  --canopy-2:#074A30;
+  --leaf-soft:#E2F6EC;
+  --petal:#EE4E95;
+  --petal-soft:#FDE8F1;
+
+  /* Care colours (icon tiles) */
+  --sun:#F59E0B;   --sun-bg:#FFF4DC;
+  --water:#2E8AF5; --water-bg:#E5F0FF;
+  --soil:#B8743E;  --soil-bg:#F8ECE1;
+  --frost:#13B3D6; --frost-bg:#E1F7FC;
+  --prune:#7A5AF8; --prune-bg:#EEEAFF;
+  --size:#12B36F;  --size-bg:#E2F6EC;
+  --alert:#E5484D; --alert-bg:#FDEBEC;
+  --warm:#F08A24;  --warm-bg:#FFF0E0;
+
+  --grad-brand:linear-gradient(135deg,#1FCB82 0%,#12B36F 45%,#0B8B5A 100%);
+  --grad-canopy:linear-gradient(160deg,#0E8A57 0%,#0B6E47 48%,#063F29 100%);
+
+  /* Type */
+  --display:"Fraunces","Iowan Old Style",Georgia,serif;
+  --ui:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  /* legacy aliases used inside app.js inline styles */
+  --serif:var(--display);
+  --sans:var(--ui);
+  --green:var(--canopy);
+  --deep:var(--canopy);
+  --sage:var(--leaf-2);
+  --moss:var(--leaf-2);
+  --rose:var(--petal);
+  --rose-soft:var(--petal-soft);
+  --paper:var(--bg);
+  --paper-2:var(--card);
+
+  /* Shape & depth */
+  --r-xl:30px;
+  --r-lg:24px;
+  --r-md:18px;
+  --r-sm:13px;
+  --sh-1:0 1px 2px rgba(16,32,26,.05),0 4px 14px rgba(16,32,26,.05);
+  --sh-2:0 2px 6px rgba(16,32,26,.05),0 14px 34px rgba(16,32,26,.09);
+  --sh-3:0 10px 24px rgba(11,110,71,.18),0 24px 60px rgba(11,110,71,.20);
+
+  --nav-h:76px;
+  --safe-b:env(safe-area-inset-bottom);
 }
-*{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:"DM Sans",system-ui,sans-serif}
-body{background:
-  radial-gradient(circle at 10% 5%, rgba(215,204,225,.35), transparent 26%),
-  radial-gradient(circle at 95% 18%, rgba(238,215,216,.42), transparent 25%),
-  var(--paper);
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+html{background:var(--bg)}
+body{
+  font-family:var(--ui);
+  color:var(--ink);
+  background:
+    radial-gradient(120% 60% at 100% 0%,rgba(18,179,111,.10),transparent 60%),
+    radial-gradient(90% 50% at 0% 10%,rgba(238,78,149,.06),transparent 60%),
+    var(--bg);
+  background-attachment:fixed;
+  -webkit-font-smoothing:antialiased;
+  font-size:15px;
+  line-height:1.5;
 }
-button,input,textarea{font:inherit}
+button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer}
-#app{max-width:760px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:calc(var(--nav-h) + 24px)}
-.topbar{height:76px;display:flex;align-items:center;justify-content:space-between;padding:10px 18px;position:sticky;top:0;z-index:20;background:rgba(247,241,231,.82);backdrop-filter:blur(18px)}
-.brand{border:0;background:transparent;display:flex;gap:8px;align-items:center;font-family:"DM Serif Display",serif;font-size:25px;color:var(--deep)}
-.brand-flower{color:var(--rose);font-size:26px;transform:rotate(-8deg)}
-.round-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}
-.ghost{background:rgba(255,250,242,.68);color:var(--deep)}
-main{padding:8px 18px 24px}
-.hero{padding:14px 2px 10px;position:relative}
-.eyebrow{text-transform:uppercase;letter-spacing:.15em;font-size:11px;font-weight:700;color:var(--moss)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid rgba(18,179,111,.45);outline-offset:2px}
 h1,h2,h3,p{margin-top:0}
-h1,h2,.serif{font-family:"DM Serif Display",serif;font-weight:400}
-h1{font-size:42px;line-height:1.02;margin-bottom:8px;letter-spacing:-.02em}
-h2{font-size:31px;line-height:1.1;margin-bottom:8px}
-.sub{color:var(--muted);line-height:1.55}
-.hero-bloom{position:absolute;right:0;top:-3px;font-size:54px;color:var(--rose);opacity:.42;transform:rotate(12deg)}
-.lens-banner{border:0;width:100%;text-align:left;padding:18px;border-radius:28px;background:linear-gradient(135deg,#526b52,#7c9474);color:white;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;margin:14px 0 18px;overflow:hidden;position:relative}
-.lens-banner:after{content:"✿";position:absolute;right:-8px;top:-25px;font-size:110px;color:rgba(255,255,255,.11)}
-.lens-icon{width:56px;height:56px;border-radius:20px;background:rgba(255,255,255,.16);display:grid;place-items:center;font-size:30px;flex:none}
-.lens-banner strong{display:block;font-size:17px;margin-bottom:3px}
-.lens-banner small{opacity:.82;font-size:13px}
-.section-title{display:flex;align-items:flex-end;justify-content:space-between;margin:22px 2px 12px}
-.section-title h3{margin:0;font-size:18px}
-.link-btn{border:0;background:transparent;color:var(--deep);font-weight:700;font-size:13px}
-.stats-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 18px}
-.stat{background:rgba(255,250,242,.72);border:1px solid var(--line);border-radius:21px;padding:14px 10px;text-align:center}
-.stat b{font-family:"DM Serif Display",serif;font-size:26px;color:var(--deep);display:block}
-.stat small{font-size:11px;color:var(--muted)}
+h1,h2,h3{color:var(--ink)}
+img{max-width:100%}
+
+/* SVG icons injected by icons.js */
+.fl-ico{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.fl-ico.fill{fill:currentColor;stroke:none}
+.fl-ico-inline{margin-right:.38em}
+
+/* ------------------------------------------------------------------ Shell */
+#app{max-width:760px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:calc(var(--nav-h) + 36px + var(--safe-b))}
+main{padding:4px 18px 28px}
+
+.topbar{
+  position:sticky;top:0;z-index:40;height:64px;padding:10px 16px;
+  padding-top:max(10px,env(safe-area-inset-top));
+  height:calc(64px + env(safe-area-inset-top));
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(243,247,244,.82);
+  backdrop-filter:saturate(1.6) blur(20px);-webkit-backdrop-filter:saturate(1.6) blur(20px);
+}
+.brand{border:0;background:none;display:flex;align-items:center;gap:9px;padding:0;
+  font-family:var(--display);font-weight:600;font-size:23px;letter-spacing:-.02em;color:var(--ink)}
+.brand-flower{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:19px;color:#fff;background:var(--grad-brand);box-shadow:0 6px 14px rgba(18,179,111,.30)}
+.round-btn{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:19px;border:0;background:var(--card);color:var(--ink-2);box-shadow:var(--sh-1);transition:transform .15s}
+.round-btn:active{transform:scale(.92)}
+
+/* --------------------------------------------------------------- Bottom nav */
+.bottom-nav{
+  position:fixed;z-index:50;left:50%;transform:translateX(-50%);
+  bottom:calc(10px + var(--safe-b));
+  width:min(560px,calc(100% - 24px));height:var(--nav-h);
+  display:grid;grid-template-columns:1fr 1fr 84px 1fr 1fr;align-items:center;
+  padding:0 8px;border-radius:26px;
+  background:rgba(255,255,255,.92);
+  backdrop-filter:saturate(1.8) blur(24px);-webkit-backdrop-filter:saturate(1.8) blur(24px);
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 10px 40px rgba(16,32,26,.14);
+  border:1px solid rgba(16,32,26,.05);
+}
+.nav-item{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--faint);padding:8px 0;transition:color .2s}
+.nav-item span{font-size:23px;line-height:1;display:grid;place-items:center;width:44px;height:30px;border-radius:12px;transition:background .2s}
+.nav-item small{font-size:10.5px;font-weight:700;letter-spacing:.01em}
+.nav-item.active{color:var(--leaf-2)}
+.nav-item.active span{background:var(--leaf-soft)}
+.lens-nav{
+  width:64px;height:64px;margin:-30px auto 0;border:4px solid var(--bg);border-radius:50%;
+  display:grid;place-items:center;font-size:28px;color:#fff;background:var(--grad-brand);
+  box-shadow:0 10px 24px rgba(18,179,111,.40);transition:transform .15s;
+}
+.lens-nav:active{transform:scale(.93)}
+
+/* --------------------------------------------------------------- Typography */
+h1{font-family:var(--display);font-weight:600;font-size:38px;line-height:1.02;letter-spacing:-.025em;margin-bottom:8px;font-variation-settings:"SOFT" 60,"opsz" 96}
+h2{font-family:var(--display);font-weight:600;font-size:26px;line-height:1.1;letter-spacing:-.015em;margin-bottom:8px;font-variation-settings:"SOFT" 60}
+h3{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.eyebrow{font-size:12.5px;font-weight:700;color:var(--leaf-2);letter-spacing:0;text-transform:none}
+.sub{color:var(--muted);line-height:1.6;font-size:14.5px}
+.small{font-size:12.5px;color:var(--muted)}
+em,i{font-style:italic}
+
+.page-head{padding:14px 2px 10px}
+.page-head h1{font-size:36px;margin:4px 0 6px}
+.page-head .sub{max-width:52ch;margin-bottom:6px}
+
+.section-title{display:flex;align-items:center;justify-content:space-between;margin:28px 2px 12px}
+.section-title h3{margin:0;font-size:19px}
+.link-btn{border:0;background:none;color:var(--leaf-2);font-weight:700;font-size:13.5px;padding:6px 2px}
+
+/* ------------------------------------------------------------------ Buttons */
+.btn{border:0;border-radius:16px;padding:15px 16px;font-weight:700;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:transform .15s,box-shadow .15s}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.45}
+.btn.primary{background:var(--grad-brand);color:#fff;box-shadow:0 8px 20px rgba(18,179,111,.30)}
+.btn.secondary{background:var(--leaf-soft);color:var(--canopy)}
+.btn.outline{background:var(--card);color:var(--ink-2);box-shadow:inset 0 0 0 1.5px var(--line-2)}
+.btn.danger{background:var(--alert);color:#fff;box-shadow:0 8px 20px rgba(229,72,77,.25)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}
+.mini-action{border:0;border-radius:999px;padding:10px 14px;background:var(--leaf-soft);color:var(--canopy);font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+.mini-action:active{transform:scale(.97)}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:var(--leaf-soft);color:var(--canopy);font-size:11.5px;font-weight:700;margin-top:8px}
+
+/* ------------------------------------------------------------- Form fields */
+.search,.journal-field{
+  width:100%;border:0;border-radius:16px;background:var(--card);padding:14px 16px;
+  box-shadow:var(--sh-1),inset 0 0 0 1px var(--line);outline:none;font-size:16px;margin-bottom:10px;
+}
+.search:focus,.journal-field:focus{box-shadow:0 0 0 3px rgba(18,179,111,.22),inset 0 0 0 1.5px var(--leaf)}
+.journal-textarea{min-height:104px;resize:vertical;line-height:1.5}
+.field-label{display:block;font-size:13px;font-weight:700;color:var(--ink-2);margin:16px 0 8px}
+.journal-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+select.journal-field{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%236A7B72' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:40px}
+
+/* ------------------------------------------------------- Generic surfaces */
+.profile-card,.empty-card,.note-card{background:var(--card);border-radius:var(--r-lg);padding:20px;box-shadow:var(--sh-1);margin-bottom:14px}
+.empty-card{text-align:center;padding:34px 22px}
+.empty-card>.sub{margin-left:auto;margin-right:auto;max-width:38ch}
+.data-missing{font-style:italic}
+
+/* ======================================================================
+   HOME
+   ====================================================================== */
+.home-hero{
+  position:relative;overflow:hidden;isolation:isolate;
+  margin:6px 0 16px;padding:24px 22px 22px;border-radius:var(--r-xl);
+  color:#fff;background:var(--grad-canopy);box-shadow:var(--sh-3);
+}
+.home-hero-leaves{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.home-hero-leaves svg{position:absolute;right:-30px;top:-20px;width:230px;height:230px;opacity:.95}
+.home-greeting{font-size:13.5px;font-weight:600;color:rgba(255,255,255,.78);margin:0 0 6px}
+.home-hero h1{color:#fff;font-size:34px;line-height:1.04;max-width:15ch;margin:0 0 18px}
+.home-scan{
+  width:100%;border:0;border-radius:20px;background:#fff;color:var(--ink);
+  display:flex;align-items:center;gap:14px;padding:12px 14px 12px 12px;text-align:left;
+  box-shadow:0 10px 30px rgba(3,40,24,.28);transition:transform .15s;
+}
+.home-scan:active{transform:scale(.98)}
+.home-scan-icon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-size:25px;color:#fff;background:var(--grad-brand);flex:none}
+.home-scan b{display:block;font-size:16px;font-weight:800}
+.home-scan small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.home-scan>.go{margin-left:auto;font-size:20px;color:var(--leaf-2)}
+.home-stats{display:flex;gap:18px;margin-top:18px}
+.home-stats div{display:flex;flex-direction:column}
+.home-stats b{font-family:var(--display);font-size:24px;font-weight:600;line-height:1}
+.home-stats small{font-size:12px;color:rgba(255,255,255,.75);margin-top:3px}
+
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 6px}
+.quick-tile{border:0;background:var(--card);border-radius:20px;padding:14px 6px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:var(--sh-1);transition:transform .15s}
+.quick-tile:active{transform:scale(.95)}
+.quick-tile span{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:23px}
+.quick-tile small{font-size:11.5px;font-weight:700;color:var(--ink-2);line-height:1.2;text-align:center}
+.quick-tile.t-identify span{background:var(--leaf-soft);color:var(--leaf-2)}
+.quick-tile.t-doctor span{background:var(--alert-bg);color:var(--alert)}
+.quick-tile.t-care span{background:var(--water-bg);color:var(--water)}
+.quick-tile.t-journal span{background:var(--prune-bg);color:var(--prune)}
+
+/* horizontal plant carousel on home */
+.plant-rail{display:grid;grid-auto-flow:column;grid-auto-columns:150px;gap:12px;overflow-x:auto;margin:0 -18px;padding:2px 18px 10px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.plant-rail::-webkit-scrollbar{display:none}
+.rail-card{scroll-snap-align:start;border:0;padding:0;background:var(--card);border-radius:22px;overflow:hidden;text-align:left;box-shadow:var(--sh-1);position:relative}
+.rail-card .plant-art{aspect-ratio:4/5;width:100%;display:block;background-size:cover;background-position:center}
+.rail-card .rail-copy{position:absolute;left:0;right:0;bottom:0;padding:48px 12px 12px;color:#fff;background:linear-gradient(180deg,rgba(5,25,16,0),rgba(5,25,16,.45) 40%,rgba(5,25,16,.82))}
+.rail-card b{display:block;font-family:var(--display);font-size:17px;font-weight:600;line-height:1.1}
+.rail-card small{display:block;font-size:11.5px;opacity:.85;margin-top:2px}
+.rail-add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--leaf-2);font-weight:700;font-size:13px;background:var(--leaf-soft);box-shadow:none;border:1.5px dashed rgba(18,179,111,.35)}
+.rail-add span{font-size:28px}
+
+/* legacy home pieces still used */
+.hero{padding:10px 2px 6px;position:relative}
+.hero-bloom{display:none}
+.lens-banner{
+  width:100%;border:0;border-radius:var(--r-lg);padding:16px;margin:10px 0 16px;
+  display:flex;align-items:center;gap:14px;text-align:left;color:#fff;
+  background:var(--grad-brand);box-shadow:var(--sh-3);position:relative;overflow:hidden;
+}
+.lens-banner:after{content:"";position:absolute;right:-40px;top:-40px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.10)}
+.lens-icon{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:26px;background:rgba(255,255,255,.2);flex:none}
+.lens-banner strong{display:block;font-size:16px;font-weight:800}
+.lens-banner small{display:block;font-size:12.5px;opacity:.88;margin-top:2px}
+
+.stats-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:6px 0 16px}
+.stat{background:var(--card);border-radius:20px;padding:14px 8px;text-align:center;box-shadow:var(--sh-1)}
+.stat b{display:block;font-family:var(--display);font-weight:600;font-size:27px;line-height:1.05;color:var(--canopy)}
+.stat small{font-size:12px;color:var(--muted);font-weight:600}
+
+/* feature rows (seasonal + care) */
+.season-home-card,.care-home-card{
+  width:100%;border:0;border-radius:22px;padding:14px 16px 14px 14px;margin:0 0 10px;
+  display:flex;align-items:center;gap:14px;text-align:left;background:var(--card);box-shadow:var(--sh-1);transition:transform .15s;
+}
+.season-home-card:active,.care-home-card:active{transform:scale(.985)}
+.season-home-card>span:nth-child(2),.care-home-card>span:nth-child(2){flex:1;min-width:0}
+.season-home-card small,.care-home-card small{display:block;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0;text-transform:none}
+.season-home-card strong,.care-home-card strong{display:block;font-size:16px;font-weight:800;margin:1px 0 2px;color:var(--ink)}
+.season-home-card em,.care-home-card em{display:block;font-style:normal;font-size:12.5px;color:var(--muted);line-height:1.4}
+.season-home-card>b,.care-home-card>b{font-size:19px;color:var(--faint);font-weight:400}
+.season-mark,.care-home-icon{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-size:24px;flex:none}
+.season-mark{background:var(--petal-soft);color:var(--petal)}
+.care-home-icon{background:var(--water-bg);color:var(--water)}
+
+/* ======================================================================
+   PIN CARDS (gallery)
+   ====================================================================== */
 .masonry{columns:2;column-gap:12px}
-.pin{break-inside:avoid;margin:0 0 12px;background:var(--paper-2);border-radius:24px;overflow:hidden;box-shadow:var(--shadow-soft);border:1px solid rgba(65,89,66,.07)}
-.pin .plant-art{width:100%;display:block;position:relative;overflow:hidden}
+.pin{break-inside:avoid;margin:0 0 12px;background:var(--card);border-radius:22px;overflow:hidden;box-shadow:var(--sh-1);position:relative;cursor:pointer;transition:transform .2s,box-shadow .2s}
+.pin:active{transform:scale(.98)}
+.pin .plant-art{width:100%;display:block;background-size:cover;background-position:center}
 .pin:nth-child(3n+1) .plant-art{aspect-ratio:.82}
 .pin:nth-child(3n+2) .plant-art{aspect-ratio:1}
-.pin:nth-child(3n) .plant-art{aspect-ratio:.72}
+.pin:nth-child(3n) .plant-art{aspect-ratio:.74}
+.pin-body{padding:12px 14px 14px}
+.pin-body b{display:block;font-family:var(--display);font-weight:600;font-size:18px;line-height:1.15}
+.pin-body small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.pin-delete{
+  position:absolute;z-index:3;top:9px;right:9px;width:32px;height:32px;border-radius:50%;border:0;
+  display:grid;place-items:center;padding:0;font-size:15px;color:var(--ink-2);
+  background:rgba(255,255,255,.92);box-shadow:0 4px 12px rgba(0,0,0,.12);
+}
+@media (hover:hover){.pin:hover{transform:translateY(-3px);box-shadow:var(--sh-2)}}
+
+/* Plant art placeholders (starter plants without photos) */
 .plant-art{background:
-radial-gradient(circle at 55% 34%, rgba(255,255,255,.92) 0 8%, transparent 9%),
-radial-gradient(circle at 43% 44%, rgba(215,164,170,.9) 0 9%, transparent 10%),
-radial-gradient(circle at 61% 52%, rgba(215,164,170,.82) 0 10%, transparent 11%),
-radial-gradient(circle at 37% 59%, rgba(215,164,170,.72) 0 8%, transparent 9%),
-linear-gradient(145deg,#becdb5,#78906f);
-}
+  radial-gradient(circle at 50% 38%,#FFE0EC 0 7%,transparent 8%),
+  radial-gradient(circle at 42% 46%,#F27AAE 0 10%,transparent 11%),
+  radial-gradient(circle at 60% 50%,#EE4E95 0 11%,transparent 12%),
+  radial-gradient(circle at 48% 58%,#D63B80 0 10%,transparent 11%),
+  radial-gradient(ellipse at 30% 80%,#2BB673 0 18%,transparent 19%),
+  radial-gradient(ellipse at 72% 82%,#1A9A5D 0 20%,transparent 21%),
+  linear-gradient(160deg,#DFF5E8,#9ED9B8)}
 .plant-art.lavender{background:
-radial-gradient(ellipse at 43% 40%,#8c7898 0 4%,transparent 5%),
-radial-gradient(ellipse at 53% 33%,#a38bb2 0 5%,transparent 6%),
-radial-gradient(ellipse at 61% 48%,#806d92 0 4%,transparent 5%),
-linear-gradient(150deg,#d8d2bf,#74866c)}
+  radial-gradient(ellipse at 40% 34%,#8B6FE0 0 4%,transparent 5%),
+  radial-gradient(ellipse at 52% 26%,#A48BF0 0 5%,transparent 6%),
+  radial-gradient(ellipse at 61% 40%,#7A5AF8 0 4%,transparent 5%),
+  radial-gradient(ellipse at 46% 48%,#9479F2 0 4%,transparent 5%),
+  radial-gradient(ellipse at 57% 56%,#B19DF5 0 4%,transparent 5%),
+  radial-gradient(ellipse at 50% 92%,#3DAA6E 0 28%,transparent 29%),
+  linear-gradient(170deg,#EEEAFF,#C5E9D3)}
 .plant-art.hydrangea{background:
-radial-gradient(circle at 48% 35%,#c5a9c7 0 12%,transparent 13%),
-radial-gradient(circle at 62% 45%,#d3bdd5 0 13%,transparent 14%),
-radial-gradient(circle at 36% 49%,#b99fbd 0 12%,transparent 13%),
-linear-gradient(160deg,#d8dfd0,#6f856e)}
-.pin-body{padding:13px 14px 15px}
-.pin-body b{display:block;font-family:"DM Serif Display",serif;font-size:18px}
-.pin-body small{color:var(--muted)}
-.chip{display:inline-flex;align-items:center;padding:6px 9px;border-radius:999px;background:rgba(143,165,139,.14);font-size:11px;color:var(--deep);font-weight:700;margin-top:8px}
-.bottom-nav{position:fixed;z-index:30;bottom:0;left:50%;transform:translateX(-50%);width:min(760px,100%);height:var(--nav-h);padding:10px 18px calc(10px + env(safe-area-inset-bottom));display:grid;grid-template-columns:1fr 1fr 1.15fr 1fr 1fr;align-items:center;background:rgba(255,250,242,.91);backdrop-filter:blur(22px);border-top:1px solid var(--line)}
-.nav-item,.lens-nav{border:0;background:transparent;color:#8a8c84}
-.nav-item{display:flex;flex-direction:column;align-items:center;gap:3px}
-.nav-item span{font-size:22px;line-height:1}
-.nav-item small{font-size:10px}
-.nav-item.active{color:var(--deep)}
-.lens-nav{width:62px;height:62px;border-radius:22px;background:var(--deep);color:white;margin:-30px auto 0;font-size:30px;box-shadow:0 12px 30px rgba(65,89,66,.28)}
-.page-head{padding:12px 2px 4px}
-.toolbar{display:flex;gap:8px;overflow:auto;padding:6px 0 14px;scrollbar-width:none}
-.filter{white-space:nowrap;border:1px solid var(--line);background:rgba(255,250,242,.74);padding:9px 13px;border-radius:999px;color:var(--muted)}
-.filter.active{background:var(--deep);color:white;border-color:var(--deep)}
-.search{width:100%;border:1px solid var(--line);background:rgba(255,250,242,.72);border-radius:18px;padding:13px 15px;outline:none;margin-bottom:8px}
-.empty-card,.note-card,.profile-card{background:rgba(255,250,242,.74);border:1px solid var(--line);border-radius:24px;padding:18px;box-shadow:var(--shadow-soft)}
-.lens-screen{min-height:calc(100vh - 190px);display:flex;flex-direction:column}
-.camera-stage{position:relative;flex:1;min-height:460px;border-radius:32px;overflow:hidden;background:
-radial-gradient(circle at 50% 42%,rgba(255,255,255,.16),transparent 35%),
-linear-gradient(145deg,#4a614b,#24392e);box-shadow:var(--shadow)}
-.camera-stage:before{content:"";position:absolute;inset:24px;border:1px solid rgba(255,255,255,.4);border-radius:28px}
-.focus-corners{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:160px;height:160px;border:2px solid rgba(255,255,255,.85);border-radius:42px}
-.camera-copy{position:absolute;left:22px;right:22px;top:25px;color:white;text-align:center}
-.camera-copy h2{font-size:27px}
-.camera-copy p{font-size:13px;opacity:.8}
-.camera-controls{position:absolute;bottom:24px;left:0;right:0;display:flex;justify-content:center;align-items:center;gap:22px}
-.capture{width:76px;height:76px;border-radius:50%;border:5px solid rgba(255,255,255,.9);background:rgba(255,255,255,.23);box-shadow:inset 0 0 0 6px rgba(36,57,46,.25)}
-.mini-cam{width:46px;height:46px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(255,255,255,.12);color:white}
-.preview-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.identify-overlay{position:absolute;inset:0;background:rgba(37,52,42,.72);backdrop-filter:blur(10px);display:grid;place-items:center;color:white;text-align:center;padding:30px}
-.flower-loader{font-size:64px;animation:pulse 1.25s ease-in-out infinite;color:#f4dfe2}
-@keyframes pulse{50%{transform:scale(1.13) rotate(8deg);opacity:.7}}
-.result-hero{border-radius:30px;overflow:hidden;position:relative;min-height:350px;background:linear-gradient(145deg,#c8d5bf,#6b8166);box-shadow:var(--shadow)}
-.result-hero .preview-img{position:absolute}
-.result-gradient{position:absolute;inset:0;background:linear-gradient(transparent 30%,rgba(22,35,27,.85))}
-.result-copy{position:absolute;bottom:0;left:0;right:0;padding:26px;color:white}
-.result-copy h1{font-size:38px;margin-bottom:3px}
-.result-copy em{opacity:.8}
-.confidence{display:inline-block;margin-top:12px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.16);font-size:12px;font-weight:700}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
-.btn{border:0;border-radius:17px;padding:13px 15px;font-weight:700}
-.btn.primary{background:var(--deep);color:white}
-.btn.secondary{background:var(--rose-soft);color:#60464a}
-.btn.outline{background:transparent;border:1px solid var(--line);color:var(--deep)}
-.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
-.info{background:rgba(255,250,242,.74);border:1px solid var(--line);border-radius:20px;padding:14px}
-.info span{font-size:20px}
-.info b{display:block;margin-top:6px;font-size:13px}
-.info small{color:var(--muted)}
-.months{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:12px}
-.month{font-size:9px;text-align:center;padding:6px 1px;border-radius:7px;background:#e9e5dc;color:#8a8a82}
-.month.on{background:var(--rose);color:white}
-.timeline-item{display:grid;grid-template-columns:42px 1fr;gap:10px;padding:13px 0;border-bottom:1px solid var(--line)}
-.timeline-icon{width:38px;height:38px;border-radius:13px;background:rgba(143,165,139,.15);display:grid;place-items:center}
-.small{font-size:12px;color:var(--muted)}
-.modal{position:fixed;inset:0;z-index:100;background:rgba(32,38,32,.35);backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center}
-.sheet{width:min(760px,100%);background:var(--paper-2);border-radius:30px 30px 0 0;padding:22px 20px calc(24px + env(safe-area-inset-bottom));box-shadow:0 -16px 55px rgba(0,0,0,.15)}
-.sheet h2{font-size:28px}
-.option-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.option{border:1px solid var(--line);background:white;border-radius:18px;padding:14px;text-align:left}
-.photo-strip{display:flex;gap:8px;overflow:auto;margin:10px 0}
-.thumb{width:74px;height:74px;border-radius:18px;object-fit:cover;flex:none;border:1px solid var(--line)}
-@media (min-width:650px){main{padding-left:28px;padding-right:28px}.masonry{columns:3}.topbar{padding-left:28px;padding-right:28px}}
+  radial-gradient(circle at 46% 36%,#6FA8FF 0 13%,transparent 14%),
+  radial-gradient(circle at 60% 46%,#8FB9FF 0 14%,transparent 15%),
+  radial-gradient(circle at 36% 50%,#5B8EF0 0 12%,transparent 13%),
+  radial-gradient(circle at 52% 56%,#A99BFA 0 11%,transparent 12%),
+  radial-gradient(ellipse at 50% 90%,#2BA866 0 30%,transparent 31%),
+  linear-gradient(165deg,#E5F0FF,#BFE3CF)}
+.plant-art.rose{}
 
+/* ======================================================================
+   GARDEN
+   ====================================================================== */
+.garden-view-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;margin:2px 0 14px;border-radius:16px;background:var(--bg-2)}
+.garden-view-switch button{border:0;background:none;border-radius:12px;padding:10px;font-weight:700;font-size:14px;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:4px}
+.garden-view-switch button.active{background:var(--card);color:var(--canopy);box-shadow:var(--sh-1)}
+.toolbar{display:flex;gap:8px;overflow-x:auto;padding:2px 0 14px;scrollbar-width:none;margin:0 -18px;padding-left:18px;padding-right:18px}
+.toolbar::-webkit-scrollbar{display:none}
+.filter{white-space:nowrap;border:0;border-radius:999px;padding:9px 15px;font-size:13px;font-weight:700;background:var(--card);color:var(--ink-2);box-shadow:var(--sh-1)}
+.filter.active{background:var(--ink);color:#fff}
 
-/* FloraLens v0.2 */
-.capture-stack{display:flex;gap:9px;overflow:auto;padding:6px 2px 14px;scrollbar-width:none}
-.capture-card{width:98px;flex:none;background:rgba(255,250,242,.76);border:1px solid var(--line);border-radius:20px;padding:8px;position:relative}
-.capture-card img{width:80px;height:80px;border-radius:15px;object-fit:cover;display:block}
-.capture-card .organ{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--deep);padding:7px 2px 1px;text-align:center}
-.capture-remove{position:absolute;right:4px;top:4px;width:25px;height:25px;border:0;border-radius:50%;background:rgba(35,45,37,.83);color:white}
-.add-capture{width:98px;height:124px;flex:none;border:1px dashed rgba(65,89,66,.32);border-radius:20px;background:rgba(255,250,242,.45);color:var(--deep);font-weight:700}
-.organ-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0 16px}
-.organ-choice{border:1px solid var(--line);border-radius:17px;background:white;padding:12px 7px;text-align:center;color:var(--deep)}
-.organ-choice span{display:block;font-size:24px;margin-bottom:5px}
-.organ-choice.active{background:var(--deep);color:white;border-color:var(--deep)}
-.quota-pill{display:inline-flex;gap:6px;align-items:center;padding:7px 10px;border-radius:999px;background:rgba(143,165,139,.14);color:var(--deep);font-size:11px;font-weight:700}
-.area-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:13px 0}
-.area-choice{border:1px solid var(--line);background:white;border-radius:18px;padding:14px;text-align:left}
-.area-choice.active{background:var(--deep);color:white}
-.match-card{width:100%;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:white;border-radius:19px;padding:14px;margin:8px 0}
-.match-score{font-family:"DM Serif Display",serif;font-size:23px;color:var(--deep)}
-.species-cache{font-size:11px;color:var(--muted);margin-top:8px}
-.photo-hero{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.toast{position:fixed;left:50%;bottom:112px;transform:translateX(-50%);z-index:140;background:#2f3f31;color:white;padding:11px 16px;border-radius:999px;box-shadow:var(--shadow);font-size:12px;font-weight:700;animation:toastIn .2s ease-out}
-@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}}
-.setup-card{background:linear-gradient(145deg,rgba(215,204,225,.42),rgba(238,215,216,.48));border:1px solid var(--line);border-radius:24px;padding:17px;margin-top:14px}
-.setup-card code{font-size:11px;background:rgba(255,255,255,.6);padding:3px 6px;border-radius:7px}
-
-
-/* FloraLens v0.3 — botanical intelligence */
-.intel-banner{
-  background:linear-gradient(145deg,rgba(140,164,137,.17),rgba(217,199,219,.26));
-  border:1px solid var(--line); border-radius:24px; padding:17px; margin:15px 0;
-}
-.intel-banner.loading{animation:intelPulse 1.4s ease-in-out infinite}
-@keyframes intelPulse{50%{opacity:.68}}
-.source-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
-.source-pill{font-size:10px;font-weight:700;letter-spacing:.04em;padding:6px 9px;border-radius:999px;background:rgba(65,89,66,.09);color:var(--deep)}
-.care-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
-.care-tile{background:rgba(255,251,246,.82);border:1px solid var(--line);border-radius:20px;padding:15px;min-height:105px}
-.care-tile .care-icon{font-size:24px;display:block;margin-bottom:10px}
-.care-tile b{display:block;color:var(--deep);font-size:13px}
-.care-tile small{display:block;color:var(--muted);line-height:1.45;margin-top:3px}
-.care-wide{grid-column:1/-1}
-.season-card{position:relative;overflow:hidden;background:linear-gradient(145deg,rgba(239,224,210,.72),rgba(222,229,214,.72));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
-.season-card:after{content:"❀";position:absolute;right:-8px;top:-22px;font-size:84px;color:rgba(128,104,116,.10)}
-.season-card h2{font-size:27px;margin:5px 0 7px}
-.fact-list{display:grid;gap:10px;margin-top:12px}
-.fact-row{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid rgba(65,89,66,.10)}
-.fact-row:first-child{border-top:0}
-.fact-row .fact-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:rgba(65,89,66,.08);flex:none}
-.good-know{background:linear-gradient(145deg,rgba(233,215,218,.52),rgba(249,243,233,.82));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
-.data-missing{color:var(--muted);font-style:italic}
-.action-row{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}
-.mini-action{border:1px solid var(--line);background:rgba(255,255,255,.65);border-radius:999px;padding:9px 12px;font-size:11px;font-weight:700;color:var(--deep)}
-.backup-card{background:linear-gradient(145deg,rgba(215,204,225,.34),rgba(225,234,218,.44));border:1px solid var(--line);border-radius:24px;padding:18px;margin:14px 0}
-.coverage{height:7px;border-radius:999px;background:rgba(65,89,66,.09);overflow:hidden;margin-top:9px}
-.coverage > span{display:block;height:100%;background:linear-gradient(90deg,#8da58b,#b998a3);border-radius:999px}
-
-/* ==========================================================
-   FloraLens v0.8 — Botanical Editorial / Scrapbook refresh
-   ========================================================== */
-:root{
-  --paper:#f3ede2;
-  --paper-2:#fffaf3;
-  --paper-3:#eee5d8;
-  --ink:#273028;
-  --muted:#77756d;
-  --sage:#91a48b;
-  --deep:#344c3a;
-  --deep-2:#26392d;
-  --moss:#62785d;
-  --rose:#c98f98;
-  --rose-soft:#ead2d5;
-  --lilac:#d8cede;
-  --sun:#d2b56f;
-  --line:rgba(52,76,58,.12);
-  --shadow:0 18px 60px rgba(57,48,38,.10),0 2px 10px rgba(57,48,38,.04);
-  --shadow-soft:0 12px 34px rgba(57,48,38,.075);
-  --radius:30px;
-}
-html{background:#e9e1d4}
-body{
-  background:
-    radial-gradient(circle at 8% -4%, rgba(205,186,211,.52), transparent 26%),
-    radial-gradient(circle at 104% 11%, rgba(224,189,193,.47), transparent 23%),
-    radial-gradient(circle at 82% 82%, rgba(167,187,157,.16), transparent 28%),
-    linear-gradient(180deg,#f8f3eb 0%,#f2ebdf 55%,#eee6da 100%);
-  background-attachment:fixed;
-}
-body:before,body:after{position:fixed;z-index:-1;pointer-events:none;color:rgba(66,86,67,.055);font-family:"Cormorant Garamond",serif;line-height:1}
-body:before{content:"❧";font-size:290px;left:-95px;top:16%;transform:rotate(-26deg)}
-body:after{content:"❦";font-size:260px;right:-100px;bottom:5%;transform:rotate(21deg)}
-#app{background:linear-gradient(90deg,rgba(255,255,255,.10),rgba(255,255,255,.28),rgba(255,255,255,.10));box-shadow:0 0 80px rgba(71,58,42,.05)}
-
-/* floating glass header */
-.topbar{height:82px;padding:13px 18px;background:linear-gradient(180deg,rgba(250,246,239,.92),rgba(247,241,231,.74));backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);border-bottom:1px solid rgba(255,255,255,.45)}
-.brand{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:30px;letter-spacing:-.03em}
-.brand-flower{font-size:22px;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:linear-gradient(145deg,#eed9dd,#f9eee7);box-shadow:inset 0 0 0 1px rgba(130,86,94,.09),0 5px 16px rgba(100,76,76,.08)}
-.round-btn{background:rgba(255,252,247,.74);border-color:rgba(52,76,58,.10);box-shadow:0 6px 22px rgba(60,48,37,.055);transition:.22s ease}
-.round-btn:active{transform:scale(.93)}
-
-/* typography */
-h1,h2,.serif{font-family:"Cormorant Garamond",serif;font-weight:600}
-h1{font-size:48px;line-height:.95;letter-spacing:-.045em}
-h2{font-size:35px;letter-spacing:-.025em}
-.eyebrow{font-size:10px;letter-spacing:.19em;color:#71806d}
-.sub{font-size:14px;line-height:1.65;color:#74746d}
-
-/* home editorial hero */
-.hero{padding:27px 5px 20px;min-height:210px;display:flex;flex-direction:column;justify-content:center}
-.hero:before{content:"BOTANICAL NOTES";position:absolute;right:4px;top:31px;font:600 10px/1 "Caveat",cursive;letter-spacing:.08em;color:rgba(79,103,76,.42);transform:rotate(5deg)}
-.hero h1{max-width:520px;font-size:54px;margin:10px 0 13px;color:#26352b}
-.hero .sub{max-width:470px;font-size:15px}
-.hero-bloom{font-size:92px;right:4px;top:58px;color:rgba(191,137,147,.22);filter:drop-shadow(0 10px 18px rgba(120,80,90,.06))}
-
-/* hero lens card */
-.lens-banner{padding:20px 20px;border-radius:31px;background:
-  radial-gradient(circle at 88% 0%,rgba(255,255,255,.16),transparent 28%),
-  linear-gradient(135deg,#314a38 0%,#526c51 52%,#74866f 100%);
-  box-shadow:0 22px 55px rgba(48,72,53,.20);border:1px solid rgba(255,255,255,.13);transition:transform .24s ease,box-shadow .24s ease}
-.lens-banner:active{transform:scale(.985)}
-.lens-banner:before{content:"";position:absolute;inset:1px;border-radius:30px;border:1px solid rgba(255,255,255,.09);pointer-events:none}
-.lens-banner:after{content:"❦";right:-24px;top:-47px;font-size:142px;transform:rotate(-18deg);color:rgba(255,255,255,.08)}
-.lens-icon{width:62px;height:62px;border-radius:22px;background:linear-gradient(145deg,rgba(255,255,255,.20),rgba(255,255,255,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 10px 26px rgba(20,35,25,.14)}
-.lens-banner strong{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:600}
-.lens-banner small{line-height:1.45}
-
-/* stats become petite journal labels */
-.stats-strip{gap:11px;margin:13px 0 23px}
-.stat{position:relative;overflow:hidden;padding:16px 8px 14px;background:rgba(255,251,245,.72);backdrop-filter:blur(10px);border-color:rgba(52,76,58,.09);box-shadow:0 7px 26px rgba(58,49,39,.045)}
-.stat:after{content:"";position:absolute;left:18%;right:18%;bottom:0;height:2px;border-radius:99px;background:linear-gradient(90deg,transparent,rgba(201,143,152,.45),transparent)}
-.stat b{font-family:"Cormorant Garamond",serif;font-weight:600;font-size:31px}
-.stat small{letter-spacing:.01em}
-.section-title{margin-top:28px}.section-title h3{font-family:"Cormorant Garamond",serif;font-size:23px;font-weight:600;letter-spacing:-.015em}
-.link-btn{background:rgba(255,255,255,.45);border:1px solid var(--line);padding:8px 12px;border-radius:999px;font-size:11px}
-
-/* Pinterest cards with tactile print feel */
-.masonry{column-gap:14px}
-.pin{position:relative;border-radius:28px;margin-bottom:14px;background:rgba(255,251,246,.91);border:1px solid rgba(255,255,255,.75);box-shadow:0 14px 34px rgba(62,50,39,.095);transform:translateZ(0);transition:transform .24s ease,box-shadow .24s ease}
-.pin:before{content:"";position:absolute;inset:0;border-radius:28px;box-shadow:inset 0 0 0 1px rgba(72,88,69,.055);pointer-events:none;z-index:2}
-.pin:active{transform:scale(.985)}
-.pin .plant-art{filter:saturate(.91) contrast(.98);transition:filter .25s ease}
-.pin-body{padding:15px 15px 17px}
-.pin-body b{font-family:"Cormorant Garamond",serif;font-size:21px;font-weight:600;line-height:1.05}
-.pin-body small{display:block;margin-top:3px;font-size:10px;color:#87847c}
-.chip{margin-top:10px;padding:6px 10px;background:#eef2ea;color:#556b54;font-size:9px;text-transform:uppercase;letter-spacing:.09em}
-
-/* page headers + controls */
-.page-head{padding:23px 4px 9px}.page-head h1{font-size:49px;margin:7px 0 8px}
-.search{background:rgba(255,252,247,.82);backdrop-filter:blur(12px);border:1px solid rgba(52,76,58,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 24px rgba(57,48,38,.045);padding:15px 17px}
-.filter{background:rgba(255,252,247,.72);box-shadow:0 5px 16px rgba(60,49,38,.03);font-size:11px;padding:10px 14px}
-.filter.active{background:linear-gradient(135deg,#324b38,#52684e);box-shadow:0 9px 21px rgba(49,72,53,.14)}
-
-/* premium camera */
-.camera-stage{min-height:500px;border-radius:36px;background:radial-gradient(circle at 50% 38%,rgba(255,255,255,.14),transparent 30%),linear-gradient(150deg,#425846,#1f3027);box-shadow:0 28px 70px rgba(35,52,40,.24)}
-.camera-stage:before{inset:20px;border-radius:32px;border-color:rgba(255,255,255,.23)}
-.focus-corners{width:174px;height:174px;border:1px solid rgba(255,255,255,.78);border-radius:50%;box-shadow:0 0 0 16px rgba(255,255,255,.025)}
-.focus-corners:after{content:"✿";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:27px;color:rgba(255,255,255,.55)}
-.camera-copy{top:32px}.camera-copy h2{font-size:31px;font-family:"Cormorant Garamond",serif}.camera-copy p{max-width:340px;margin:0 auto;line-height:1.5}
-.capture{box-shadow:0 10px 26px rgba(0,0,0,.18),inset 0 0 0 8px rgba(255,255,255,.09);transition:.18s}.capture:active{transform:scale(.91)}
-.mini-cam{backdrop-filter:blur(12px);background:rgba(255,255,255,.10)}
-
-/* result and profile hero */
-.result-hero{border-radius:34px;min-height:380px;box-shadow:0 24px 62px rgba(54,63,49,.17);border:1px solid rgba(255,255,255,.35)}
-.result-gradient{background:linear-gradient(180deg,transparent 25%,rgba(24,38,29,.12) 45%,rgba(21,33,25,.92) 100%)}
-.result-copy{padding:29px}.result-copy h1{font-size:45px;line-height:.92;text-shadow:0 5px 18px rgba(0,0,0,.15)}
-.confidence{background:rgba(255,255,255,.13);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.14)}
-
-/* buttons */
-.btn{border-radius:18px;padding:14px 16px;transition:transform .18s ease,box-shadow .18s ease}.btn:active{transform:scale(.975)}
-.btn.primary{background:linear-gradient(135deg,#324b38,#53694f);box-shadow:0 12px 26px rgba(51,75,56,.16)}
-.btn.secondary{background:linear-gradient(145deg,#edd9db,#e6c9cd);color:#62484d}
-.btn.outline{background:rgba(255,255,255,.42)}
-
-/* content cards */
-.empty-card,.note-card,.profile-card{background:rgba(255,251,245,.78);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.72);box-shadow:0 13px 38px rgba(58,48,38,.065);border-radius:29px}
-.profile-card{padding:20px}
-.intel-banner{background:linear-gradient(145deg,rgba(218,226,211,.72),rgba(235,220,230,.56));border:1px solid rgba(255,255,255,.72);box-shadow:0 12px 30px rgba(58,48,38,.05);border-radius:28px}
-.source-pill{background:rgba(255,255,255,.54);border:1px solid rgba(71,91,70,.08)}
-
-/* care tiles feel like individual botanical notes */
-.care-grid{gap:11px;margin:14px 0}
-.care-tile{position:relative;overflow:hidden;min-height:116px;padding:16px 16px 17px;border-radius:24px;background:linear-gradient(145deg,rgba(255,253,249,.94),rgba(248,242,234,.82));border:1px solid rgba(255,255,255,.8);box-shadow:0 10px 28px rgba(58,49,39,.06)}
-.care-tile:after{content:"";position:absolute;width:64px;height:64px;border-radius:50%;right:-30px;top:-30px;background:rgba(200,164,170,.08)}
-.care-tile .care-icon{font-size:25px;width:39px;height:39px;display:grid;place-items:center;border-radius:14px;background:rgba(107,133,103,.10);margin-bottom:12px}
-.care-tile b{font-family:"Cormorant Garamond",serif;font-size:17px;font-weight:600}
-.care-tile small{font-size:11px;line-height:1.55}
-.care-wide{min-height:auto}
-
-/* flowering calendar */
-.months{gap:5px}.month{font-size:9px;padding:8px 1px;background:#ece8df;border:1px solid rgba(65,89,66,.035)}.month.on{background:linear-gradient(180deg,#d6a3aa,#c88791);box-shadow:0 6px 15px rgba(192,127,139,.20)}
-
-/* seasonal + good to know */
-.season-card,.good-know,.backup-card{border-radius:29px;border:1px solid rgba(255,255,255,.72);box-shadow:0 12px 34px rgba(58,48,38,.055)}
-.season-card{background:linear-gradient(145deg,rgba(238,222,202,.82),rgba(219,229,211,.78))}
-.season-card h2,.good-know h2{font-family:"Cormorant Garamond",serif}
-.good-know{background:linear-gradient(145deg,rgba(238,217,221,.68),rgba(255,249,241,.82))}
-.timeline-icon,.fact-row .fact-icon{background:linear-gradient(145deg,rgba(143,165,139,.15),rgba(215,204,225,.16))}
-
-/* bottom dock */
-.bottom-nav{height:90px;width:min(724px,calc(100% - 18px));bottom:9px;border-radius:28px;padding:10px 17px calc(10px + env(safe-area-inset-bottom));background:rgba(255,251,245,.88);backdrop-filter:blur(28px) saturate(1.3);-webkit-backdrop-filter:blur(28px) saturate(1.3);border:1px solid rgba(255,255,255,.75);box-shadow:0 18px 50px rgba(57,49,39,.14)}
-.nav-item{transition:.2s}.nav-item span{font-size:21px}.nav-item small{font-size:9px;font-weight:600;letter-spacing:.03em}.nav-item.active{color:#344d3a}.nav-item.active span{transform:translateY(-1px)}
-.lens-nav{width:66px;height:66px;border-radius:24px;margin:-32px auto 0;background:linear-gradient(145deg,#2f4836,#52684f);box-shadow:0 14px 32px rgba(46,70,52,.28),inset 0 0 0 1px rgba(255,255,255,.12)}
-
-/* sheets */
-.modal{background:rgba(30,39,31,.28);backdrop-filter:blur(9px)}
-.sheet{background:linear-gradient(180deg,#fffaf3,#f5ede3);border:1px solid rgba(255,255,255,.85);box-shadow:0 -24px 70px rgba(38,33,28,.20);padding-top:28px}
-.sheet:before{content:"";display:block;width:42px;height:4px;border-radius:10px;background:rgba(52,76,58,.16);margin:-14px auto 18px}
-
-/* small motion */
-@keyframes floraRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.hero,.lens-banner,.stats-strip,.masonry,.profile-card,.care-grid,.intel-banner,.season-card,.good-know{animation:floraRise .42s ease both}
-.masonry{animation-delay:.05s}
-
-@media (hover:hover){
-  .pin:hover{transform:translateY(-4px) rotate(-.15deg);box-shadow:0 22px 48px rgba(62,50,39,.13)}
-  .lens-banner:hover{transform:translateY(-2px);box-shadow:0 26px 60px rgba(48,72,53,.24)}
-  .link-btn:hover,.round-btn:hover{background:rgba(255,255,255,.8)}
-}
-@media (max-width:390px){h1{font-size:43px}.hero h1{font-size:48px}.page-head h1{font-size:44px}.care-grid{grid-template-columns:1fr 1fr}.bottom-nav{width:calc(100% - 12px);bottom:6px}}
-
-
-/* v0.8.1 — direct camera + Home delete affordance */
-.pin-delete{position:absolute;z-index:6;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.78);background:rgba(255,251,246,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 7px 18px rgba(44,42,35,.16);font:500 24px/29px "DM Sans",sans-serif;color:#6d6d65;display:grid;place-items:center;padding:0;cursor:pointer}
-.pin-delete:active{transform:scale(.92)}
-.btn.danger{background:#8d5e63;color:#fff;border-color:#8d5e63;box-shadow:0 10px 26px rgba(109,67,72,.18)}
-
-
-/* v0.8.2 — Discover as a real inspiration scrapbook */
-.destination-choice{
-  width:100%;display:flex;gap:14px;align-items:center;text-align:left;
-  border:1px solid rgba(45,76,55,.12);background:rgba(255,255,255,.58);
-  border-radius:20px;padding:16px;margin:10px 0;color:var(--ink);
-}
-.destination-choice>span{
-  width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
-  background:rgba(151,116,124,.12);font-size:22px;flex:none;
-}
-.destination-choice b{display:block;font-family:var(--serif);font-size:19px}
-.destination-choice small{display:block;margin-top:3px;line-height:1.35;color:var(--muted)}
-.discovery-pin{position:relative}
-.wishlist-heart{
-  position:absolute;top:12px;left:12px;width:38px;height:38px;border:0;border-radius:50%;
-  background:rgba(250,247,240,.88);backdrop-filter:blur(8px);font-size:19px;color:#8d6d75;
-  box-shadow:0 6px 18px rgba(54,48,39,.12);z-index:3;
-}
-.wishlist-heart.active{color:#a85f70;background:rgba(255,243,246,.94)}
-.discovery-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
-.mini-action{
-  width:100%;margin-top:10px;border:0;border-radius:999px;padding:9px 12px;
-  background:rgba(52,83,61,.09);color:var(--green);font-weight:700;
-}
-
-
-/* v0.8.3 — Discover detail profiles */
-.discovery-pin{cursor:pointer}
-.discovery-profile-actions{margin-top:18px}
-.discovery-delete-link{
-  width:100%;margin-top:12px;text-align:center;color:#8e6168;
-}
-
-/* v0.9 — Garden Journal */
-.journal-hero-button{width:100%;border:0;border-radius:28px;padding:18px 20px;display:flex;align-items:center;gap:14px;text-align:left;background:linear-gradient(135deg,rgba(55,88,65,.96),rgba(82,111,87,.94));color:#fff;box-shadow:0 18px 38px rgba(45,70,52,.18);margin-bottom:18px}
-.journal-hero-button>span:nth-child(2){flex:1}.journal-hero-button strong{display:block;font-family:var(--serif);font-size:21px;font-weight:500}.journal-hero-button small{display:block;opacity:.76;margin-top:3px}.journal-hero-button>b{font-size:26px}.journal-hero-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.13);font-size:23px}
-.journal-feed{display:grid;gap:18px;margin-top:20px}.journal-entry{overflow:hidden;border-radius:28px;background:rgba(255,252,245,.86);box-shadow:0 14px 36px rgba(69,58,46,.10);border:1px solid rgba(68,82,63,.08);cursor:pointer}.journal-photo{width:100%;aspect-ratio:16/10;background:#d9d5c9 center/cover no-repeat}.journal-entry-body{padding:18px 19px 20px}.journal-date{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}.journal-entry-head{display:flex;align-items:center;justify-content:space-between}.journal-type{padding:6px 10px;border-radius:999px;background:rgba(166,119,130,.10);color:#795e65;font-size:12px;font-weight:700}.journal-delete{width:34px;height:34px;border:0;border-radius:50%;background:rgba(73,70,61,.06);color:var(--muted);font-size:19px}.journal-entry h2{font-family:var(--serif);font-size:26px;margin:12px 0 1px;font-weight:500}.journal-entry em{font-size:13px;color:var(--muted)}.journal-entry p{line-height:1.6;margin:12px 0 0}.journal-link{margin-top:14px;color:var(--green);font-size:13px;font-weight:700}.journal-empty{text-align:center;padding:42px 24px}.pressed-flower{font-size:58px;color:var(--rose);opacity:.75}
-.journal-composer h2{font-size:31px;margin:5px 0 18px}.field-label{display:block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:15px 0 7px}.journal-field{width:100%;box-sizing:border-box;border:1px solid rgba(56,79,61,.13);border-radius:16px;background:rgba(255,255,255,.72);padding:13px 14px;color:var(--ink);font:inherit;font-size:16px}.journal-textarea{min-height:100px;resize:vertical}.journal-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.journal-type-choice{min-height:62px;border:1px solid rgba(56,79,61,.10);border-radius:16px;background:rgba(255,255,255,.55);color:var(--muted);display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;font-size:17px}.journal-type-choice span{font-size:10px;font-weight:700}.journal-type-choice.active{background:rgba(54,88,65,.10);border-color:rgba(54,88,65,.30);color:var(--green)}.journal-two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}.journal-photo-button{width:100%;height:48px;border:1px dashed rgba(56,79,61,.22);border-radius:16px;background:rgba(255,255,255,.5);color:var(--green);font-weight:700}.story-moment-copy{min-width:0;flex:1}.story-note{font-size:13px;line-height:1.45;margin-top:6px}.story-thumb{width:92px;height:72px;border-radius:14px;margin-top:9px;background:#ddd center/cover no-repeat}
-
-/* v1.0 — Care Calendar */
-.care-home-card{width:100%;border:1px solid rgba(61,87,67,.10);border-radius:26px;background:linear-gradient(135deg,rgba(239,239,218,.92),rgba(250,244,232,.94));padding:17px 18px;margin:8px 0 20px;display:flex;align-items:center;gap:14px;text-align:left;color:var(--ink);box-shadow:0 12px 28px rgba(66,65,50,.07)}
-.care-home-card>span:nth-child(2){flex:1}.care-home-card small{display:block;font-size:9px;letter-spacing:.13em;font-weight:800;color:var(--green)}.care-home-card strong{display:block;font-family:var(--serif);font-size:20px;margin:3px 0}.care-home-card em{display:block;font-style:normal;font-size:11px;color:var(--muted);line-height:1.35}.care-home-card>b{font-size:20px;color:var(--green)}.care-home-icon{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(61,91,68,.10);color:var(--green);font-size:24px}
-.care-add{width:100%;border:0;border-radius:22px;background:var(--green);color:white;display:flex;align-items:center;gap:13px;padding:15px 17px;text-align:left;box-shadow:0 14px 30px rgba(50,78,58,.16);margin-bottom:16px}.care-add>span{font-size:25px}.care-add b{display:block;font-family:var(--serif);font-size:19px}.care-add small{display:block;opacity:.7;margin-top:2px}
-.care-season-card{border-radius:28px;padding:21px;background:linear-gradient(135deg,rgba(163,119,131,.12),rgba(226,216,183,.36));display:flex;gap:15px;align-items:center;margin-bottom:21px}.care-season-card>div{flex:1}.care-season-card h2{font-family:var(--serif);font-size:27px;margin:5px 0}.care-season-card p{margin:0;color:var(--muted);line-height:1.45;font-size:13px}.care-season-card>span{font-size:58px;color:var(--rose);opacity:.62}
-.care-count{min-width:27px;height:27px;border-radius:999px;background:rgba(158,91,102,.12);display:grid;place-items:center;font-size:12px;color:#8b5962;font-weight:800}
-.care-list{display:grid;gap:11px}.care-task{display:flex;gap:12px;align-items:flex-start;border-radius:22px;padding:15px;background:rgba(255,252,246,.86);border:1px solid rgba(61,80,62,.08);box-shadow:0 10px 25px rgba(67,59,49,.06)}.care-task.overdue{border-color:rgba(157,87,96,.20);background:rgba(255,248,246,.92)}.care-check{width:39px;height:39px;border-radius:50%;border:1px solid rgba(53,87,63,.22);background:rgba(70,101,78,.07);color:var(--green);font-size:18px;flex:none}.care-task-copy{flex:1;min-width:0}.care-task-top{display:flex;justify-content:space-between;gap:8px;align-items:center}.care-task-top span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:var(--green)}.care-task-top small{font-size:11px;color:var(--muted)}.care-task h2{font-family:var(--serif);font-size:20px;margin:5px 0}.care-task p{font-size:12px;line-height:1.45;color:var(--muted);margin:7px 0 0}.care-plant-link{border:0;background:none;padding:0;color:#8a6870;font-size:11px;font-weight:700}.care-more{border:0;background:none;color:var(--muted);font-weight:800;padding:5px}
-.care-suggestions{display:grid;gap:12px}.care-suggestion{display:flex;gap:14px;padding:17px;border-radius:24px;background:rgba(247,243,231,.92);border:1px solid rgba(79,89,64,.08)}.care-suggest-icon{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(68,100,76,.09);color:var(--green);font-size:20px}.care-suggestion h2{font-family:var(--serif);font-size:20px;margin:4px 0}.care-suggestion p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}.care-clear{text-align:center;padding:30px 20px}.care-clear>span{font-size:36px;color:var(--green)}.care-completed{border-radius:22px;background:rgba(255,255,255,.42);padding:6px 15px}.care-completed>div{display:flex;gap:11px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(60,72,58,.07)}.care-completed>div:last-child{border-bottom:0}.care-completed>div>span{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(62,102,73,.09);color:var(--green)}.care-completed p{margin:0}.care-completed b,.care-completed small{display:block}.care-completed b{font-size:13px}.care-completed small{font-size:10px;color:var(--muted);margin-top:2px}
-
-/* v1.1 — Garden Map */
-.garden-view-switch{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:999px;background:rgba(71,83,67,.07);margin:4px 0 18px}
-.garden-view-switch button{border:0;border-radius:999px;background:transparent;color:var(--muted);padding:11px 12px;font-weight:700}
-.garden-view-switch button.active{background:rgba(255,252,245,.95);color:var(--green);box-shadow:0 5px 15px rgba(68,58,48,.08)}
-.map-intro{display:flex;gap:15px;align-items:flex-end;padding:4px 2px 16px}.map-intro>div{flex:1}.map-intro h2{font-family:var(--serif);font-size:27px;line-height:1.05;margin:5px 0 7px}.map-intro p{font-size:12px;line-height:1.5;color:var(--muted);margin:0}.map-add-area{border:1px solid rgba(58,87,65,.13);border-radius:999px;background:rgba(255,255,255,.58);padding:10px 13px;color:var(--green);font-weight:800;white-space:nowrap}
-.map-summary{display:flex;gap:8px;margin:0 0 13px}.map-summary span{background:rgba(255,255,255,.48);border:1px solid rgba(66,80,64,.07);border-radius:999px;padding:7px 10px;color:var(--muted);font-size:10px}.map-summary b{color:var(--ink);font-size:12px;margin-right:2px}
-.garden-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;align-items:stretch}
-.garden-zone{position:relative;overflow:hidden;min-height:218px;border-radius:31px;padding:16px;border:1px solid rgba(63,83,64,.09);box-shadow:0 14px 30px rgba(69,60,49,.07);cursor:pointer}
-.garden-zone:nth-child(3n+1){min-height:245px}.garden-zone:nth-child(4n){min-height:225px}
-.garden-zone.garden,.garden-zone.front{background:linear-gradient(145deg,rgba(222,231,206,.94),rgba(244,238,214,.92))}
-.garden-zone.border{background:linear-gradient(145deg,rgba(231,218,222,.92),rgba(247,237,222,.95))}
-.garden-zone.patio{background:linear-gradient(145deg,rgba(229,222,205,.94),rgba(245,235,218,.96))}
-.garden-zone.indoor{background:linear-gradient(145deg,rgba(225,221,234,.91),rgba(247,239,228,.96))}
-.garden-zone.glass{background:linear-gradient(145deg,rgba(215,232,226,.90),rgba(241,242,221,.94))}
-.garden-zone.unplaced{background:repeating-linear-gradient(135deg,rgba(247,243,233,.8),rgba(247,243,233,.8) 12px,rgba(239,234,222,.72) 12px,rgba(239,234,222,.72) 24px)}
-.garden-zone.other{background:linear-gradient(145deg,rgba(232,228,210,.94),rgba(245,238,226,.94))}
-.zone-top{display:flex;align-items:center;justify-content:space-between}.zone-icon{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.52);color:var(--green);font-size:19px}.zone-menu{border:0;background:rgba(255,255,255,.42);border-radius:999px;padding:6px 8px;color:var(--muted);font-weight:800}
-.zone-copy{margin:19px 0 11px}.zone-copy h2{font-family:var(--serif);font-size:24px;line-height:1;margin:5px 0}.zone-copy p{font-size:10px;color:var(--muted);margin:0}
-.zone-plants{position:relative;display:flex;flex-wrap:wrap;gap:7px;align-items:flex-start}
-.map-plant{width:54px;border:0;background:transparent;padding:0;color:var(--ink);text-align:center}.map-plant-photo{display:block;width:45px;height:45px;margin:auto;border-radius:50%;background:#ddd center/cover no-repeat;border:3px solid rgba(255,252,245,.88);box-shadow:0 6px 15px rgba(60,55,48,.13)}.map-plant small{display:block;font-size:8px;line-height:1.05;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.map-more{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.58);font-size:10px;font-weight:800;color:var(--green)}.zone-empty{font-family:var(--serif);font-style:italic;color:var(--muted);font-size:14px;line-height:1.3;max-width:130px}
-.map-footnote{display:flex;gap:13px;align-items:flex-start;margin:18px 2px 4px;padding:15px;border-radius:20px;background:rgba(255,255,255,.38)}.map-footnote>span{font-size:23px;color:var(--green)}.map-footnote p{margin:0;font-size:11px;line-height:1.45;color:var(--muted)}.map-footnote b{color:var(--ink)}
-.area-detail-head{display:flex;gap:13px;align-items:center;margin-bottom:14px}.area-detail-head>span{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:rgba(67,99,74,.09);color:var(--green);font-size:23px}.area-detail-head h2{margin:2px 0;font-size:28px}.area-plant-list{display:grid;gap:8px;max-height:48vh;overflow:auto}.area-plant-list>button{display:flex;align-items:center;gap:11px;border:1px solid rgba(63,83,64,.08);background:rgba(255,255,255,.56);border-radius:17px;padding:9px;text-align:left;color:var(--ink)}.area-plant-list>button>span:nth-child(2){flex:1;min-width:0}.area-plant-list b,.area-plant-list small{display:block}.area-plant-list small{font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}.area-list-photo{width:45px;height:45px;flex:none;border-radius:13px;background:#ddd center/cover no-repeat}
-.profile-location-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:20px;background:rgba(227,231,211,.55);border:1px solid rgba(61,86,65,.08);margin:14px 0}.profile-location-card h3{font-family:var(--serif);font-size:22px;margin:2px 0 0}
+.map-intro{display:flex;align-items:flex-end;gap:14px;margin:0 2px 12px}
+.map-intro>div{flex:1}
+.map-intro h2{font-size:22px;margin:4px 0 6px}
+.map-intro p{font-size:13px;color:var(--muted);margin:0;line-height:1.5}
+.map-add-area{border:0;border-radius:999px;padding:10px 14px;background:var(--grad-brand);color:#fff;font-weight:700;font-size:13px;white-space:nowrap;box-shadow:0 6px 14px rgba(18,179,111,.28)}
+.map-summary{display:flex;gap:8px;margin:0 0 14px}
+.map-summary>span{background:var(--card);border-radius:999px;padding:7px 12px;font-size:12px;color:var(--muted);box-shadow:var(--sh-1)}
+.map-summary b{color:var(--ink)}
+.garden-map{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.garden-zone{position:relative;overflow:hidden;min-height:210px;border-radius:24px;padding:14px;background:var(--card);box-shadow:var(--sh-1);cursor:pointer;--z:var(--leaf);--zb:var(--leaf-soft)}
+.garden-zone:before{content:"";position:absolute;inset:0 0 auto 0;height:88px;background:linear-gradient(180deg,var(--zb),transparent);pointer-events:none}
+.garden-zone>*{position:relative}
+.garden-zone.front,.garden-zone.garden{--z:var(--leaf);--zb:var(--leaf-soft)}
+.garden-zone.border{--z:var(--petal);--zb:var(--petal-soft)}
+.garden-zone.patio{--z:var(--warm);--zb:var(--warm-bg)}
+.garden-zone.indoor{--z:var(--prune);--zb:var(--prune-bg)}
+.garden-zone.glass{--z:var(--frost);--zb:var(--frost-bg)}
+.garden-zone.other{--z:var(--sun);--zb:var(--sun-bg)}
+.garden-zone.unplaced{--z:var(--faint);--zb:#EEF2EF}
+.zone-top{display:flex;align-items:center;justify-content:space-between}
+.zone-icon{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:20px;background:#fff;color:var(--z);box-shadow:var(--sh-1)}
+.zone-menu{border:0;background:rgba(255,255,255,.8);border-radius:10px;padding:5px 8px;color:var(--muted);font-weight:800;font-size:12px}
+.zone-copy{margin:16px 0 12px}
+.zone-copy .eyebrow{color:var(--z);font-size:11.5px}
+.zone-copy h2{font-size:21px;margin:2px 0}
+.zone-copy p{font-size:12px;color:var(--muted);margin:0}
+.zone-plants{display:flex;flex-wrap:wrap;gap:6px}
+.map-plant{width:50px;border:0;background:none;padding:0;text-align:center}
+.map-plant-photo{display:block;width:44px;height:44px;margin:auto;border-radius:50%;background-size:cover;background-position:center;border:2.5px solid #fff;box-shadow:0 3px 10px rgba(16,32,26,.15)}
+.map-plant small{display:block;font-size:9.5px;font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.map-more{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--zb);color:var(--z);font-size:12px;font-weight:800}
+.zone-empty{font-size:12.5px;color:var(--muted);line-height:1.4}
+.map-footnote{display:flex;gap:12px;align-items:flex-start;margin:16px 0 0;padding:14px 16px;border-radius:18px;background:var(--card);box-shadow:var(--sh-1)}
+.map-footnote>span{font-size:20px;color:var(--leaf)}
+.map-footnote p{margin:0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+.map-footnote b{color:var(--ink)}
 @media(min-width:700px){.garden-map{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
+.area-detail-head{display:flex;gap:13px;align-items:center;margin-bottom:14px}
+.area-detail-head>span{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-size:23px;background:var(--leaf-soft);color:var(--leaf-2)}
+.area-detail-head h2{margin:2px 0}
+.area-detail-head .sub{margin:0}
+.area-plant-list{display:grid;gap:8px;max-height:46vh;overflow:auto}
+.area-plant-list>button{display:flex;align-items:center;gap:12px;border:0;background:var(--bg);border-radius:16px;padding:9px 12px 9px 9px;text-align:left}
+.area-plant-list>button>span:nth-child(2){flex:1;min-width:0}
+.area-plant-list b{display:block;font-size:14.5px}
+.area-plant-list small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.area-list-photo{width:48px;height:48px;flex:none;border-radius:13px;background-size:cover;background-position:center}
 
-/* v1.1.1 — iOS Discover card fragmentation fix
-   Safari can fragment positioned children inside CSS multi-column cards,
-   which made the heart/delete controls appear as a "ghost" copy. */
-.discovery-masonry{
-  columns:auto !important;
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-  align-items:start;
+/* ======================================================================
+   LENS / IDENTIFY
+   ====================================================================== */
+.lens-choice-grid{display:grid;gap:12px;margin:6px 0 16px}
+.lens-choice-card{
+  width:100%;border:0;border-radius:var(--r-lg);padding:18px;display:grid;grid-template-columns:60px 1fr auto;gap:14px;align-items:center;text-align:left;
+  background:var(--card);box-shadow:var(--sh-2);transition:transform .15s;
 }
-.discovery-masonry .discovery-pin{
-  width:100%;
-  margin:0;
-  break-inside:auto;
-  -webkit-column-break-inside:auto;
-  page-break-inside:auto;
-  align-self:start;
+.lens-choice-card:active{transform:scale(.98)}
+.lens-choice-mark{width:60px;height:60px;border-radius:19px;display:grid;place-items:center;font-size:28px;color:#fff;background:var(--grad-brand);box-shadow:0 8px 18px rgba(18,179,111,.30)}
+.doctor-choice .lens-choice-mark{background:linear-gradient(135deg,#FF7A85,#E5484D);box-shadow:0 8px 18px rgba(229,72,77,.28)}
+.lens-choice-card small{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.lens-choice-card strong{display:block;font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;margin:2px 0 4px}
+.lens-choice-card strong i{font-family:var(--ui);font-style:normal;font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--alert-bg);color:var(--alert);vertical-align:middle;margin-left:4px}
+.lens-choice-card em{display:block;font-style:normal;font-size:13px;color:var(--muted);line-height:1.45}
+.lens-choice-card>b{font-size:19px;color:var(--faint);font-weight:400}
+.doctor-note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:18px;background:var(--card);box-shadow:var(--sh-1)}
+.doctor-note>span{font-size:20px;color:var(--leaf)}
+.doctor-note p{margin:0;font-size:12.5px;line-height:1.55;color:var(--muted)}
+.doctor-note b{color:var(--ink)}
+
+.capture-stack{display:flex;gap:10px;overflow-x:auto;padding:4px 0 14px;scrollbar-width:none}
+.capture-card{position:relative;flex:none;width:96px;padding:6px;border-radius:20px;background:var(--card);box-shadow:var(--sh-1)}
+.capture-card img{display:block;width:84px;height:84px;object-fit:cover;border-radius:15px}
+.capture-card .organ{display:block;text-align:center;font-size:11.5px;font-weight:700;color:var(--leaf-2);padding:6px 0 2px;text-transform:capitalize}
+.capture-remove{position:absolute;top:2px;right:2px;width:26px;height:26px;border-radius:50%;border:2px solid #fff;background:var(--ink);color:#fff;font-size:12px;display:grid;place-items:center;padding:0}
+.add-capture{flex:none;width:96px;height:124px;border-radius:20px;border:1.5px dashed rgba(18,179,111,.45);background:var(--leaf-soft);color:var(--leaf-2);font-weight:700;font-size:13px}
+.organ-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.organ-choice{border:0;border-radius:18px;background:var(--bg);padding:14px 8px;font-weight:700;font-size:13px;color:var(--ink-2)}
+.organ-choice span{display:grid;place-items:center;width:44px;height:44px;margin:0 auto 6px;border-radius:14px;background:#fff;color:var(--leaf-2);font-size:22px;box-shadow:var(--sh-1)}
+
+.result-hero,.doctor-photo-hero{position:relative;overflow:hidden;min-height:380px;border-radius:var(--r-xl);background:var(--bg-2);box-shadow:var(--sh-2)}
+.preview-img,.doctor-photo-hero>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.result-gradient{position:absolute;inset:0;background:linear-gradient(180deg,transparent 35%,rgba(4,26,16,.85))}
+.result-copy{position:absolute;left:0;right:0;bottom:0;padding:24px;color:#fff}
+.result-copy .eyebrow{color:rgba(255,255,255,.85)!important}
+.result-copy h1{color:#fff;font-size:38px;margin:4px 0 2px}
+.result-copy em{opacity:.85;font-size:15px}
+.confidence{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:7px 12px;border-radius:999px;background:var(--leaf);color:#fff;font-size:12.5px;font-weight:800;box-shadow:0 6px 16px rgba(18,179,111,.4)}
+.identify-overlay{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:28px;color:#fff;background:rgba(6,40,25,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.identify-overlay h2{color:#fff}
+.flower-loader{width:76px;height:76px;margin:0 auto;border-radius:50%;display:grid;place-items:center;font-size:36px;color:#fff;background:rgba(255,255,255,.14);position:relative}
+.flower-loader:after{content:"";position:absolute;inset:-6px;border-radius:50%;border:3px solid rgba(255,255,255,.18);border-top-color:#fff;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.quota-pill{display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:999px;background:var(--leaf-soft);color:var(--canopy);font-size:12px;font-weight:700}
+.photo-strip{display:flex;gap:8px;overflow-x:auto;margin:12px 0}
+.thumb{width:72px;height:72px;border-radius:16px;object-fit:cover;display:block}
+.match-card{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;background:var(--bg);border-radius:18px;padding:14px 16px;margin:8px 0;text-align:left}
+.match-card b{font-size:15px}
+.match-card small{color:var(--muted)}
+.match-score{flex:none;min-width:58px;text-align:center;padding:7px 10px;border-radius:12px;background:var(--leaf-soft);color:var(--canopy);font-weight:800;font-size:14px}
+.setup-card{margin-top:14px;padding:16px;border-radius:18px;background:var(--sun-bg)}
+.setup-card code{font-size:12px;background:#fff;padding:2px 6px;border-radius:6px}
+
+/* destination / area sheets */
+.destination-choice{width:100%;display:flex;align-items:center;gap:14px;border:0;background:var(--bg);border-radius:18px;padding:14px;margin:8px 0;text-align:left;transition:background .15s}
+.destination-choice:active{background:var(--bg-2)}
+.destination-choice>span{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:21px;background:#fff;color:var(--leaf-2);box-shadow:var(--sh-1);flex:none}
+.destination-choice b{display:block;font-size:15px;font-weight:800}
+.destination-choice small{display:block;font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:1px}
+.area-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.area-choice{border:0;border-radius:15px;padding:13px 14px;background:var(--bg);font-weight:700;font-size:14px;text-align:left;color:var(--ink-2)}
+.area-choice.active{background:var(--leaf);color:#fff;box-shadow:0 6px 14px rgba(18,179,111,.3)}
+
+/* ======================================================================
+   PROFILE
+   ====================================================================== */
+.profile-back{padding:6px 0 10px}
+.profile-back .link-btn{padding-left:0}
+.profile-dossier-hero{position:relative;isolation:isolate;overflow:hidden;min-height:420px;border-radius:var(--r-xl);background:var(--bg-2);box-shadow:var(--sh-2)}
+.profile-dossier-hero>.plant-art,.profile-dossier-hero .photo-hero{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.profile-dossier-shade{position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,transparent 26%,transparent 46%,rgba(4,26,16,.88) 100%)}
+.profile-dossier-top{position:absolute;z-index:2;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;gap:8px}
+.profile-family,.profile-season-badge{display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.profile-family{background:rgba(255,255,255,.22);color:#fff}
+.profile-season-badge{background:#fff;color:var(--petal)}
+.profile-dossier-copy{position:absolute;z-index:2;left:20px;right:20px;bottom:20px;color:#fff}
+.profile-dossier-copy h1{color:#fff;font-size:40px;margin:0 0 2px}
+.profile-dossier-copy em{font-size:16px;opacity:.88}
+.profile-meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.profile-meta-row>span{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12px;font-weight:700;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.profile-meta-row>span:first-child{background:var(--leaf)}
+
+.profile-tabs{position:sticky;top:calc(64px + env(safe-area-inset-top));z-index:30;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin:14px 0 18px;border-radius:16px;background:rgba(233,241,236,.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.profile-tab{border:0;background:none;border-radius:12px;padding:10px 6px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px;color:var(--muted)}
+.profile-tab span{font-size:16px;display:grid}
+.profile-tab.active{background:var(--card);color:var(--canopy);box-shadow:var(--sh-1)}
+.profile-panel{display:none}
+.profile-panel.active{display:block;animation:panelIn .25s ease both}
+@keyframes panelIn{from{opacity:0;transform:translateY(6px)}}
+.profile-dock-reserve{height:8px}
+
+.profile-section-intro{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 14px}
+.profile-section-intro h2{font-size:24px;margin:2px 0 0}
+.profile-completeness{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;background:var(--card);box-shadow:var(--sh-1);flex:none}
+.profile-completeness>span{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:15px;background:var(--leaf-soft);color:var(--leaf-2)}
+.profile-completeness.botanical>span{background:var(--prune-bg);color:var(--prune)}
+.profile-completeness.history>span{background:var(--sun-bg);color:var(--sun)}
+.profile-completeness div{display:flex;flex-direction:column;line-height:1.1}
+.profile-completeness b{font-size:15px;font-weight:800}
+.profile-completeness small{font-size:10.5px;color:var(--muted);font-weight:600}
+
+/* care tiles — the colourful heart of the profile */
+.care-glance{background:var(--card);border-radius:var(--r-lg);padding:18px;box-shadow:var(--sh-1);margin-bottom:14px}
+.care-glance-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.care-glance-head span{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0}
+.care-glance-head b{display:block;font-size:18px;font-weight:800}
+.care-glance-head em{font-style:normal;font-size:12px;color:var(--muted);font-weight:600}
+.care-glance-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.care-glance-grid>div{display:grid;grid-template-columns:42px 1fr;grid-template-rows:auto 1fr;column-gap:10px;align-items:start;padding:12px;border-radius:18px;background:var(--ic-bg,var(--bg))}
+.care-glance-grid>div>span{grid-row:1/3;width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:21px;background:#fff;color:var(--ic,var(--leaf))}
+.care-glance-grid small{font-size:12px;font-weight:700;color:var(--ic,var(--muted))}
+.care-glance-grid b{font-size:13px;font-weight:600;line-height:1.35;color:var(--ink-2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+.care-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+.care-tile{background:var(--card);border-radius:20px;padding:16px;box-shadow:var(--sh-1)}
+.care-tile .care-icon{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:21px;margin-bottom:12px;background:var(--ic-bg,var(--leaf-soft));color:var(--ic,var(--leaf))}
+.care-tile b{display:block;font-size:14px;font-weight:800;margin-bottom:3px}
+.care-tile small{display:block;font-size:13px;color:var(--muted);line-height:1.5}
+.care-wide{grid-column:1/-1}
+
+/* icon colour roles, applied by icons.js via data-ico on the container */
+[data-ico="sun"]{--ic:var(--sun);--ic-bg:var(--sun-bg)}
+[data-ico="drop"]{--ic:var(--water);--ic-bg:var(--water-bg)}
+[data-ico="soil"]{--ic:var(--soil);--ic-bg:var(--soil-bg)}
+[data-ico="snow"]{--ic:var(--frost);--ic-bg:var(--frost-bg)}
+[data-ico="height"]{--ic:var(--size);--ic-bg:var(--size-bg)}
+[data-ico="scissors"]{--ic:var(--prune);--ic-bg:var(--prune-bg)}
+[data-ico="sprout"]{--ic:var(--leaf);--ic-bg:var(--leaf-soft)}
+[data-ico="flower"],[data-ico="tulip"]{--ic:var(--petal);--ic-bg:var(--petal-soft)}
+[data-ico="alert"]{--ic:var(--alert);--ic-bg:var(--alert-bg)}
+[data-ico="clock"]{--ic:var(--warm);--ic-bg:var(--warm-bg)}
+[data-ico="pot"]{--ic:var(--soil);--ic-bg:var(--soil-bg)}
+[data-ico="flask"]{--ic:var(--prune);--ic-bg:var(--prune-bg)}
+[data-ico="trend"],[data-ico="leaf"]{--ic:var(--leaf);--ic-bg:var(--leaf-soft)}
+[data-ico="wave"]{--ic:var(--frost);--ic-bg:var(--frost-bg)}
+[data-ico="home"]{--ic:var(--warm);--ic-bg:var(--warm-bg)}
+[data-ico="check"]{--ic:var(--leaf);--ic-bg:var(--leaf-soft)}
+
+/* apply roles to every icon container */
+.care-glance-grid>div>span,.care-icon,.dossier-fact>span,.plant-today-item>span,.timeline-icon,
+.care-suggest-icon,.season-care-list>button>span,.knowledge-row i,.journal-type{color:var(--ic,var(--leaf-2))}
+.care-icon,.dossier-fact>span,.timeline-icon,.care-suggest-icon,.season-care-list>button>span,.knowledge-row i{background:var(--ic-bg,var(--leaf-soft))}
+
+.profile-summary-card{background:var(--card);border-radius:var(--r-lg);padding:18px 20px;box-shadow:var(--sh-1);margin-bottom:14px}
+.profile-summary-card p{margin:0;font-family:var(--display);font-size:17px;line-height:1.55;color:var(--ink-2);font-variation-settings:"SOFT" 80}
+
+.season-card{position:relative;overflow:hidden;border-radius:var(--r-lg);padding:18px 20px;margin-bottom:14px;background:linear-gradient(135deg,#FDE8F1,#FFF4DC);}
+.season-card .eyebrow{color:var(--petal)}
+.season-card h2{font-size:22px;margin:4px 0 6px}
+.season-card .sub{color:var(--ink-2)}
+
+.flowering-card .profile-card-head{margin-bottom:4px}
+.profile-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.profile-card-head h2{font-size:21px;margin:2px 0 10px}
+.profile-card-head>span{flex:none;padding:6px 11px;border-radius:999px;background:var(--petal-soft);color:var(--petal);font-size:12px;font-weight:700}
+.months{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:6px}
+.month{text-align:center;padding:10px 0;border-radius:9px;background:var(--bg);color:var(--faint);font-size:11px;font-weight:700}
+.month.on{background:linear-gradient(180deg,#F77BB4,#EE4E95);color:#fff;box-shadow:0 4px 10px rgba(238,78,149,.3)}
+
+.good-know{border-radius:var(--r-lg);padding:18px 20px;margin-bottom:14px;background:var(--sun-bg)}
+.good-know .eyebrow{color:#B26B00}
+.good-know h2{font-size:21px}
+.good-know .sub{color:var(--ink-2)}
+.compact-note{padding:14px 18px;background:var(--card);box-shadow:var(--sh-1)}
+.compact-note .eyebrow{color:var(--leaf-2)}
+.compact-note .sub{font-size:13px;margin:4px 0 0;color:var(--muted)}
+
+/* Your plant today */
+.plant-today-card{background:var(--card);border-radius:var(--r-lg);padding:18px;margin-bottom:14px;box-shadow:var(--sh-2);position:relative;overflow:hidden}
+.plant-today-card:before{content:"";position:absolute;inset:0 0 auto 0;height:4px;background:var(--grad-brand)}
+.plant-today-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.plant-today-head h2{font-size:23px;margin:2px 0 3px}
+.plant-today-head p{font-size:13px;color:var(--muted);margin:0}
+.plant-today-mark{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:21px;background:var(--leaf-soft);color:var(--leaf-2);flex:none}
+.plant-today-status{margin:14px 0 10px;font-size:15px;font-weight:800;color:var(--canopy)}
+.plant-today-list{display:grid;gap:8px}
+.plant-today-item{display:grid;grid-template-columns:40px 1fr;gap:12px;align-items:start;padding:12px;border-radius:16px;background:var(--bg)}
+.plant-today-item>span{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:19px;background:#fff;box-shadow:var(--sh-1)}
+.plant-today-item b{display:block;font-size:14px;font-weight:800;margin:1px 0 2px}
+.plant-today-item p{margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+.plant-today-item.attention{background:var(--warm-bg)}
+.plant-today-item.positive{background:var(--leaf-soft)}
+.plant-today-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.plant-today-actions .mini-action{flex:1;min-width:130px}
+
+/* Pruning assistant */
+.pruning-assistant{border-radius:var(--r-lg);padding:18px;margin-bottom:14px;background:var(--prune-bg)}
+.pruning-assistant-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.pruning-assistant-head .eyebrow{color:var(--prune)}
+.pruning-assistant-head h2{font-size:22px;margin:2px 0 0}
+.pruning-assistant-head>span{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:20px;background:#fff;color:var(--prune);flex:none;box-shadow:var(--sh-1)}
+.pruning-verdict{display:inline-flex;margin:14px 0 8px;padding:7px 13px;border-radius:999px;background:#fff;font-weight:800;font-size:14px;color:var(--prune)}
+.pruning-assistant>p{margin:0;font-size:13.5px;line-height:1.5;color:var(--ink-2)}
+.pruning-actions{margin-top:12px}
+.pruning-actions .mini-action{background:#fff;color:var(--prune)}
+.pruning-assistant.positive{background:var(--leaf-soft)}
+.pruning-assistant.positive .pruning-verdict,.pruning-assistant.positive .pruning-assistant-head>span,.pruning-assistant.positive .eyebrow{color:var(--leaf-2)}
+.pruning-assistant.attention{background:var(--warm-bg)}
+.pruning-assistant.attention .pruning-verdict,.pruning-assistant.attention .pruning-assistant-head>span,.pruning-assistant.attention .eyebrow{color:#C26510}
+.pruning-assistant.muted{background:var(--card);box-shadow:var(--sh-1)}
+.pruning-assistant.muted .pruning-verdict{background:var(--bg);color:var(--muted)}
+
+/* Botany */
+.botany-identity{display:flex;align-items:center;gap:14px;padding:16px;border-radius:var(--r-lg);background:var(--card);box-shadow:var(--sh-1);margin-bottom:12px}
+.botany-seal{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:25px;color:#fff;background:linear-gradient(135deg,#9B82FF,#7A5AF8);flex:none}
+.botany-identity small{font-size:12px;font-weight:700;color:var(--muted)}
+.botany-identity h3{font-family:var(--display);font-style:italic;font-weight:600;font-size:19px;margin:1px 0}
+.botany-identity p{font-size:12.5px;color:var(--muted);margin:0}
+.record-meter{background:var(--card);border-radius:var(--r-lg);padding:16px;box-shadow:var(--sh-1);margin-bottom:12px}
+.knowledge-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.knowledge-row>span{display:grid;grid-template-columns:34px auto;column-gap:10px;align-items:center}
+.knowledge-row i{grid-row:1/3;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-style:normal;font-size:16px}
+.knowledge-row b{font-size:14px;font-weight:800}
+.knowledge-row small{font-size:12px;color:var(--muted)}
+.knowledge-row strong{font-size:16px;font-weight:800;color:var(--canopy)}
+.coverage{height:8px;border-radius:99px;background:var(--bg);overflow:hidden;margin-bottom:14px}
+.coverage:last-child{margin-bottom:0}
+.coverage>span{display:block;height:100%;border-radius:99px;background:var(--grad-brand)}
+.botanical-coverage>span{background:linear-gradient(90deg,#9B82FF,#7A5AF8)}
+
+.dossier-facts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.dossier-fact{display:flex;gap:11px;align-items:flex-start;padding:14px;border-radius:18px;background:var(--card);box-shadow:var(--sh-1)}
+.dossier-fact>span{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:17px;flex:none}
+.dossier-fact small{display:block;font-size:11.5px;font-weight:700;color:var(--muted)}
+.dossier-fact b{display:block;font-size:13.5px;font-weight:700;line-height:1.35;margin-top:1px}
+.dossier-fact em{display:block;font-style:normal;font-size:11.5px;color:var(--faint);margin-top:4px}
+.dossier-fact-wide{grid-column:1/-1}
+.profile-empty{text-align:center;padding:30px 20px;border-radius:var(--r-lg);background:var(--card);box-shadow:var(--sh-1);margin-bottom:14px}
+.profile-empty>span{font-size:30px;color:var(--leaf)}
+.profile-empty b{display:block;font-size:16px;margin:6px 0 4px}
+.profile-empty p{font-size:13px;color:var(--muted);margin:0}
+
+.source-dossier{background:var(--card);border-radius:var(--r-lg);padding:18px;box-shadow:var(--sh-1);margin-bottom:12px}
+.source-dossier h3{font-size:17px;margin:3px 0 10px}
+.source-row{display:flex;flex-wrap:wrap;gap:6px}
+.source-pill{padding:6px 11px;border-radius:999px;background:var(--bg);font-size:12px;font-weight:600;color:var(--ink-2)}
+
+/* distribution map */
+.distribution-card{padding:18px}
+.distribution-card .profile-card-head>span{background:var(--frost-bg);color:#0A8BAA}
+.distribution-map-wrap{margin:4px 0 12px;border-radius:18px;overflow:hidden;background:#E8F4F8}
+.distribution-live-map{position:relative;min-height:170px;display:grid;place-items:center}
+.distribution-map-svg{display:block;width:100%;height:auto}
+.distribution-map-svg .occurrence-dot{fill:var(--petal);fill-opacity:.9;stroke:#fff;stroke-width:1.2}
+.distribution-loading{position:absolute;font-size:12px;font-weight:700;color:var(--muted)}
+.distribution-map-note{display:flex;justify-content:space-between;gap:10px;margin-top:8px;padding:0 10px;font-size:11.5px;color:var(--muted)}
+.distribution-map-note b{color:var(--leaf-2)}
+.distribution-map-caveat{padding:2px 10px 10px;font-size:11px;line-height:1.45;color:var(--faint)}
+.distribution-caption{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.distribution-caption b{display:block;font-size:14px;font-weight:700;line-height:1.4}
+.distribution-caption small{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+.distribution-caption .mini-action{width:auto;flex:none}
+.distribution-modal-live{margin:14px 0 10px;border-radius:20px;overflow:hidden;background:#E8F4F8}
+.distribution-modal-copy{margin-top:10px}
+
+/* History */
+.history-lead{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:var(--r-lg);background:linear-gradient(135deg,var(--sun-bg),var(--petal-soft));margin-bottom:12px}
+.history-lead>span{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;font-size:21px;background:#fff;color:var(--petal);flex:none}
+.history-lead small{display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:none;letter-spacing:0}
+.history-lead b{display:block;font-family:var(--display);font-size:19px;font-weight:600;margin:1px 0 3px}
+.history-lead p{margin:0;font-size:13px;color:var(--ink-2);line-height:1.45}
+.profile-location-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:18px;background:var(--card);box-shadow:var(--sh-1);margin-bottom:12px}
+.profile-location-card h3{margin:2px 0 0;font-size:17px}
+.history-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.history-actions .mini-action{padding:12px}
+.plant-life-timeline{position:relative;padding:8px 18px}
+.plant-life-timeline:before{content:"";position:absolute;left:38px;top:26px;bottom:26px;width:2px;border-radius:2px;background:linear-gradient(180deg,var(--leaf-soft),var(--bg-2))}
+.timeline-item{display:grid;grid-template-columns:42px 1fr;gap:12px;padding:12px 0;position:relative}
+.timeline-icon{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:18px;box-shadow:0 0 0 4px #fff}
+.timeline-item b{font-size:14.5px}
+.story-note{font-size:13.5px;line-height:1.5;margin-top:5px;color:var(--ink-2)}
+.story-thumb{width:110px;height:84px;border-radius:14px;margin-top:8px;background-size:cover;background-position:center}
+.history-delete,.discovery-delete-link{display:block;width:100%;text-align:center;margin-top:14px;color:var(--alert)!important}
+.discovery-profile-actions .actions{margin-bottom:0}
+
+/* ======================================================================
+   JOURNAL
+   ====================================================================== */
+.journal-hero-button,.care-add{
+  width:100%;border:0;border-radius:var(--r-lg);padding:16px;margin:4px 0 16px;
+  display:flex;align-items:center;gap:14px;text-align:left;color:#fff;
+  background:linear-gradient(135deg,#9B82FF,#7A5AF8 55%,#5B3FD6);box-shadow:0 12px 30px rgba(122,90,248,.32);
+}
+.care-add{background:linear-gradient(135deg,#5AA9FF,#2E8AF5 55%,#1868D1);box-shadow:0 12px 30px rgba(46,138,245,.30)}
+.journal-hero-button>span:nth-child(2),.care-add>div{flex:1}
+.journal-hero-mark,.care-add>span{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;font-size:23px;background:rgba(255,255,255,.2);flex:none}
+.journal-hero-button strong,.care-add b{display:block;font-size:16px;font-weight:800}
+.journal-hero-button small,.care-add small{display:block;font-size:12.5px;opacity:.88;margin-top:2px}
+.journal-hero-button>b{font-size:22px}
+.journal-feed{display:grid;gap:14px}
+.journal-entry{background:var(--card);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh-1);cursor:pointer}
+.journal-photo{aspect-ratio:16/10;background-size:cover;background-position:center;background-color:var(--bg-2)}
+.journal-entry-body{padding:16px 18px 18px}
+.journal-date{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:8px}
+.journal-entry-head{display:flex;align-items:center;justify-content:space-between}
+.journal-type{display:inline-flex;align-items:center;gap:4px;padding:6px 11px;border-radius:999px;background:var(--ic-bg,var(--leaf-soft));font-size:12.5px;font-weight:700}
+.journal-delete{width:32px;height:32px;border:0;border-radius:50%;background:var(--bg);color:var(--muted);font-size:14px;display:grid;place-items:center;padding:0}
+.journal-entry h2{font-size:22px;margin:12px 0 0}
+.journal-entry em{font-size:13px;color:var(--muted)}
+.journal-entry p{margin:10px 0 0;line-height:1.55;color:var(--ink-2)}
+.journal-link{margin-top:12px;font-size:13px;font-weight:700;color:var(--leaf-2)}
+.journal-empty .pressed-flower,.pressed-flower{font-size:44px;width:80px;height:80px;margin:0 auto 10px;border-radius:24px;display:grid;place-items:center;background:var(--petal-soft);color:var(--petal)}
+.journal-composer h2{margin:4px 0 6px}
+.journal-type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.journal-type-choice{border:0;border-radius:15px;padding:12px 6px;background:var(--bg);display:flex;flex-direction:column;align-items:center;gap:5px;font-size:20px;color:var(--ic,var(--leaf-2))}
+.journal-type-choice>span:not(.fl-ico-wrap){font-size:12px;font-weight:700;color:var(--ink-2)}
+.journal-type-choice .fl-ico{width:22px;height:22px}
+.journal-type-choice.active{background:var(--ic-bg,var(--leaf-soft));box-shadow:inset 0 0 0 2px var(--ic,var(--leaf))}
+.journal-photo-button{width:100%;height:50px;border:1.5px dashed rgba(18,179,111,.45);border-radius:16px;background:var(--leaf-soft);color:var(--leaf-2);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
+
+/* ======================================================================
+   CARE CALENDAR
+   ====================================================================== */
+.care-season-card{display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:var(--r-lg);background:linear-gradient(135deg,var(--leaf-soft),var(--frost-bg));margin-bottom:6px}
+.care-season-card>div{flex:1}
+.care-season-card h2{font-size:22px;margin:3px 0 4px}
+.care-season-card p{font-size:13px;color:var(--ink-2);margin:0;line-height:1.5}
+.care-season-card>span{font-size:40px;color:var(--leaf)}
+.care-count{min-width:26px;height:26px;padding:0 8px;border-radius:999px;display:grid;place-items:center;background:var(--alert);color:#fff;font-size:12px;font-weight:800}
+.care-list,.care-suggestions{display:grid;gap:10px}
+.care-task{display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:20px;background:var(--card);box-shadow:var(--sh-1)}
+.care-task.overdue{box-shadow:var(--sh-1),inset 4px 0 0 var(--alert)}
+.care-check{width:40px;height:40px;flex:none;border-radius:50%;border:2px solid var(--line-2);background:#fff;color:transparent;font-size:16px;display:grid;place-items:center;padding:0;transition:all .15s}
+.care-check:hover,.care-check:active{border-color:var(--leaf);background:var(--leaf);color:#fff}
+.care-task-copy{flex:1;min-width:0}
+.care-task-top{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.care-task-top span{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:var(--water)}
+.care-task-top small{font-size:12px;font-weight:600;color:var(--muted)}
+.care-task.overdue .care-task-top small{color:var(--alert)}
+.care-task h2{font-family:var(--ui);font-size:16px;font-weight:800;margin:4px 0 2px}
+.care-task p{font-size:13px;color:var(--muted);margin:6px 0 0;line-height:1.45}
+.care-plant-link{border:0;background:none;padding:0;color:var(--leaf-2);font-size:12.5px;font-weight:700}
+.care-more{border:0;background:none;color:var(--faint);font-weight:800;padding:4px}
+.care-suggestion{display:flex;gap:14px;padding:16px;border-radius:20px;background:var(--card);box-shadow:var(--sh-1)}
+.care-suggest-icon{width:44px;height:44px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:20px}
+.care-suggestion .eyebrow{color:var(--muted);font-size:12px}
+.care-suggestion h2{font-family:var(--ui);font-size:15.5px;font-weight:800;margin:2px 0 4px}
+.care-suggestion p{font-size:13px;color:var(--muted);line-height:1.5;margin:0}
+.care-suggestion .mini-action{margin-top:10px}
+.care-clear>span{display:grid;place-items:center;width:60px;height:60px;margin:0 auto 10px;border-radius:20px;background:var(--leaf-soft);color:var(--leaf);font-size:28px}
+.care-completed{background:var(--card);border-radius:20px;padding:4px 16px;box-shadow:var(--sh-1)}
+.care-completed>div{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.care-completed>div:last-child{border-bottom:0}
+.care-completed>div>span{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--leaf);color:#fff;font-size:13px;flex:none}
+.care-completed p{margin:0}
+.care-completed b,.care-completed small{display:block}
+.care-completed b{font-size:14px;color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
+.care-completed small{font-size:12px;color:var(--faint)}
+
+/* ======================================================================
+   DISCOVER
+   ====================================================================== */
+.discovery-masonry{columns:auto!important;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.discovery-masonry .discovery-pin{margin:0;overflow:hidden}
+.discovery-media{position:relative}
+.discovery-media .plant-art{aspect-ratio:.9;width:100%}
+.discovery-controls{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;padding:9px}
+.discovery-controls .pin-delete{position:static}
+.wishlist-heart{width:34px;height:34px;border:0;border-radius:50%;display:grid;place-items:center;padding:0;font-size:16px;background:rgba(255,255,255,.92);color:var(--petal);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.wishlist-heart.active{background:var(--petal);color:#fff}
+.discovery-meta{display:flex;gap:6px;flex-wrap:wrap}
+.discovery-pin .mini-action{width:100%;margin-top:10px}
+@media(min-width:650px){.discovery-masonry{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* ======================================================================
+   SEASONAL SHEET, BLOOM MOSAIC, YEAR
+   ====================================================================== */
+.season-sheet h2{margin:4px 0 6px}
+.season-scroll{display:grid;grid-auto-flow:column;grid-auto-columns:64%;gap:10px;overflow-x:auto;padding-bottom:6px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.season-plant-card{scroll-snap-align:start;border-radius:20px;overflow:hidden;background:var(--bg);cursor:pointer}
+.season-plant-photo{aspect-ratio:16/11;background-size:cover;background-position:center}
+.season-plant-card>div:last-child{padding:10px 12px 12px}
+.season-plant-card>div>span{font-size:11.5px;font-weight:700;color:var(--petal)}
+.season-plant-card h3{font-family:var(--display);font-weight:600;font-size:18px;margin:2px 0}
+.season-plant-card small{font-size:12px;color:var(--muted)}
+.season-care-list{display:grid;gap:8px}
+.season-care-list>button{display:flex;gap:12px;align-items:flex-start;border:0;background:var(--bg);border-radius:16px;padding:12px;text-align:left}
+.season-care-list>button>span{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;font-size:17px;flex:none}
+.season-care-list>button>div{flex:1}
+.season-care-list b{display:block;font-size:14px}
+.season-care-list small{display:block;font-size:12px;color:var(--muted);line-height:1.4;margin-top:2px}
+.season-care-list strong{color:var(--leaf);font-size:18px}
+.bloom-summary,.year-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.year-grid{grid-template-columns:1fr 1fr}
+.bloom-summary>span,.year-grid>div{padding:14px 8px;border-radius:18px;background:var(--bg);text-align:center}
+.bloom-summary b,.year-grid b{display:block;font-family:var(--display);font-weight:600;font-size:26px;color:var(--petal);line-height:1.1}
+.year-grid>div:nth-child(2n) b{color:var(--leaf-2)}
+.bloom-summary small,.year-grid small{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}
+.bloom-mosaic{columns:2;column-gap:8px}
+.bloom-mosaic button{display:block;width:100%;break-inside:avoid;border:0;background:none;padding:0;margin:0 0 10px;text-align:left}
+.bloom-photo{display:block;aspect-ratio:4/5;border-radius:18px;background-size:cover;background-position:center}
+.bloom-mosaic em{display:block;font-style:normal;font-family:var(--display);font-weight:600;font-size:15px;margin:6px 4px 0}
+.bloom-mosaic small{display:block;font-size:11.5px;color:var(--muted);margin:0 4px}
+.bloom-empty>div{font-size:40px;color:var(--petal)}
+.backup-card{margin:12px 0;padding:18px;border-radius:20px;background:var(--leaf-soft)}
+.backup-card b{display:block;font-size:15px;margin-bottom:4px}
+
+/* ======================================================================
+   PLANT DOCTOR
+   ====================================================================== */
+.doctor-plant-list{max-height:56vh;overflow:auto}
+.doctor-photo-hero.compact{min-height:290px;margin-bottom:14px}
+.doctor-photo-badge{position:absolute;top:14px;right:14px;padding:6px 12px;border-radius:999px;background:var(--alert);color:#fff;font-size:12px;font-weight:800}
+.doctor-result-card{border-radius:var(--r-lg);padding:20px;margin-bottom:14px;background:var(--warm-bg)}
+.doctor-result-card .eyebrow{color:#C26510}
+.doctor-result-card.doctor-healthy{background:var(--leaf-soft)}
+.doctor-result-card.doctor-healthy .eyebrow{color:var(--leaf-2)}
+.doctor-result-card h2{font-size:23px;margin:4px 0 8px}
+.doctor-result-card .sub{color:var(--ink-2)}
+.doctor-caution{margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.75);font-size:12.5px;line-height:1.5;color:var(--ink-2)}
+.doctor-check-list{display:grid;gap:10px;margin-top:10px}
+.doctor-check-list>div{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start}
+.doctor-check-list span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--leaf);color:#fff;font-size:12px}
+.doctor-check-list p{margin:2px 0 0;font-size:14px;line-height:1.5}
+.doctor-context-grid{display:grid;gap:8px;margin-top:10px}
+.doctor-context-grid>div{padding:12px 14px;border-radius:14px;background:var(--bg)}
+.doctor-context-grid b{font-size:12.5px;color:var(--leaf-2)}
+.doctor-context-grid p{margin:4px 0 0;font-size:13px;color:var(--ink-2);line-height:1.5}
+.doctor-source-note{text-align:center;margin:16px 6px 0;line-height:1.55}
+
+/* ======================================================================
+   SHEETS, TOAST, MOTION
+   ====================================================================== */
+.modal{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center;background:rgba(6,24,16,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:fadeIn .2s ease}
+.sheet{width:min(760px,100%);max-height:88vh;overflow-y:auto;overscroll-behavior:contain;background:var(--card);border-radius:28px 28px 0 0;padding:12px 20px calc(24px + var(--safe-b));box-shadow:0 -20px 60px rgba(0,0,0,.18);animation:sheetUp .32s cubic-bezier(.2,.9,.25,1)}
+.sheet:before{content:"";display:block;width:40px;height:5px;border-radius:5px;background:var(--line-2);margin:0 auto 16px}
+.sheet h2{font-size:26px;margin:4px 0 8px}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes sheetUp{from{transform:translateY(40px);opacity:.4}}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 26px + var(--safe-b));z-index:200;display:flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;background:var(--ink);color:#fff;font-size:13.5px;font-weight:700;box-shadow:0 10px 30px rgba(0,0,0,.2);animation:toastIn .25s ease;white-space:nowrap}
+.toast:before{content:"";width:8px;height:8px;border-radius:50%;background:var(--leaf)}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,10px)}}
+
+/* One orchestrated entrance: the home hero */
+.home-hero{animation:heroIn .6s cubic-bezier(.2,.9,.25,1) both}
+.home-hero-leaves svg{animation:leafSway 9s ease-in-out infinite alternate;transform-origin:80% 20%}
+@keyframes heroIn{from{opacity:0;transform:translateY(12px) scale(.985)}}
+@keyframes leafSway{to{transform:rotate(-4deg) translateY(4px)}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation:none!important;transition:none!important}
+}
+@media (max-width:380px){
+  main{padding-left:14px;padding-right:14px}
+  h1{font-size:33px}
+  .home-hero h1{font-size:30px}
+  .quick-grid{gap:8px}
+  .quick-tile small{font-size:10.5px}
+  .care-glance-grid,.dossier-facts{grid-template-columns:1fr}
 }
 @media (min-width:650px){
-  .discovery-masonry{
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    gap:14px;
-  }
+  main{padding-left:26px;padding-right:26px}
+  .masonry{columns:3}
+  .plant-rail{margin:0 -26px;padding-left:26px;padding-right:26px}
 }
 
-/* v1.2 — Seasonal Garden */
-.season-home-card{width:100%;border:1px solid rgba(119,82,89,.10);border-radius:28px;background:linear-gradient(135deg,rgba(222,203,204,.65),rgba(238,230,204,.70));padding:17px 18px;margin:6px 0 14px;display:flex;gap:14px;align-items:center;text-align:left;color:var(--ink);box-shadow:0 14px 30px rgba(73,59,48,.07)}
-.season-home-card>span:nth-child(2){flex:1}.season-home-card small{display:block;font-size:9px;letter-spacing:.14em;font-weight:800;color:#7e646a}.season-home-card strong{display:block;font-family:var(--serif);font-size:21px;margin:3px 0}.season-home-card em{font-style:normal;font-size:11px;color:var(--muted);line-height:1.4;display:block}.season-home-card>b{font-size:20px;color:var(--green)}.season-mark{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.48);font-size:24px;color:#8a6870}
-.season-sheet h2{font-size:31px;margin:5px 0 8px}.season-scroll{display:grid;grid-auto-flow:column;grid-auto-columns:68%;gap:10px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity}.season-plant-card{border:1px solid rgba(62,82,64,.08);border-radius:22px;overflow:hidden;background:rgba(255,255,255,.62);padding:0;text-align:left;color:var(--ink);scroll-snap-align:start}.season-plant-photo{width:100%;aspect-ratio:16/10;background:#ddd center/cover no-repeat}.season-plant-card>div:last-child{padding:12px}.season-plant-card span{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--green);font-weight:800}.season-plant-card h3{font-family:var(--serif);font-size:19px;margin:4px 0}.season-plant-card small{font-size:10px;color:var(--muted)}
-.season-care-list{display:grid;gap:8px}.season-care-list>button{display:flex;gap:10px;align-items:flex-start;border:1px solid rgba(61,81,62,.08);background:rgba(255,255,255,.54);border-radius:18px;padding:11px;text-align:left;color:var(--ink)}.season-care-list>button>span{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:rgba(61,92,68,.08);color:var(--green);flex:none}.season-care-list>button>div{flex:1}.season-care-list b,.season-care-list small{display:block}.season-care-list small{font-size:10px;color:var(--muted);line-height:1.35;margin-top:2px}.season-care-list strong{font-size:18px;color:var(--green)}
-.bloom-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}.bloom-summary span{padding:12px 8px;border-radius:17px;background:rgba(255,255,255,.55);text-align:center}.bloom-summary b,.bloom-summary small{display:block}.bloom-summary b{font-family:var(--serif);font-size:23px}.bloom-summary small{font-size:9px;color:var(--muted);margin-top:3px}
-.bloom-mosaic{columns:2;column-gap:8px}.bloom-mosaic button{width:100%;display:block;break-inside:avoid;border:0;background:transparent;padding:0;margin:0 0 8px;text-align:left;color:var(--ink)}.bloom-photo{display:block;width:100%;aspect-ratio:4/5;border-radius:18px;background:#ddd center/cover no-repeat;box-shadow:0 8px 18px rgba(60,52,45,.08)}.bloom-mosaic em,.bloom-mosaic small{display:block}.bloom-mosaic em{font-family:var(--serif);font-style:normal;font-size:14px;margin:5px 4px 0}.bloom-mosaic small{font-size:9px;color:var(--muted);margin:1px 4px 0}.bloom-empty{text-align:center;padding:34px 20px}.bloom-empty>div{font-size:50px;color:var(--rose)}
-.year-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-top:16px}.year-grid>div{padding:16px;border-radius:19px;background:linear-gradient(145deg,rgba(255,255,255,.60),rgba(239,232,216,.68));text-align:center}.year-grid b,.year-grid small{display:block}.year-grid b{font-family:var(--serif);font-size:29px}.year-grid small{font-size:10px;color:var(--muted);margin-top:3px;line-height:1.25}
-
-
-/* v1.2.1 — hard Safari fix for Discover controls
-   Avoids the WebKit compositing path entirely: no absolute-positioned
-   glass controls and no transform animation on the Discover grid. */
-.discovery-masonry{
-  animation:none !important;
-  transform:none !important;
-}
-.discovery-masonry .discovery-pin{
-  position:relative;
-  isolation:isolate;
-  overflow:hidden;
-  transform:none !important;
-  animation:none !important;
-}
-.discovery-media{
-  display:grid;
-  grid-template-columns:1fr;
-  grid-template-rows:1fr;
-  position:relative;
-  overflow:hidden;
-}
-.discovery-media > .plant-art,
-.discovery-media > .discovery-controls{
-  grid-column:1;
-  grid-row:1;
-}
-.discovery-media > .plant-art{
-  z-index:1;
-}
-.discovery-controls{
-  z-index:4;
-  align-self:start;
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  padding:10px;
-  pointer-events:none;
-}
-.discovery-controls button{
-  pointer-events:auto;
-  position:static !important;
-  top:auto !important;
-  right:auto !important;
-  left:auto !important;
-  margin:0 !important;
-  flex:none;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
-  background:rgba(255,251,246,.96) !important;
-  border:1px solid rgba(93,79,72,.09);
-  box-shadow:0 5px 14px rgba(44,42,35,.12);
-}
-.discovery-controls .wishlist-heart{
-  width:38px;
-  height:38px;
-  border-radius:50%;
-}
-.discovery-controls .pin-delete{
-  width:34px;
-  height:34px;
-  border-radius:50%;
-}
-
-
-/* v1.2.3 — Plant Doctor Beta */
-.lens-choice-grid{display:grid;gap:16px;margin:10px 0 18px}
-.lens-choice-card{
-  width:100%;border:1px solid rgba(83,92,76,.10);border-radius:28px;padding:20px 18px;
-  display:grid;grid-template-columns:58px 1fr auto;gap:14px;align-items:center;text-align:left;
-  background:linear-gradient(145deg,rgba(255,253,247,.96),rgba(239,236,222,.88));
-  box-shadow:0 14px 34px rgba(62,67,56,.10);color:var(--ink)
-}
-.lens-choice-card.doctor-choice{background:linear-gradient(145deg,rgba(250,244,241,.98),rgba(231,237,222,.92))}
-.lens-choice-card .lens-choice-mark{
-  width:58px;height:58px;border-radius:20px;display:grid;place-items:center;font-size:29px;
-  background:rgba(111,130,102,.11);color:var(--green)
-}
-.lens-choice-card small{display:block;text-transform:uppercase;letter-spacing:.14em;font-size:10px;font-weight:700;color:var(--sage)}
-.lens-choice-card strong{display:block;font-family:"Cormorant Garamond",serif;font-size:27px;line-height:1.05;margin:4px 0 5px}
-.lens-choice-card strong i{font-family:"DM Sans",sans-serif;font-size:10px;font-style:normal;text-transform:uppercase;letter-spacing:.1em;background:rgba(150,109,120,.12);padding:4px 7px;border-radius:999px;color:#8b6570;vertical-align:middle}
-.lens-choice-card em{display:block;font-style:normal;font-size:13px;line-height:1.45;color:var(--muted)}
-.lens-choice-card>b{font-size:22px;font-weight:400;color:var(--sage)}
-.doctor-note{display:flex;gap:13px;align-items:flex-start;padding:16px 17px;border-radius:22px;background:rgba(255,255,255,.46);border:1px solid rgba(255,255,255,.75)}
-.doctor-note span{font-size:24px;color:var(--sage)}.doctor-note p{margin:0;font-size:12px;line-height:1.55;color:var(--muted)}
-.doctor-plant-list{max-height:58vh;overflow:auto}
-.doctor-photo-hero{position:relative;border-radius:30px;overflow:hidden;min-height:390px;background:#d8d6cc;box-shadow:0 16px 40px rgba(61,62,52,.13);margin-bottom:16px}
-.doctor-photo-hero.compact{min-height:310px}
-.doctor-photo-hero>img{width:100%;height:100%;position:absolute;inset:0;object-fit:cover}
-.doctor-photo-badge{position:absolute;right:14px;top:14px;padding:7px 11px;border-radius:999px;background:rgba(255,250,245,.93);font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
-.doctor-result-card{padding:22px;border-radius:28px;background:linear-gradient(145deg,#f7ece7,#edf0e5);border:1px solid rgba(255,255,255,.85);box-shadow:0 14px 34px rgba(74,68,61,.09);margin-bottom:16px}
-.doctor-result-card.doctor-healthy{background:linear-gradient(145deg,#eef3e8,#f9f5ea)}
-.doctor-result-card h2{font-size:29px;margin:7px 0 8px}
-.doctor-caution{margin-top:14px;padding:12px 13px;border-radius:16px;background:rgba(255,255,255,.58);font-size:11px;line-height:1.5;color:var(--muted)}
-.doctor-check-list{display:grid;gap:10px;margin-top:10px}
-.doctor-check-list>div{display:grid;grid-template-columns:28px 1fr;gap:9px;align-items:start}
-.doctor-check-list span{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:rgba(105,129,98,.12);color:var(--green);font-size:12px;font-weight:800}
-.doctor-check-list p{margin:2px 0 0;font-size:13px;line-height:1.5}
-.doctor-context-grid{display:grid;gap:10px;margin-top:10px}
-.doctor-context-grid>div{padding:13px 14px;border-radius:17px;background:rgba(247,244,235,.78)}
-.doctor-context-grid b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--sage)}
-.doctor-context-grid p{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
-.doctor-source-note{margin:16px 5px 0;line-height:1.55;text-align:center}
-
-.coverage-label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;font-size:12px;color:var(--muted)}
-.coverage-label b{color:var(--ink);font-size:13px}
-
-/* v1.2.6 — Profile 2.0: private botanical dossier */
-.profile-back{padding-bottom:8px}
-.profile-dossier-hero{position:relative;min-height:430px;border-radius:34px;overflow:hidden;background:linear-gradient(145deg,#bac9b1,#657860);box-shadow:0 26px 64px rgba(48,58,46,.18);border:1px solid rgba(255,255,255,.5);isolation:isolate}
-.profile-dossier-hero>.plant-art{position:absolute;inset:0}
-.profile-dossier-hero .photo-hero{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
-.profile-dossier-shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(22,34,25,.10) 8%,rgba(26,35,27,.02) 42%,rgba(24,32,25,.86) 100%)}
-.profile-dossier-top{position:absolute;left:18px;right:18px;top:17px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.profile-family,.profile-season-badge{display:inline-flex;align-items:center;min-height:34px;padding:8px 12px;border-radius:999px;background:rgba(26,35,28,.42);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);color:#fff;border:1px solid rgba(255,255,255,.22);font-size:10px;font-weight:800;letter-spacing:.06em}
-.profile-family{text-transform:uppercase}.profile-season-badge{letter-spacing:0;text-transform:none;background:rgba(248,242,221,.90);color:#445746;border-color:rgba(255,255,255,.45)}
-.profile-dossier-copy{position:absolute;left:22px;right:22px;bottom:22px;color:#fff}
-.profile-dossier-copy h1{margin:0 0 4px;color:#fff;font-size:46px;line-height:.96;text-shadow:0 2px 16px rgba(0,0,0,.16)}
-.profile-dossier-copy em{font-family:var(--serif);font-size:18px;color:rgba(255,255,255,.84)}
-.profile-meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.profile-meta-row span{display:inline-flex;align-items:center;padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.20);backdrop-filter:blur(10px);font-size:11px;font-weight:700}
-.profile-tabs{position:sticky;top:8px;z-index:20;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:5px;margin:14px 0 18px;background:rgba(244,239,225,.88);border:1px solid rgba(82,91,70,.08);border-radius:999px;box-shadow:0 12px 28px rgba(64,57,48,.08);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.profile-tab{border:0;background:transparent;border-radius:999px;padding:11px 8px;color:var(--muted);font-weight:800;font-size:12px;display:flex;justify-content:center;align-items:center;gap:6px}.profile-tab span{font-size:15px}.profile-tab.active{background:rgba(255,252,245,.98);color:var(--green);box-shadow:0 5px 14px rgba(66,58,47,.09)}
-.profile-panel{display:none;animation:floraRise .3s ease both}.profile-panel.active{display:block}
-.profile-section-intro{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin:4px 3px 15px}.profile-section-intro h2{margin:4px 0 0;font-size:31px;line-height:1.02}.profile-score{width:68px;height:68px;flex:none;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(145deg,rgba(223,232,209,.96),rgba(244,232,217,.96));border:1px solid rgba(82,101,75,.09);box-shadow:0 10px 25px rgba(62,58,48,.08)}.profile-score b{font-family:var(--serif);font-size:20px;color:var(--green);line-height:1}.profile-score span{font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:4px}.profile-score.botanical{background:linear-gradient(145deg,rgba(219,231,222,.96),rgba(228,223,238,.93))}.profile-score.history{background:linear-gradient(145deg,rgba(238,221,224,.94),rgba(244,236,214,.96))}
-.profile-summary-card{padding:16px 18px;margin-bottom:14px;border-left:3px solid rgba(91,117,88,.35);background:rgba(255,251,244,.48);border-radius:0 20px 20px 0}.profile-summary-card p{margin:0;font-family:var(--serif);font-size:17px;line-height:1.55;color:#495348}
-.premium-season{margin:0 0 14px}.dossier-care-grid{margin-bottom:14px}.flowering-card{margin-top:4px}.profile-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.profile-card-head h2{font-size:25px;margin:4px 0 12px}.profile-card-head>span{font-size:10px;font-weight:800;color:var(--green);background:rgba(78,110,80,.08);padding:7px 9px;border-radius:999px}
-.record-meter{padding:16px 17px;margin-bottom:14px;border-radius:23px;background:rgba(255,251,245,.70);border:1px solid rgba(79,91,70,.07)}.record-meter>div:nth-of-type(odd){display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-top:7px}.record-meter>div:first-child{margin-top:0}.record-meter b{color:var(--ink)}.botanical-coverage>span{background:linear-gradient(90deg,#7f9e89,#938ba8)}
-.dossier-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}.dossier-fact{min-height:105px;padding:15px;border-radius:22px;background:rgba(255,251,245,.76);border:1px solid rgba(73,89,70,.075);box-shadow:0 9px 22px rgba(60,55,47,.045);display:flex;gap:10px;align-items:flex-start}.dossier-fact>span{width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(74,104,79,.08);color:var(--green);font-size:16px}.dossier-fact small,.dossier-fact b,.dossier-fact em{display:block}.dossier-fact small{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--sage);margin:2px 0 5px}.dossier-fact b{font-family:var(--serif);font-size:15px;line-height:1.28;font-weight:600}.dossier-fact em{font-size:9px;line-height:1.35;color:var(--muted);margin-top:5px}.dossier-fact-wide{grid-column:1/-1;min-height:auto}
-.source-dossier{padding:18px;border-radius:25px;background:linear-gradient(145deg,rgba(232,237,219,.67),rgba(243,232,222,.72));border:1px solid rgba(78,93,71,.07);margin-bottom:13px}.source-dossier h3{font-family:var(--serif);font-size:22px;margin:4px 0 11px}.compact-note{padding:15px 17px}.compact-note p{font-size:11px;line-height:1.55}.profile-empty{text-align:center;padding:34px 20px;border-radius:26px;background:rgba(255,251,245,.55);margin-bottom:14px}.profile-empty>span{font-size:31px;color:var(--green)}.profile-empty b{display:block;font-family:var(--serif);font-size:21px;margin:8px 0 5px}.profile-empty p{font-size:11px;color:var(--muted);margin:0}.history-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}.history-actions .mini-action{padding:12px}.history-delete{display:block;margin:16px auto 0}
-@media(max-width:390px){.profile-dossier-hero{min-height:405px}.profile-dossier-copy h1{font-size:40px}.profile-section-intro h2{font-size:28px}.profile-score{width:62px;height:62px}.dossier-facts{gap:8px}.dossier-fact{padding:13px}}
-.profile-dossier-hero>.plant-art,.profile-dossier-hero .photo-hero{z-index:0}
-.profile-dossier-shade{z-index:1}
-.profile-dossier-top,.profile-dossier-copy{z-index:2}
-
-/* v1.2.7 — Profile 2.0 polish pass */
-.profile-panel{padding-bottom:calc(var(--nav-h) + 54px + env(safe-area-inset-bottom));scroll-margin-bottom:calc(var(--nav-h) + 40px)}
-.profile-section-intro{align-items:center;margin-top:1px;margin-bottom:13px}
-.profile-completeness{flex:none;min-width:102px;min-height:58px;padding:9px 12px 9px 9px;border-radius:20px;display:flex;align-items:center;gap:9px;background:rgba(255,250,241,.72);border:1px solid rgba(75,92,70,.08);box-shadow:0 10px 24px rgba(61,56,48,.055)}
-.profile-completeness>span{width:37px;height:37px;border-radius:50%;display:grid;place-items:center;background:rgba(86,112,83,.09);color:var(--green);font-size:17px}
-.profile-completeness div{display:flex;flex-direction:column}.profile-completeness b{font-family:var(--serif);font-size:19px;line-height:1;color:var(--ink);font-weight:650}.profile-completeness small{margin-top:4px;font-size:7px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--sage);white-space:nowrap}
-.profile-completeness.botanical{background:linear-gradient(145deg,rgba(238,243,233,.83),rgba(238,233,243,.72))}.profile-completeness.botanical>span{background:rgba(109,117,104,.09)}
-.profile-completeness.history{background:linear-gradient(145deg,rgba(246,235,228,.80),rgba(240,239,220,.78))}.profile-completeness.history>span{background:rgba(140,107,94,.08)}
-
-.care-glance{margin:0 0 14px;padding:17px;border-radius:27px;background:linear-gradient(145deg,rgba(236,242,226,.86),rgba(250,243,231,.80));border:1px solid rgba(255,255,255,.78);box-shadow:0 13px 32px rgba(65,62,52,.065)}
-.care-glance-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:12px}.care-glance-head span{display:block;font-size:8px;font-weight:900;letter-spacing:.14em;color:var(--sage)}.care-glance-head b{display:block;font-family:var(--serif);font-size:21px;margin-top:3px;font-weight:600}.care-glance-head em{font-size:9px;color:var(--muted);font-style:normal;white-space:nowrap}
-.care-glance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.care-glance-grid>div{min-height:84px;padding:11px 12px;border-radius:19px;background:rgba(255,253,248,.72);border:1px solid rgba(81,96,74,.06);display:grid;grid-template-columns:30px 1fr;grid-template-rows:auto 1fr;column-gap:8px;align-items:start}.care-glance-grid>div>span{grid-row:1/3;width:29px;height:29px;border-radius:50%;display:grid;place-items:center;background:rgba(86,112,83,.08);font-size:14px}.care-glance-grid small{font-size:7px;text-transform:uppercase;letter-spacing:.1em;color:var(--sage);font-weight:850;margin-top:2px}.care-glance-grid b{font-family:var(--serif);font-size:13px;line-height:1.25;font-weight:600;margin-top:4px}
-
-.botany-identity{display:grid;grid-template-columns:55px 1fr;gap:13px;align-items:center;padding:16px 17px;margin:0 0 12px;border-radius:25px;background:linear-gradient(135deg,rgba(222,233,219,.78),rgba(239,232,224,.76));border:1px solid rgba(255,255,255,.7);box-shadow:0 11px 28px rgba(60,58,49,.055)}
-.botany-seal{width:55px;height:55px;border-radius:50%;display:grid;place-items:center;font-size:25px;color:#55705a;background:radial-gradient(circle at 36% 30%,rgba(255,255,255,.9),rgba(219,229,212,.86));border:1px solid rgba(83,107,82,.10);box-shadow:inset 0 0 0 5px rgba(255,255,255,.28)}
-.botany-identity small{font-size:7px;letter-spacing:.13em;color:var(--sage);font-weight:900}.botany-identity h3{margin:3px 0 2px;font-family:var(--serif);font-size:19px;line-height:1.05;font-style:italic;font-weight:600}.botany-identity p{margin:0;font-size:9px;line-height:1.35;color:var(--muted)}
-.knowledge-meter{padding:15px 16px 16px}.knowledge-meter .knowledge-row{display:flex!important;align-items:center!important;justify-content:space-between!important;margin:0 0 7px!important}.knowledge-row>span{display:grid;grid-template-columns:28px auto;grid-template-rows:auto auto;column-gap:8px;align-items:center}.knowledge-row i{grid-row:1/3;width:27px;height:27px;border-radius:50%;display:grid;place-items:center;background:rgba(83,109,82,.08);font-style:normal}.knowledge-row b{font-size:10px!important}.knowledge-row small{font-size:8px;color:var(--muted)}.knowledge-row strong{font-family:var(--serif);font-size:16px;color:var(--green);font-weight:650}
-.knowledge-meter .coverage{height:5px;margin-bottom:13px;background:rgba(82,97,76,.08)}.knowledge-meter .coverage:last-child{margin-bottom:0}
-.distribution-card{margin:0 0 14px;padding:16px 16px 14px;background:linear-gradient(180deg,rgba(252,249,242,.95),rgba(245,241,231,.92));border:1px solid rgba(83,101,79,.08);box-shadow:0 10px 24px rgba(60,57,48,.05)}
-.distribution-map-wrap{margin:10px 0 12px;border-radius:24px;overflow:hidden;background:linear-gradient(180deg,rgba(232,242,238,.9),rgba(248,244,236,.9));border:1px solid rgba(80,103,82,.08)}
-.distribution-map-svg{display:block;width:100%;height:auto}.map-sea{fill:#e6efe7}.map-land{fill:rgba(108,126,107,.28);stroke:rgba(78,99,79,.16);stroke-width:2}.map-land.on{fill:#7c9d75;stroke:#58724f}
-.distribution-caption{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}.distribution-caption b{display:block;font-family:var(--serif);font-size:17px;line-height:1.28;font-weight:600;color:var(--ink)}.distribution-caption small{display:block;margin-top:4px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}
-.distribution-modal-map{margin-top:12px;border-radius:24px;overflow:hidden;border:1px solid rgba(80,103,82,.09);background:linear-gradient(180deg,rgba(232,242,238,.9),rgba(248,244,236,.9))}
-
-.history-lead{display:grid;grid-template-columns:48px 1fr;gap:12px;align-items:start;padding:15px 16px;margin-bottom:12px;border-radius:24px;background:linear-gradient(145deg,rgba(246,236,229,.78),rgba(240,241,224,.78));border:1px solid rgba(255,255,255,.72)}.history-lead>span{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(105,117,89,.09);font-size:20px;color:var(--green)}.history-lead small{display:block;font-size:7px;letter-spacing:.13em;font-weight:900;color:var(--sage);margin:2px 0 3px}.history-lead b{font-family:var(--serif);font-size:18px;font-weight:600}.history-lead p{margin:5px 0 0;font-size:9px;line-height:1.45;color:var(--muted)}
-.plant-life-timeline{position:relative;overflow:hidden}.plant-life-timeline:before{content:"";position:absolute;left:28px;top:29px;bottom:29px;width:1px;background:linear-gradient(180deg,rgba(98,120,91,.12),rgba(98,120,91,.30),rgba(98,120,91,.08))}.plant-life-timeline .timeline-item{position:relative;z-index:1}.plant-life-timeline .timeline-icon{box-shadow:0 0 0 5px rgba(255,251,245,.94);background:#edf0e6;color:var(--green)}
-
-@media(max-width:390px){.profile-completeness{min-width:94px;padding-right:9px}.profile-completeness>span{width:34px;height:34px}.profile-completeness b{font-size:18px}.care-glance{padding:14px}.care-glance-grid>div{padding:10px;min-height:80px}.botany-identity{grid-template-columns:48px 1fr}.botany-seal{width:48px;height:48px}.distribution-caption{flex-direction:column;align-items:flex-start}.profile-panel{padding-bottom:calc(var(--nav-h) + 60px + env(safe-area-inset-bottom))}}
-
-/* v1.2.8 — profile spacing + floating dock correction */
-main:has(.profile-dossier-hero) .profile-back{padding-top:10px;padding-bottom:6px}
-main:has(.profile-dossier-hero) .profile-dossier-hero{min-height:405px}
-main:has(.profile-dossier-hero) .profile-tabs{margin-top:11px;margin-bottom:14px}
-main:has(.profile-dossier-hero) .profile-section-intro{margin-bottom:18px}
-main:has(.profile-dossier-hero) .profile-panel{padding-bottom:calc(var(--nav-h) + 86px + env(safe-area-inset-bottom))}
-#app:has(.profile-dossier-hero) .bottom-nav{height:78px;bottom:7px;padding-top:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom));border-radius:26px}
-#app:has(.profile-dossier-hero) .bottom-nav .nav-item span{font-size:19px}
-#app:has(.profile-dossier-hero) .bottom-nav .nav-item small{font-size:8px}
-#app:has(.profile-dossier-hero) .bottom-nav .lens-nav{width:58px;height:58px;border-radius:21px;margin-top:-27px}
-@media(max-width:430px){
-  main:has(.profile-dossier-hero) .profile-dossier-hero{min-height:392px}
-  main:has(.profile-dossier-hero) .profile-section-intro h2{font-size:29px}
-  main:has(.profile-dossier-hero) .profile-section-intro{gap:10px;margin-bottom:18px}
-  main:has(.profile-dossier-hero) .profile-completeness{min-width:96px;min-height:54px;padding:8px 10px 8px 8px}
-}
-
-/* v1.2.9 — structural profile dock safe-zone fix */
-main:has(.profile-dossier-hero){
-  --profile-dock-h:64px;
-  scroll-padding-bottom:calc(var(--profile-dock-h) + 34px + env(safe-area-inset-bottom));
-}
-#app:has(.profile-dossier-hero){
-  padding-bottom:calc(var(--profile-dock-h) + 26px + env(safe-area-inset-bottom));
-}
-#app:has(.profile-dossier-hero) .bottom-nav{
-  height:var(--profile-dock-h);
-  bottom:3px;
-  padding:6px 15px calc(6px + env(safe-area-inset-bottom));
-  border-radius:23px;
-}
-#app:has(.profile-dossier-hero) .bottom-nav .nav-item{gap:2px}
-#app:has(.profile-dossier-hero) .bottom-nav .nav-item span{font-size:17px}
-#app:has(.profile-dossier-hero) .bottom-nav .nav-item small{font-size:7.5px;line-height:1}
-#app:has(.profile-dossier-hero) .bottom-nav .lens-nav{
-  width:50px;
-  height:50px;
-  border-radius:18px;
-  margin-top:-18px;
-  font-size:24px;
-}
-main:has(.profile-dossier-hero) .profile-panel{
-  padding-bottom:calc(var(--profile-dock-h) + 54px + env(safe-area-inset-bottom));
-  scroll-margin-bottom:calc(var(--profile-dock-h) + 34px + env(safe-area-inset-bottom));
-}
-@media(max-width:390px){
-  #app:has(.profile-dossier-hero) .bottom-nav{
-    width:calc(100% - 10px);
-    bottom:2px;
-    padding-left:12px;
-    padding-right:12px;
-  }
-  main:has(.profile-dossier-hero) .profile-panel{
-    padding-bottom:calc(var(--profile-dock-h) + 58px + env(safe-area-inset-bottom));
-  }
-}
-
-
-/* v1.2.14 — filtered land-only occurrence map */
-#app:has(.profile-dossier-hero){
-  height:auto;
-  min-height:100vh;
-  overflow:visible;
-  padding-bottom:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom));
-}
-main:has(.profile-dossier-hero){
-  height:auto;
-  min-height:0;
-  overflow:visible;
-  padding-bottom:calc(var(--profile-dock-h) + 76px + env(safe-area-inset-bottom));
-  scroll-padding-bottom:calc(var(--profile-dock-h) + 60px + env(safe-area-inset-bottom));
-}
-main:has(.profile-dossier-hero) .profile-panel{
-  padding-bottom:0;
-}
-main:has(.profile-dossier-hero) .profile-dock-reserve{
-  display:block;
-  height:calc(var(--profile-dock-h) + 86px + env(safe-area-inset-bottom));
-  width:100%;
-  pointer-events:none;
-}
-.distribution-live-map{position:relative;min-height:190px;display:grid;place-items:center}
-.distribution-loading{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}
-.distribution-map-svg .occurrence-dot{fill:#35563a;fill-opacity:.92;stroke:#f8f3ea;stroke-opacity:1;stroke-width:1.2;filter:drop-shadow(0 0 1px rgba(34,49,35,.22))}
-.distribution-map-svg .occurrence-dot.cluster{fill:#274a31;fill-opacity:.95}
-.distribution-map-note{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:9px;color:var(--muted)}
-.distribution-map-note b{font-family:var(--sans);font-size:9px;color:var(--green);letter-spacing:.04em}
-.distribution-map-caveat{margin-top:4px;font-size:8px;line-height:1.45;color:var(--sage)}
-@media(max-width:390px){
-  #app:has(.profile-dossier-hero){padding-bottom:calc(var(--profile-dock-h) + 98px + env(safe-area-inset-bottom))}
-  main:has(.profile-dossier-hero) .profile-dock-reserve{height:calc(var(--profile-dock-h) + 92px + env(safe-area-inset-bottom))}
-}
-
-/* v1.2.15 — expanded GBIF occurrence map */
-.distribution-modal-live{margin:14px 0 12px;min-height:260px;border-radius:26px;overflow:hidden;background:#e6efe7;border:1px solid rgba(80,103,82,.10)}
-.distribution-modal-live .distribution-map-svg{width:100%;height:auto;display:block}
-.distribution-modal-live .distribution-map-note{padding:0 4px 8px;margin-top:6px}
-.distribution-modal-live .distribution-map-caveat{padding:0 4px 10px}
-.distribution-modal-copy{margin-top:10px}
-@media(max-width:390px){.distribution-modal-live{min-height:210px}}
-
-/* v1.2.16 — Your plant today */
-.plant-today-card{margin:0 0 14px;padding:18px;border-radius:28px;background:linear-gradient(145deg,rgba(236,243,231,.95),rgba(250,244,235,.96));border:1px solid rgba(255,255,255,.78);box-shadow:0 14px 32px rgba(60,57,48,.06)}
-.plant-today-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.plant-today-head h2{margin:4px 0 4px;font-family:var(--serif);font-size:29px;line-height:1;font-weight:600}.plant-today-head p{margin:0;font-size:9px;line-height:1.4;color:var(--muted)}
-.plant-today-mark{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(80,108,79,.10);color:var(--green);font-family:var(--serif);font-size:22px;font-weight:700;box-shadow:inset 0 0 0 5px rgba(255,255,255,.28)}
-.plant-today-status{margin:15px 0 10px;padding-top:12px;border-top:1px solid rgba(79,101,77,.10);font-family:var(--serif);font-size:18px;font-weight:600;color:var(--green)}
-.plant-today-list{display:grid;gap:8px}.plant-today-item{display:grid;grid-template-columns:37px 1fr;gap:11px;align-items:flex-start;padding:11px 12px;border-radius:19px;background:rgba(255,252,246,.72);border:1px solid rgba(78,99,76,.06)}.plant-today-item>span{width:35px;height:35px;border-radius:50%;display:grid;place-items:center;background:rgba(82,106,80,.08);font-size:16px}.plant-today-item b{display:block;font-size:11px;color:var(--ink);margin:1px 0 3px}.plant-today-item p{margin:0;font-size:9px;line-height:1.45;color:var(--muted)}
-.plant-today-item.attention{background:rgba(249,239,228,.80)}.plant-today-item.attention>span{background:rgba(165,120,82,.10);color:#8c684f}.plant-today-item.positive{background:rgba(237,244,233,.80)}.plant-today-item.positive>span{background:rgba(74,112,77,.10);color:var(--green)}
-.plant-today-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.plant-today-actions .mini-action{flex:1;min-width:130px;text-align:center}
-@media(max-width:390px){.plant-today-card{padding:16px}.plant-today-head h2{font-size:27px}.plant-today-actions{flex-direction:column}.plant-today-actions .mini-action{width:100%}}
-
-/* v1.2.17 — Pruning Assistant */
-.pruning-assistant{margin:0 0 14px;padding:17px;border-radius:26px;background:linear-gradient(145deg,rgba(249,246,239,.96),rgba(238,244,235,.94));border:1px solid rgba(255,255,255,.8);box-shadow:0 12px 28px rgba(60,57,48,.055)}
-.pruning-assistant-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.pruning-assistant-head h2{margin:4px 0 0;font-family:var(--serif);font-size:26px;line-height:1.05;font-weight:600}.pruning-assistant-head>span{width:42px;height:42px;flex:none;border-radius:50%;display:grid;place-items:center;background:rgba(77,105,78,.09);color:var(--green);font-size:18px;font-weight:800}
-.pruning-verdict{margin:14px 0 7px;font-family:var(--serif);font-size:19px;font-weight:650;color:var(--green)}.pruning-assistant>p{margin:0;font-size:10px;line-height:1.5;color:var(--muted)}.pruning-actions{margin-top:12px}
-.pruning-assistant.attention{background:linear-gradient(145deg,rgba(249,240,231,.96),rgba(248,245,237,.95))}.pruning-assistant.attention .pruning-assistant-head>span{background:rgba(159,114,76,.10);color:#8c684f}.pruning-assistant.attention .pruning-verdict{color:#7d5b43}
-.pruning-assistant.positive{background:linear-gradient(145deg,rgba(235,244,232,.97),rgba(247,244,236,.95))}.pruning-assistant.muted{background:rgba(248,246,240,.86)}.pruning-assistant.muted .pruning-assistant-head>span{color:var(--sage)}
-@media(max-width:390px){.pruning-assistant{padding:15px}.pruning-assistant-head h2{font-size:24px}.pruning-assistant-head>span{width:39px;height:39px}}
+/* icon wrappers inserted by icons.js */
+.fl-ico-wrap{display:inline-flex;align-items:center}
