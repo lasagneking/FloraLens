@@ -1304,6 +1304,7 @@ function careGapsFor(p){
   return {missing,known};
 }
 async function fillGapsWithGemini(p,{force=false}={}){
+  fillGapsWithGemini.lastCalled=false;
   if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine) return false;
   const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
   const g=cache.gemini;
@@ -1313,6 +1314,7 @@ async function fillGapsWithGemini(p,{force=false}={}){
   const {missing,known}=careGapsFor(p);
   if(!missing.length) return false;
   geminiFillInFlight.add(p.speciesKey);
+  fillGapsWithGemini.lastCalled=true;
   try{
     const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/fill`,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({scientific:p.scientific,common:p.common,family:p.family||cache.family||"",missing,known})});
@@ -1330,6 +1332,7 @@ async function fillGapsWithGemini(p,{force=false}={}){
     }
     state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{fields,asked:missing,fetchedAt:new Date().toISOString(),model:data.model||"gemini"}};
     saveState();
+    syncPlantsFromSpecies(p.speciesKey);
     return Object.keys(fields).length>0;
   }catch(err){
     console.warn("Gemini gap fill",err);
@@ -3426,12 +3429,65 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.6.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.7 · made for our garden</div>`);
 });
 
 renderHome();
 backgroundEnrichTryV7SavedRecords();
 
+
+// Work through every garden plant and discovery in the background, gently,
+// so Home, Garden, Care and every profile have the filled-in details without
+// each profile needing to be opened first. Each species is only ever asked once.
+let gardenFillRunning=false;
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function fillGardenGaps(){
+  if(gardenFillRunning||!API_PROXY_URL||!navigator.onLine) return;
+  gardenFillRunning=true;
+  let plantsFilled=0, details=0;
+  try{
+    const seen=new Set();
+    const items=[...state.plants,...state.discoveries].filter(p=>p?.speciesKey && !seen.has(p.speciesKey) && seen.add(p.speciesKey));
+    for(const p of items){
+      if(!navigator.onLine) break;
+      const g=state.speciesCache[p.speciesKey]?.gemini;
+      if(g?.fetchedAt) continue;                                  // already done
+      if(!state.speciesCache[p.speciesKey]){
+        state.speciesCache[p.speciesKey]={scientific:p.scientific,common:p.common,family:p.family||"",source:"FloraLens",fetchedAt:new Date().toISOString(),enrichment:null};
+      }
+      const cache=state.speciesCache[p.speciesKey];
+      let called=false;
+      if(!cache.enrichment && !cache.enrichmentError){            // real sources first
+        await enrichSpecies(p.scientific,p.speciesKey).catch(()=>null);
+        called=true;
+      }
+      const filled=await fillGapsWithGemini(p);
+      called=called||fillGapsWithGemini.lastCalled;
+      if(filled){ plantsFilled++; details+=Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).length; }
+      if(called) await pause(2500);                               // go easy on the free tier
+    }
+  }finally{ gardenFillRunning=false; }
+  if(plantsFilled){
+    refreshCurrentView();
+    toast(`Gemini filled ${details} missing detail${details===1?"":"s"} across ${plantsFilled} plant${plantsFilled===1?"":"s"}`);
+  }
+}
+function refreshCurrentView(){
+  try{
+    if(currentRoute==="home") renderHome();
+    else if(currentRoute==="garden") renderGarden();
+    else if(currentRoute==="care") renderCareCalendar();
+    else if(currentRoute==="discover") renderDiscover();
+    else if(currentRoute==="profile"){
+      const id=view.dataset.profileId; if(!id) return;
+      const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab, y=window.scrollY;
+      renderProfile(id).then(()=>{ if(tab) setProfileTab(tab); window.scrollTo(0,y); });
+    }
+  }catch(e){ console.warn("Refresh after gap fill",e); }
+}
+window.addEventListener("load",()=>setTimeout(fillGardenGaps,4000));
+window.addEventListener("online",()=>setTimeout(fillGardenGaps,3000));
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") setTimeout(fillGardenGaps,3000); });
 
 /* ===================== Home-screen app: offline + updates ===================== */
 function updateOnlineState(){
