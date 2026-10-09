@@ -1920,6 +1920,158 @@ function renderHome(){
   hydratePhotos();
 }
 
+/* ===================== "What should I plant here?" (Garden, via Gemini) ===================== */
+const PLAN_SETTING=["In the ground","In pots","Indoors"];
+const PLAN_SUN=["Full sun","Part shade","Shade","Not sure"];
+const PLAN_SOIL=["Clay","Loam","Sandy","Chalky","Not sure"];
+const PLAN_MOIST=["Dry","Average","Damp"];
+const PLAN_WISHES={
+  "Colours":["Pink","Purple","Blue","White","Yellow","Red & orange"],
+  "Height":["Low (under 50 cm)","Medium","Tall (over 1 m)","Climber"],
+  "Must-haves":["Long flowering","Bee & butterfly friendly","Scented","Evergreen","Low maintenance","Safe for pets","Good in pots"],
+  "When it looks best":["Spring","Summer","Autumn","Winter interest"]
+};
+let planDraft=null;        // {area, setting, sun, soil, moisture, wishes:Set, note, photo:{file,dataUrl}}
+let planResult=null;       // {result, photos, draft}
+let planBusy=false;
+
+function plannerBanner(){
+  return `<button class="planner-banner" onclick="openPlanner()">
+    <span class="planner-mark">✦</span><span><strong>What should I plant here?</strong><small>Ideas for any spot in your garden, chosen for its light, soil and what already grows there.</small></span><b>→</b></button>`;
+}
+function openPlanner(area){
+  if(area) return startPlanner(area);
+  const areas=state.areas.filter(a=>a!=="Unplaced");
+  if(!areas.length){ toast("Add a garden area first"); return; }
+  modal(`<div class="eyebrow">What should I plant here?</div><h2>Which spot?</h2><p class="sub">Choose the area you'd like ideas for.</p>
+    <div class="area-grid">${areas.map(a=>`<button class="area-choice" onclick="closeModal();startPlanner(decodeURIComponent('${jsArg(a)}'))">${esc(a)}</button>`).join("")}</div>`);
+}
+function guessSetting(area){
+  const m=areaMood(area).cls;
+  return m==="indoor"?"Indoors":m==="patio"?"In pots":"In the ground";
+}
+function startPlanner(area){
+  const saved=(state.areaInfo||{})[area]||{};
+  planDraft={area,setting:saved.setting||guessSetting(area),sun:saved.sun||"Not sure",soil:saved.soil||"Not sure",moisture:saved.moisture||"Average",
+    wishes:new Set(saved.lastWishes||[]),note:"",photo:null};
+  renderPlannerForm();
+}
+function planPick(field,val){ if(!planDraft) return; planDraft[field]=val; renderPlannerForm(true); }
+function planWish(val){ if(!planDraft) return; planDraft.wishes.has(val)?planDraft.wishes.delete(val):planDraft.wishes.add(val); renderPlannerForm(true); }
+function planPhoto(){
+  let inp=document.getElementById("planPhotoInput");
+  if(!inp){ inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.setAttribute("capture","environment"); inp.hidden=true; inp.id="planPhotoInput"; document.body.appendChild(inp); }
+  inp.onchange=async e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f&&planDraft){ planDraft.photo={file:f,dataUrl:await fileToDataUrl(f)}; renderPlannerForm(true); } };
+  inp.click();
+}
+function renderPlannerForm(keepScroll=false){
+  const d=planDraft; if(!d) return;
+  const y=keepScroll?appScrollTop():0;
+  currentRoute="garden";
+  const inArea=state.plants.filter(p=>p.area===d.area);
+  const seg=(field,opts)=>`<div class="plan-seg">${opts.map(o=>`<button class="${d[field]===o?"on":""}" onclick="planPick('${field}',decodeURIComponent('${jsArg(o)}'))">${esc(o)}</button>`).join("")}</div>`;
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="planDraft=null;setRoute('garden')">← My Garden</button></section>
+    <section class="planner-hero"><span>${areaMood(d.area).icon}</span><div><div class="eyebrow">What should I plant here?</div><h1>${esc(d.area)}</h1>
+      <p>${inArea.length?`Already growing: ${inArea.slice(0,4).map(p=>esc(p.common)).join(", ")}${inArea.length>4?` and ${inArea.length-4} more`:""}`:"Nothing planted here yet"}</p></div></section>
+    <section class="plan-block"><h3>About this spot</h3><p class="small">FloraLens remembers this for next time.</p>
+      <label class="plan-label">Where</label>${seg("setting",PLAN_SETTING)}
+      <label class="plan-label">Light</label>${seg("sun",PLAN_SUN)}
+      ${d.setting==="Indoors"?"":`<label class="plan-label">Soil</label>${seg("soil",PLAN_SOIL)}<label class="plan-label">Moisture</label>${seg("moisture",PLAN_MOIST)}`}
+      <label class="plan-label">Photo of the spot <span>(optional)</span></label>
+      ${d.photo?`<div class="plan-photo"><img src="${d.photo.dataUrl}" alt="The spot"><button class="capture-remove" aria-label="Remove photo" onclick="planDraft.photo=null;renderPlannerForm(true)">×</button></div>`
+        :`<button class="plan-photo-add" onclick="planPhoto()">📷 Add a photo, so Gemini can see the space</button>`}
+    </section>
+    <section class="plan-block"><h3>What would you love?</h3><p class="small">Pick as many as you like, or none.</p>
+      ${Object.entries(PLAN_WISHES).map(([group,opts])=>`<label class="plan-label">${group}</label><div class="plan-chips">${opts.map(o=>`<button class="${d.wishes.has(o)?"on":""}" onclick="planWish(decodeURIComponent('${jsArg(o)}'))">${esc(o)}</button>`).join("")}</div>`).join("")}
+      <label class="plan-label" for="planNote">Anything else?</label>
+      <textarea id="planNote" class="journal-field journal-textarea" maxlength="300" placeholder="e.g. something to hide the fence, cottage-garden feel" oninput="planDraft.note=this.value">${esc(d.note)}</textarea>
+    </section>
+    <button class="btn primary" style="width:100%" onclick="runPlanner()">✦ Suggest plants</button>`;
+  if(keepScroll) appScrollTo(y); else appScrollTo(0);
+}
+async function runPlanner(exclude=[]){
+  const d=planDraft; if(!d||planBusy) return;
+  if(!API_PROXY_URL){ toast("Plant ideas need the FloraLens Worker"); return; }
+  planBusy=true;
+  state.areaInfo=state.areaInfo||{};
+  state.areaInfo[d.area]={setting:d.setting,sun:d.sun,soil:d.soil,moisture:d.moisture,lastWishes:[...d.wishes]};
+  saveState();
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="renderPlannerForm()">← ${esc(d.area)}</button></section>
+    <div class="lookup-loading planner-loading"><div class="flower-loader">✦</div><h2>Finding plants for ${esc(d.area)}</h2><p class="sub">Matching the light, soil and what already grows there. This takes a few seconds.</p></div>`;
+  appScrollTo(0);
+  try{
+    const body={
+      area:d.area,setting:d.setting,sun:d.sun,soil:d.setting==="Indoors"?"":d.soil,moisture:d.setting==="Indoors"?"":d.moisture,
+      wishes:[...d.wishes],note:d.note.trim(),
+      inArea:state.plants.filter(p=>p.area===d.area).map(p=>`${p.common} (${p.scientific})`),
+      garden:state.plants.filter(p=>p.area!==d.area).map(p=>p.common),
+      exclude,today:new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}),
+      image:d.photo?await doctorImagePayload(d.photo.file):null
+    };
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/suggest`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>null);
+    if(!data) throw new Error(res.status===404?"The Worker doesn't have a /suggest route yet. Upload the new worker.js.":`Suggestions failed (${res.status}).`);
+    if(!res.ok||data.error){ if(res.status===429||res.status===402) noteGeminiPause(data); throw new Error(data.error||`Suggestions failed (${res.status}).`); }
+    clearGeminiPause();
+    planResult={...data,excluded:exclude};
+    planBusy=false;
+    renderPlannerResult();
+  }catch(err){
+    planBusy=false;
+    view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="renderPlannerForm()">← ${esc(d.area)}</button></section>
+      <section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Couldn't get ideas</span></div><h2>Something went wrong</h2><p>${esc(friendlyNetError(err,"Plant ideas"))}</p></section>
+      <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="runPlanner()">↻ Try again</button><button class="btn secondary" onclick="renderPlannerForm()">Back</button></div>`;
+  }
+}
+function planOnWishlist(s){ const k=slug(s.scientific); return state.discoveries.some(d=>d.speciesKey===k)||state.plants.some(p=>p.speciesKey===k); }
+function renderPlannerResult(){
+  const d=planDraft, R=planResult; if(!d||!R) return renderGarden();
+  const list=R.result?.suggestions||[];
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="renderPlannerForm()">← Change what I asked for</button></section>
+    <section class="page-head" style="padding-top:0"><div class="eyebrow">Ideas for ${esc(d.area)}</div><h1>${list.length} plants that would suit</h1>
+      <p class="sub">${esc([d.setting,d.sun!=="Not sure"?d.sun.toLowerCase():"",d.setting!=="Indoors"&&d.soil!=="Not sure"?d.soil.toLowerCase()+" soil":""].filter(Boolean).join(" · "))}${d.wishes.size?` · ${esc([...d.wishes].join(", ").toLowerCase())}`:""}</p></section>
+    ${d.photo&&R.result?.read_of_spot?`<div class="ai-note planner-read"><span>📷</span><p><i>From your photo:</i> ${esc(R.result.read_of_spot)}</p></div>`:""}
+    <section class="plan-results">${list.map((s,i)=>{
+      const ph=R.photos?.[i]; const on=planOnWishlist(s); const months=(s.flowering||[]).map(Number);
+      return `<article class="plan-card">
+        <div class="plan-card-photo">${ph?.url?`<img src="${esc(ph.url)}" data-fallback="${esc(ph.fallback||"")}" alt="${esc(s.common)}" loading="lazy" onerror="lookupImgFallback(this)">`:`<div class="plant-art"></div>`}
+          <span class="plan-care ${s.care==="Easy"?"easy":s.care==="Needs care"?"hard":""}">${esc(s.care||"")}</span>${s.pet_safe?`<span class="plan-pet">Pet safe</span>`:""}</div>
+        <div class="plan-card-body">
+          <h3>${esc(s.common)}</h3><em>${esc(s.scientific)}</em>
+          <p>${esc(s.why)}</p>
+          <div class="plan-facts"><span>↕ ${esc(s.height||"")}</span>${s.plant_when?`<span>🌱 ${esc(s.plant_when)}</span>`:""}</div>
+          ${months.length?`<div class="months plan-months">${LOOKUP_MONTHS.map((m,mi)=>`<div class="month ${months.includes(mi+1)?"on":""}">${m}</div>`).join("")}</div>`:""}
+          <div class="plan-actions">
+            <button class="btn ${on?"secondary":"primary"}" ${on?"disabled":""} onclick="planToWishlist(${i},this)">${on?"✓ On your list":"♡ Wishlist"}</button>
+            <button class="btn outline" onclick="lookupFrom='planner';lookupPlant(decodeURIComponent('${jsArg(s.scientific)}'))">Full details</button>
+          </div>
+          ${ph?.credit?`<small class="plan-credit">Photo: ${esc(ph.credit)}</small>`:""}
+        </div></article>`;}).join("")}</section>
+    ${R.result?.tip?`<div class="ai-tip"><span>🌱</span><div><small>Preparing the spot</small><p>${esc(R.result.tip)}</p></div></div>`:""}
+    <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="runPlanner(${jsArgList([...(R.excluded||[]),...list.map(s=>s.scientific)])})">↻ Different ideas</button><button class="btn secondary" onclick="planDraft=null;setRoute('garden')">Done</button></div>
+    <p class="ai-foot">Ideas from Google Gemini, chosen for this spot. Photos are reference photos from iNaturalist or Wikipedia.</p>`;
+  appScrollTo(0);
+}
+function jsArgList(arr){ return `JSON.parse(decodeURIComponent('${jsArg(JSON.stringify(arr))}'))`; }
+async function planToWishlist(i,btn){
+  const d=planDraft, s=planResult?.result?.suggestions?.[i], ph=planResult?.photos?.[i];
+  if(!s||planOnWishlist(s)) return;
+  if(btn){ btn.disabled=true; btn.textContent="Saving…"; }
+  const id="discovery-"+Date.now(), photoKey=`${id}-hero`, speciesKey=slug(s.scientific);
+  const stored=ph?await storeReferencePhoto(ph,photoKey):false;
+  if(!state.speciesCache[speciesKey]) state.speciesCache[speciesKey]={scientific:s.scientific,common:s.common,family:"",source:"Garden planner",fetchedAt:new Date().toISOString(),enrichment:null};
+  state.discoveries.unshift({
+    id,speciesKey,photoKey:stored?photoKey:"",photoUrl:!stored&&ph?.url?ph.url:null,
+    common:s.common||s.scientific,scientific:s.scientific,family:"",score:null,spotted:new Date().toISOString(),wishlist:true,
+    note:`Idea for ${d.area}: ${s.why||""}`.trim(),source:"lookup",species:s.species||"",plannedArea:d.area,
+    stockPhoto:!!(stored||ph?.url),photoCredit:ph?(ph.credit||ph.source):null
+  });
+  saveState();
+  if(btn){ btn.textContent="✓ On your list"; btn.className="btn secondary"; }
+  toast(`${s.common} added to your wishlist`);
+  setTimeout(fillGardenGaps,1500);   // real sources + Gemini gap-fill for its care details
+}
+
 function renderGarden(){
   const isMap=state.gardenView==="map";
   view.innerHTML=`<section class="page-head"><div class="eyebrow">My collection</div><h1>My Garden</h1><p class="sub">${state.plants.length} plants across ${state.areas.filter(x=>x!=="Unplaced").length} named spaces.</p></section>
@@ -1927,6 +2079,7 @@ function renderGarden(){
       <button class="${!isMap?"active":""}" onclick="setGardenView('gallery')">▦ Gallery</button>
       <button class="${isMap?"active":""}" onclick="setGardenView('map')">⌂ Garden Map</button>
     </div>
+    ${plannerBanner()}
     ${isMap?gardenMapMarkup():gardenGalleryMarkup()}`;
   hydratePhotos();
 }
@@ -1983,7 +2136,8 @@ function openAreaMap(area){
   const mood=areaMood(area);
   modal(`<div class="area-detail-head"><span>${mood.icon}</span><div><div class="eyebrow">${esc(mood.note)}</div><h2>${esc(area)}</h2><p class="sub">${plants.length} ${plants.length===1?"plant":"plants"} here</p></div></div>
     ${plants.length?`<div class="area-plant-list">${plants.map(p=>`<button onclick="closeModal();setRoute('profile',{id:'${p.id}'})"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small></span><b>→</b></button>`).join("")}</div>`:`<div class="empty-card" style="text-align:center"><p class="sub">There aren't any plants in this area yet.</p></div>`}
-    <button class="btn secondary" style="width:100%;margin-top:12px" onclick="closeModal();startCamera('identify')">⌾ Identify a plant</button>`);
+    ${area!=="Unplaced"?`<button class="btn primary" style="width:100%;margin-top:12px" onclick="closeModal();openPlanner(decodeURIComponent('${jsArg(area)}'))">✦ What should I plant here?</button>`:""}
+    <button class="btn secondary" style="width:100%;margin-top:10px" onclick="closeModal();startCamera('identify')">⌾ Identify a plant</button>`);
   hydratePhotos(document);
 }
 function addAreaFromMap(){
@@ -2001,6 +2155,7 @@ function areaMenu(area){
   modal(`<div class="eyebrow">Garden area</div><h2>${esc(area)}</h2>
     <button class="destination-choice" onclick="renameAreaPrompt(decodeURIComponent('${jsArg(area)}'))"><span>✎</span><div><b>Rename area</b><small>Update this name everywhere in My Garden.</small></div></button>
     ${area!=="Unplaced"?`<button class="destination-choice" onclick="closeModal();startCamera('identify')"><span>⌾</span><div><b>Add another plant</b><small>Identify something and save it to this space.</small></div></button>`:""}
+    ${area!=="Unplaced"?`<button class="destination-choice" onclick="closeModal();openPlanner(decodeURIComponent('${jsArg(area)}'))"><span>✦</span><div><b>What should I plant here?</b><small>Ideas that suit this spot's light, soil and neighbours.</small></div></button>`:""}
     ${area!=="Unplaced"?`<button class="link-btn discovery-delete-link" style="width:100%" onclick="deleteAreaPrompt(decodeURIComponent('${jsArg(area)}'))">Remove area${plants.length?` (${plants.length} plants move to Unplaced)`:""}</button>`:""}`);
 }
 function renameAreaPrompt(area){
@@ -2012,6 +2167,8 @@ function saveAreaRename(oldName){
   if(state.areas.some(a=>a!==oldName&&a.toLowerCase()===name.toLowerCase())){toast("That area already exists");return}
   state.areas=state.areas.map(a=>a===oldName?name:a);
   state.plants.forEach(p=>{if(p.area===oldName)p.area=name});
+  if(state.areaInfo?.[oldName]){ state.areaInfo[name]=state.areaInfo[oldName]; delete state.areaInfo[oldName]; }
+  state.discoveries.forEach(d=>{ if(d.plannedArea===oldName) d.plannedArea=name; });
   saveState();closeModal();toast("Area renamed");renderGarden();
 }
 function deleteAreaPrompt(area){
@@ -2355,7 +2512,7 @@ async function deleteDiscovery(id){
 function addDiscoveryToGarden(id){
   const d=state.discoveries.find(x=>x.id===id);
   if(!d) return;
-  chosenArea="Unplaced";
+  chosenArea=d.plannedArea&&state.areas.includes(d.plannedArea)?d.plannedArea:"Unplaced";
   modal(`<div class="eyebrow">Bring it home</div><h2>Add ${esc(d.common)} to My Garden?</h2>
     <p class="sub">Choose where it lives. The original discovery can stay in Discover as part of the story.</p>
     <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a===chosenArea?"active":""}" onclick="selectArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
@@ -3114,8 +3271,10 @@ let lastLookup=null;      // {query, result, photo, model}
 let lookupBusy=false;
 const LOOKUP_MONTHS=["J","F","M","A","M","J","J","A","S","O","N","D"];
 
+let lookupFrom=null;
+function lookupBack(){ if(lookupFrom==="planner"&&planResult){ lookupFrom=null; renderPlannerResult(); } else { lookupFrom=null; setRoute("discover"); } }
 function lookupCard(){
-  return `<form class="lookup-card" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
+  return `<form class="lookup-card" onsubmit="event.preventDefault();lookupFrom=null;lookupPlant(this.elements.q.value)">
     <div class="lookup-head"><span>⌕</span><div><b>Look up a plant</b><small>Type a name from a label, a magazine or a friend's tip</small></div></div>
     <div class="lookup-row"><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="e.g. Salvia Hot Lips"><button aria-label="Look up">→</button></div>
   </form>`;
@@ -3126,7 +3285,7 @@ async function lookupPlant(q){
   if(!API_PROXY_URL){ toast("Plant lookup needs the FloraLens Worker"); return; }
   lookupBusy=true;
   currentRoute="discover";
-  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="lookupBack()">← ${lookupFrom==="planner"?"Plant ideas":"Discover"}</button></section>
     <div class="lookup-loading"><div class="flower-loader">⌕</div><h2>Looking up “${esc(q)}”</h2><p class="sub">Gemini is finding the plant and its details.</p></div>`;
   appScrollTo(0);
   try{
@@ -3143,7 +3302,7 @@ async function lookupPlant(q){
     renderLookupResult();
   }catch(err){
     lookupBusy=false;
-    view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
+    view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="lookupBack()">← ${lookupFrom==="planner"?"Plant ideas":"Discover"}</button></section>
       <section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Couldn't look it up</span></div><h2>Something went wrong</h2><p>${esc(friendlyNetError(err,"Plant lookup"))}</p></section>
       <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="lookupPlant(decodeURIComponent('${jsArg(q)}'))">↻ Try again</button><button class="btn secondary" onclick="setRoute('discover')">Back</button></div>`;
   }
@@ -3155,7 +3314,7 @@ function lookupAltChips(alts){
 function renderLookupResult(){
   const L=lastLookup; if(!L) return setRoute("discover");
   const r=L.result||{};
-  const back=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>`;
+  const back=`<section class="page-head profile-back"><button class="link-btn" onclick="lookupBack()">← ${lookupFrom==="planner"?"Plant ideas":"Discover"}</button></section>`;
   if(!r.found||!r.scientific){
     view.innerHTML=`${back}<section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Not found</span></div><h2>Couldn't place “${esc(L.query)}”</h2><p>Check the spelling, or try the name exactly as it's written on the label.</p></section>
       ${r.alternatives?.length?`<h3 class="lookup-sub">Did you mean</h3><div class="lookup-alts">${lookupAltChips(r.alternatives)}</div>`:""}
@@ -3635,7 +3794,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9.2 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.0 · made for our garden</div>`);
 });
 
 renderHome();

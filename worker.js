@@ -5,6 +5,7 @@
    /lookup    Plant details by name (Gemini + reference photo)
    /image     Fetches a reference photo (iNaturalist / Wikimedia only)
    /photo     Finds a reference photo for a plant name (no Gemini call)
+   /suggest   "What should I plant here?" for a garden area (Gemini + reference photos)
    Secrets: PLANTNET_API_KEY, PERENUAL_API_KEY, TREFLE_TOKEN, GEMINI_API_KEY */
 
 const PLANTNET_BASE = "https://my-api.plantnet.org/v2/identify/all";
@@ -177,11 +178,12 @@ export default {
       return json({ photo }, 200, cors);
     }
 
-    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup") {
+    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup" || url.pathname === "/suggest") {
       try {
         if (url.pathname === "/doctor") return await handleDoctor(request, env, cors);
         if (url.pathname === "/fill") return await handleFill(request, env, cors);
         if (url.pathname === "/lookup") return await handleLookup(request, env, cors);
+        if (url.pathname === "/suggest") return await handleSuggest(request, env, cors);
         return await handleBuyCheck(request, env, cors);
       } catch (error) {
         console.error("FloraLens Gemini route error:", error);
@@ -770,4 +772,84 @@ async function handleImage(request, url, corsHeaders) {
   const type = r.headers.get("Content-Type") || "";
   if (!r.ok || !type.startsWith("image/")) return doctorJson({ error: `Image fetch failed (${r.status})` }, 502, corsHeaders);
   return new Response(r.body, { status: 200, headers: { ...corsHeaders, "Content-Type": type, "Cache-Control": "public, max-age=86400" } });
+}
+
+/* ------------------------------------------------------------------ /suggest */
+
+const SUGGEST_RULES = `You are FloraLens, an experienced UK garden designer helping a home gardener choose plants for one particular spot in her garden.
+You are given the area's name and conditions, what she'd like, what already grows there and elsewhere in her garden, today's date, and sometimes a photo of the spot.
+
+Suggest 6 plants that:
+- genuinely suit the conditions (light, soil, moisture, and whether it's in the ground, in pots or indoors). Conditions come first; never suggest a sun-lover for shade or a bog plant for dry soil. For "Indoors" suggest houseplants.
+- are hardy enough for a UK garden in that setting, and easy to find in UK garden centres or nurseries.
+- match her wishes (colour, height, season, must-haves). If "Safe for pets" is asked for, only suggest plants with no known toxicity to cats and dogs, and set pet_safe true.
+- work with what she already has: extend the flowering season, add contrast in shape or colour, and don't repeat plants she already grows.
+- vary: a mix of heights and flowering times unless she asked otherwise.
+
+If a photo is provided, look at it: how much light the spot seems to get, what's around it, the space available. Describe what you see in "read_of_spot" (one or two sentences), and let it inform the choice. If there's no photo, leave read_of_spot empty.
+
+For each plant: scientific (a specific, buyable variety in single quotes is welcome), species (the plain two-word species without the variety), common name, "why" (one or two friendly sentences, under 30 words, saying why it suits this spot and her garden; mention her existing plants by name where relevant), height (eventual height and spread, metric), flowering (month numbers, 1-12; empty if grown for foliage), care ("Easy", "Moderate" or "Needs care"), pet_safe (true only if confident), plant_when (when to plant it, given today's date).
+"tip": one practical sentence about preparing this spot. British English throughout.`;
+
+const SUGGEST_SCHEMA = {
+  type: "object",
+  properties: {
+    read_of_spot: { type: "string" },
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          scientific: { type: "string" }, species: { type: "string" }, common: { type: "string" },
+          why: { type: "string" }, height: { type: "string" },
+          flowering: { type: "array", items: { type: "integer" } },
+          care: { type: "string", enum: ["Easy", "Moderate", "Needs care"] },
+          pet_safe: { type: "boolean" }, plant_when: { type: "string" }
+        },
+        required: ["scientific", "species", "common", "why", "height", "flowering", "care", "pet_safe", "plant_when"]
+      }
+    },
+    tip: { type: "string" }
+  },
+  required: ["read_of_spot", "suggestions", "tip"]
+};
+
+async function handleSuggest(request, env, corsHeaders) {
+  if (request.method !== "POST") return doctorJson({ error: "Use POST" }, 405, corsHeaders);
+  if (!originAllowed(request)) return doctorJson({ error: "Origin not allowed" }, 403, corsHeaders);
+  if (!env.GEMINI_API_KEY) return doctorJson({ error: "GEMINI_API_KEY is not set on the Worker." }, 500, corsHeaders);
+  let b;
+  try { b = await request.json(); } catch { return doctorJson({ error: "Bad request" }, 400, corsHeaders); }
+  const clip = (v, n) => String(v || "").slice(0, n);
+  const list = (v, n = 40) => (Array.isArray(v) ? v : []).map(x => clip(x, 80)).filter(Boolean).slice(0, n);
+  const text = [
+    `Area: ${clip(b.area, 60)}`,
+    `Setting: ${clip(b.setting, 30) || "not said"}`,
+    `Light: ${clip(b.sun, 30) || "not sure"}`,
+    `Soil: ${clip(b.soil, 30) || "not sure"}`,
+    `Moisture: ${clip(b.moisture, 30) || "not sure"}`,
+    `Her wishes: ${list(b.wishes).join(", ") || "none in particular"}`,
+    b.note ? `In her words: ${clip(b.note, 300)}` : null,
+    `Already in this area: ${list(b.inArea).join(", ") || "nothing yet"}`,
+    `Elsewhere in her garden: ${list(b.garden, 60).join(", ") || "nothing recorded"}`,
+    list(b.exclude).length ? `Already suggested, so suggest different plants: ${list(b.exclude).join(", ")}` : null,
+    `Today: ${clip(b.today, 40)}`,
+    "Return the JSON result.",
+  ].filter(Boolean).join("\n");
+  const input = [];
+  if (b.image && typeof b.image.data === "string" && /^image\/(jpeg|png|webp)$/.test(b.image.mime_type || "")) {
+    input.push({ type: "image", data: b.image.data, mime_type: b.image.mime_type });
+  }
+  input.push({ type: "text", text });
+
+  const out = await callGemini(env, { system: SUGGEST_RULES, schema: SUGGEST_SCHEMA, input });
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
+  const suggestions = (out.result?.suggestions || []).slice(0, 6);
+  const photos = await Promise.all(suggestions.map(async s => {
+    try {
+      const sp = String(s.species || "").trim();
+      return (sp.includes(" ") ? await findPlantPhoto(sp) : null) || await findPlantPhoto(s.scientific);
+    } catch { return null; }
+  }));
+  return doctorJson({ result: { ...out.result, suggestions }, photos, model: GEMINI_MODEL }, 200, corsHeaders);
 }
