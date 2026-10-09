@@ -781,7 +781,8 @@ You are given the area's name and conditions, what she'd like, what already grow
 
 Suggest 6 plants that:
 - genuinely suit the conditions (light, soil, moisture, and whether it's in the ground, in pots or indoors). Conditions come first; never suggest a sun-lover for shade or a bog plant for dry soil. For "Indoors" suggest houseplants.
-- are hardy enough for a UK garden in that setting, and easy to find in UK garden centres or nurseries.
+- are hardy enough for a UK garden in that setting, and stocked by most ordinary UK garden centres (not just specialist nurseries or mail order).
+- are reliable, well-proven choices: prefer plants holding the RHS Award of Garden Merit. Avoid rare, new or specialist-only varieties. If you name a particular variety, choose one that is widely sold.
 - match her wishes (colour, height, season, must-haves). If "Safe for pets" is asked for, only suggest plants with no known toxicity to cats and dogs, and set pet_safe true.
 - work with what she already has: extend the flowering season, add contrast in shape or colour, and don't repeat plants she already grows.
 - vary: a mix of heights and flowering times unless she asked otherwise.
