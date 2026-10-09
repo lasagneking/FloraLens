@@ -1744,12 +1744,15 @@ function setRoute(route, data={}){
 
 function pin(p,{canDelete=false}={}){
   return `<article class="pin" onclick="if(!event.target.closest('.pin-delete')) setRoute('profile',{id:'${p.id}'})">
-    <div class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></div>
+    <div class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></div>
     ${canDelete?`<button class="pin-delete" aria-label="Delete ${esc(p.common)}" title="Delete" onclick="event.stopPropagation();confirmDeletePlant('${p.id}')">×</button>`:""}
     <div class="pin-body"><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small><br><span class="chip">✿ ${esc(p.status||p.area||"Saved")}</span></div>
   </article>`;
 }
 async function hydratePhotos(scope=document){
+  for(const n of scope.querySelectorAll("[data-photo-url]")){
+    if(!n.dataset.photoKey&&n.dataset.photoUrl){ n.style.backgroundImage=`url("${n.dataset.photoUrl}")`; n.style.backgroundSize="cover"; n.style.backgroundPosition="center"; }
+  }
   const nodes=[...scope.querySelectorAll("[data-photo-key]")].filter(n=>n.dataset.photoKey);
   for(const n of nodes){
     const url=await getPhotoUrl(n.dataset.photoKey);
@@ -1908,7 +1911,7 @@ function renderHome(){
     </div>
     <div class="section-title"><h3>My plants</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
     <div class="plant-rail">
-      ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
+      ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
       <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
     </div>
     <div class="section-title"><h3>Today in the garden</h3></div>
@@ -2383,7 +2386,8 @@ async function confirmDiscoveryToGarden(id){
     soil:cached.soil||"Gathering botanical notes…",
     height:cached.height||"Gathering botanical notes…",
     bloom:cached.bloom||[],
-    stockPhoto:!!d.stockPhoto, photoCredit:d.photoCredit||null
+    stockPhoto:!!d.stockPhoto, photoCredit:d.photoCredit||null,
+    ...(d.source==="lookup"&&!oldUrl?{source:"lookup",species:d.species||"",photoUrl:d.photoUrl||null,photoKey:""}:{})
   });
   saveState();
   closeModal();
@@ -2844,6 +2848,10 @@ async function renderProfile(id,isNew=false){
       <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>`;
 
+  if(!p.photoKey&&p.photoUrl){
+    const hero=document.getElementById("profileHero"); hero?.querySelector(".plant-art")?.remove();
+    hero?.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${esc(p.photoUrl)}" alt="${esc(p.common)}">`);
+  }
   if(p.photoKey){
     const url=await getPhotoUrl(p.photoKey);
     if(url){ const hero=document.getElementById("profileHero"); hero?.querySelector(".plant-art")?.remove(); hero?.insertAdjacentHTML("afterbegin",`<img class="photo-hero" src="${url}" alt="${esc(p.common)}">`); }
@@ -3187,20 +3195,52 @@ function lookupImgFallback(img){
   if(f&&img.src!==f){ img.src=f; img.dataset.fallback=""; }
   else img.replaceWith(Object.assign(document.createElement("div"),{className:"plant-art"}));
 }
+// Download a reference photo onto the phone (via the Worker), so it also works offline.
+async function storeReferencePhoto(photo,photoKey){
+  for(const u of [photo?.url,photo?.fallback].filter(Boolean)){
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/image?url=${encodeURIComponent(u)}`);
+        if(!res.ok){ console.warn("Reference photo",res.status,u); break; }
+        const blob=await res.blob();
+        if(!blob.size||!String(blob.type).startsWith("image/")) break;
+        await savePhoto(photoKey,blob);
+        return true;
+      }catch(e){ console.warn("Reference photo",e); }
+    }
+  }
+  return false;
+}
+// Looked-up plants saved without a photo (e.g. a dropped connection) get one later, automatically.
+async function backfillReferencePhotos(){
+  if(!API_PROXY_URL||!navigator.onLine) return 0;
+  let done=0;
+  const todo=[...state.discoveries,...state.plants].filter(x=>x.source==="lookup"&&!x.photoKey&&!x.photoTried).slice(0,6);
+  for(const item of todo){
+    try{
+      const q=new URLSearchParams({name:item.scientific});
+      if(item.species) q.set("species",item.species);
+      const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/photo?${q}`);
+      const data=await res.json().catch(()=>null);
+      const key=`${item.id}-hero`;
+      if(data?.photo&&await storeReferencePhoto(data.photo,key)){
+        item.photoKey=key; item.stockPhoto=true; item.photoUrl=null; item.photoCredit=data.photo.credit||data.photo.source; done++;
+      }else if(data?.photo){                            // found but couldn't store: show it online, retry storing later
+        if(!item.photoUrl){ item.photoUrl=data.photo.url; item.stockPhoto=true; item.photoCredit=data.photo.credit||data.photo.source; done++; }
+      }else if(res.ok){ item.photoTried=true; }         // genuinely no photo out there; don't keep asking
+    }catch(e){ console.warn("Photo backfill",e); }
+  }
+  if(todo.length) saveState();
+  if(done) refreshCurrentView();
+  return done;
+}
 async function addLookupToWishlist(){
   const L=lastLookup, r=L?.result; if(!r?.scientific) return;
   const speciesKey=slug(r.scientific);
   const id="discovery-"+Date.now(), photoKey=`${id}-hero`;
-  let stored=false;
-  if(L.photo?.url){
-    for(const u of [L.photo.url,L.photo.fallback].filter(Boolean)){
-      try{
-        const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/image?url=${encodeURIComponent(u)}`);
-        if(!res.ok) continue;
-        await savePhoto(photoKey,await res.blob()); stored=true; break;
-      }catch(e){ console.warn("Reference photo",e); }
-    }
-  }
+  const btn=document.querySelector(".lookup-actions .btn.primary");
+  if(btn){ btn.disabled=true; btn.textContent="Saving…"; }
+  const stored=L.photo?await storeReferencePhoto(L.photo,photoKey):false;
   // Gemini's details become the species' gap-filled record; real sources still win later.
   const fieldKeys=["light","water","soil","height","hardiness","growthHabit","growthRate","pruning","propagation","safety","description"];
   const fields={};
@@ -3210,10 +3250,10 @@ async function addLookupToWishlist(){
   const cache=state.speciesCache[speciesKey]||{scientific:r.scientific,common:r.common,family:r.family,genus:r.genus,source:"Plant lookup",fetchedAt:new Date().toISOString(),enrichment:null};
   state.speciesCache[speciesKey]={...cache,gemini:{fields,asked:Object.keys(fields),fetchedAt:new Date().toISOString(),model:L.model||"gemini"}};
   state.discoveries.unshift({
-    id,speciesKey,photoKey:stored?photoKey:"",
+    id,speciesKey,photoKey:stored?photoKey:"",photoUrl:!stored&&L.photo?.url?L.photo.url:null,
     common:r.common||r.scientific,scientific:r.scientific,family:r.family||"",
     score:null,spotted:new Date().toISOString(),wishlist:true,note:"",
-    source:"lookup",stockPhoto:stored,photoCredit:stored?(L.photo.credit||L.photo.source):null
+    source:"lookup",species:r.species||"",stockPhoto:!!(stored||L.photo?.url),photoCredit:L.photo?(L.photo.credit||L.photo.source):null
   });
   saveState();
   toast(`${r.common||r.scientific} added to your wishlist`);
@@ -3226,7 +3266,7 @@ async function replaceStockPhotos(speciesKey,file){
   for(const item of [...state.discoveries,...state.plants]){
     if(item.speciesKey!==speciesKey||!item.stockPhoto) continue;
     const key=item.photoKey||`${item.id}-hero`;
-    try{ await savePhoto(key,file); item.photoKey=key; item.stockPhoto=false; item.photoCredit=null; n++; }catch(e){ console.warn(e); }
+    try{ await savePhoto(key,file); item.photoKey=key; item.photoUrl=null; item.stockPhoto=false; item.photoCredit=null; n++; }catch(e){ console.warn(e); }
   }
   if(n) saveState();
   return n;
@@ -3246,7 +3286,7 @@ function renderDiscover(){
     ${items.length
       ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
           <div class="discovery-media">
-            <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
+            <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}" data-photo-url="${esc(d.photoUrl||"")}"></div>
             ${buyBadge(d)}
             <div class="discovery-controls">
               <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
@@ -3595,7 +3635,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9.2 · made for our garden</div>`);
 });
 
 renderHome();
@@ -3608,6 +3648,7 @@ backgroundEnrichTryV7SavedRecords();
 let gardenFillRunning=false;
 const pause=ms=>new Promise(r=>setTimeout(r,ms));
 async function fillGardenGaps(){
+  backfillReferencePhotos().catch(()=>{});
   if(gardenFillRunning||!API_PROXY_URL||!navigator.onLine) return;
   gardenFillRunning=true;
   let plantsFilled=0, details=0;

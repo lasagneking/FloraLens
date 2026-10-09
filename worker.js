@@ -4,6 +4,7 @@
    /fill      Gemini gap-filler              /buycheck "Should I buy it?" (Gemini)
    /lookup    Plant details by name (Gemini + reference photo)
    /image     Fetches a reference photo (iNaturalist / Wikimedia only)
+   /photo     Finds a reference photo for a plant name (no Gemini call)
    Secrets: PLANTNET_API_KEY, PERENUAL_API_KEY, TREFLE_TOKEN, GEMINI_API_KEY */
 
 const PLANTNET_BASE = "https://my-api.plantnet.org/v2/identify/all";
@@ -168,6 +169,13 @@ export default {
 
     // Gemini: Plant Doctor, gap-filling and "Should I buy it?"
     if (url.pathname === "/image") return await handleImage(request, url, cors);
+    if (url.pathname === "/photo") {
+      const name = (url.searchParams.get("name") || "").slice(0, 120);
+      const species = (url.searchParams.get("species") || "").slice(0, 120);
+      if (!name) return json({ error: "name required" }, 400, cors);
+      const photo = (species && species.includes(" ") ? await findPlantPhoto(species) : null) || await findPlantPhoto(name);
+      return json({ photo }, 200, cors);
+    }
 
     if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup") {
       try {
