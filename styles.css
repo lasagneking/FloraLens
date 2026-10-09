@@ -1051,3 +1051,40 @@ button,a{-webkit-touch-callout:none}
 }
 @keyframes rotateHint{0%,30%{transform:rotate(-90deg)}60%,100%{transform:rotate(0)}}
 .profile-tabs::before{content:"";position:absolute;left:-18px;right:-18px;top:-14px;height:14px;background:var(--bg);pointer-events:none}
+
+/* At a glance: always full width, full text (no tap-to-expand) */
+.care-glance-grid{grid-template-columns:1fr}
+.glance-tile{grid-column:auto;cursor:default}
+.care-glance-grid .glance-tile b{display:block;-webkit-line-clamp:unset;overflow:visible;font-size:14.5px;line-height:1.5;margin-top:2px}
+.glance-more{display:none!important}
+
+/* ======================================================================
+   PLANT LOOKUP (Discover)
+   ====================================================================== */
+.lookup-card{margin:0 0 16px;padding:16px;border-radius:var(--r-lg);background:var(--card);box-shadow:var(--sh-1)}
+.lookup-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.lookup-head>span{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;font-size:19px;background:var(--petal-soft);color:var(--petal);flex:none}
+.lookup-head b{display:block;font-size:15.5px;font-weight:800}
+.lookup-head small{display:block;font-size:12.5px;color:var(--muted)}
+.lookup-row{display:flex;gap:8px;align-items:center;padding:5px 5px 5px 14px;border-radius:16px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.lookup-row input{flex:1;min-width:0;border:0;background:none;outline:none;font-size:16px;padding:8px 0}
+.lookup-row input::placeholder{color:var(--faint)}
+.lookup-row button{width:42px;height:42px;flex:none;border:0;border-radius:13px;background:linear-gradient(135deg,#F77BB4,#EE4E95);color:#fff;font-size:18px;display:grid;place-items:center}
+.lookup-loading{text-align:center;padding:60px 20px}
+.lookup-loading .flower-loader{background:var(--petal-soft);color:var(--petal)}
+.lookup-loading .flower-loader:after{border-color:rgba(238,78,149,.18);border-top-color:var(--petal)}
+.lookup-loading h2{margin:18px 0 6px}
+.lookup-hero{position:relative;isolation:isolate;overflow:hidden;min-height:340px;border-radius:var(--r-xl);background:var(--bg-2);box-shadow:var(--sh-2)}
+.lookup-hero>img,.lookup-hero>.plant-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+.photo-credit{display:inline-flex;align-items:center;padding:7px 12px;border-radius:999px;font-size:12px;font-weight:700;background:rgba(255,255,255,.9);color:var(--ink-2)}
+.photo-credit-line{margin:8px 4px 0;font-size:11px;color:var(--faint);line-height:1.4}
+.hero-credit{position:absolute;z-index:3;right:14px;top:56px;max-width:70%;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,.42);color:#fff;font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-dossier-hero .profile-dossier-copy{z-index:4}
+.lookup-sub{font-size:15px;margin:16px 2px 8px}
+.lookup-alts{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
+.lookup-alts button{flex:none;border:0;border-radius:16px;padding:10px 14px;text-align:left;background:var(--card);box-shadow:var(--sh-1)}
+.lookup-alts b{display:block;font-size:13.5px}
+.lookup-alts small{display:block;font-size:11.5px;color:var(--muted)}
+.lookup-actions{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin:14px 0}
+.lookup-buy{margin-top:0}
+.chip-ref{background:var(--prune-bg);color:var(--prune)}

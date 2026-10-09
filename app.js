@@ -2168,6 +2168,17 @@ async function saveDiscovery(){
     };
   }
 
+  const looked=state.discoveries.find(d=>d.speciesKey===speciesKey&&d.stockPhoto);
+  if(looked){
+    const buyFiles=captures.slice(0,3).map(c=>c.file);
+    await replaceStockPhotos(speciesKey,captures[0].file);
+    looked.score=Math.round((r.score||0)*100); looked.spotted=new Date().toISOString(); delete looked.buyCheck;
+    saveState(); captures=[]; pendingResults=null;
+    toast(`Your photo of ${looked.common} replaced the reference photo`);
+    runBuyCheck(looked.id,{files:buyFiles});
+    setRoute("discover");
+    return;
+  }
   const id="discovery-"+Date.now();
   const photoKey=`${id}-hero`;
   try{ await savePhoto(photoKey,captures[0].file); }catch(e){ console.warn("Discovery photo storage failed",e); }
@@ -2279,6 +2290,11 @@ function renderBuyCheck(d){
     return `<section class="buy-card buy-checking" id="buy-${d.id}">${head}<h2>Taking a close look…</h2></div><span class="buy-spin"></span></div><p class="buy-sum">Checking the leaves, stems and compost for anything that should put you off.</p></section>`;
   }
   const b=d.buyCheck;
+  if(!b&&d.stockPhoto){
+    return `<section class="buy-card buy-empty" id="buy-${d.id}">${head}<h2>Spotted one in a shop?</h2></div><span class="buy-mark">⌾</span></div>
+      <p class="buy-sum">Scan it with Identify. Your photo replaces the reference photo, and Gemini checks whether that plant is worth buying.</p>
+      <button class="btn primary" style="width:100%;margin-top:12px" onclick="startCamera('discover')">⌾ Scan it</button></section>`;
+  }
   if(!b){
     return `<section class="buy-card buy-empty" id="buy-${d.id}">${head}<h2>${d.buyCheckError?"Couldn't check this time":"Check how healthy it looks"}</h2></div><span class="buy-mark">✦</span></div>
       <p class="buy-sum">${esc(d.buyCheckError||"Gemini looks at the photo for pests, disease, damage and pot-bound roots, and tells you whether it's worth buying.")}</p>
@@ -2351,7 +2367,8 @@ async function confirmDiscoveryToGarden(id){
     water:cached.water||"Gathering botanical notes…",
     soil:cached.soil||"Gathering botanical notes…",
     height:cached.height||"Gathering botanical notes…",
-    bloom:cached.bloom||[]
+    bloom:cached.bloom||[],
+    stockPhoto:!!d.stockPhoto, photoCredit:d.photoCredit||null
   });
   saveState();
   closeModal();
@@ -2431,6 +2448,7 @@ async function confirmPlant(){
   }
   const id="plant-"+Date.now(), photoKey=`${id}-hero`;
   try{ await savePhoto(photoKey,captures[0].file); }catch(e){ console.warn("Photo storage failed",e); }
+  replaceStockPhotos(speciesKey,captures[0].file).catch(()=>{});
   const cached=state.speciesCache[speciesKey]||{};
   state.plants.unshift({id,speciesKey,photoKey,common:x.common,scientific:x.sci,family:x.family,area:chosenArea,status:"New",added:new Date().toISOString().slice(0,10),notes:cached.notes||"Newly identified with FloraLens.",sun:cached.sun||"Gathering botanical notes…",water:cached.water||"Gathering botanical notes…",soil:cached.soil||"Gathering botanical notes…",height:cached.height||"Gathering botanical notes…",bloom:cached.bloom||[]});
   saveState(); closeModal(); captures=[]; toast(`${x.common} saved to ${chosenArea}`);
@@ -2761,7 +2779,7 @@ async function renderProfile(id,isNew=false){
 
   view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
     <div class="profile-dossier-hero" id="profileHero">
-      <div class="plant-art ${p.art||""}"></div><div class="profile-dossier-shade"></div>
+      <div class="plant-art ${p.art||""}"></div><div class="profile-dossier-shade"></div>${p.stockPhoto?`<span class="hero-credit">Reference photo${p.photoCredit?` · ${esc(p.photoCredit)}`:""}</span>`:""}
       <div class="profile-dossier-top"><span class="profile-family">${esc(p.family||"Botanical profile")}</span><span class="profile-season-badge">${esc(bloomStatus)}</span></div>
       <div class="profile-dossier-copy"><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><div class="profile-meta-row"><span>◎ ${esc(confidence)}</span><span>⌂ ${esc(placeLabel)}</span></div></div>
     </div>
@@ -2777,7 +2795,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
-      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<button type="button" class="glance-tile" data-ico="sun" aria-expanded="false" onclick="toggleGlance(this)"><span>☀</span><small>Light${gmTag(care,"light")}</small><b>${esc(care.light)}</b><em class="glance-more">More</em></button>`:""}${care.water?`<button type="button" class="glance-tile" data-ico="drop" aria-expanded="false" onclick="toggleGlance(this)"><span>💧</span><small>Water${gmTag(care,"water")}</small><b>${esc(care.water)}</b><em class="glance-more">More</em></button>`:""}${care.soil?`<button type="button" class="glance-tile" data-ico="soil" aria-expanded="false" onclick="toggleGlance(this)"><span>♧</span><small>Soil${gmTag(care,"soil")}</small><b>${esc(care.soil)}</b><em class="glance-more">More</em></button>`:""}${care.hardiness?`<button type="button" class="glance-tile" data-ico="snow" aria-expanded="false" onclick="toggleGlance(this)"><span>❄</span><small>Hardiness${gmTag(care,"hardiness")}</small><b>${esc(care.hardiness)}</b><em class="glance-more">More</em></button>`:""}</div></div>`:""}
+      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div class="glance-tile" data-ico="sun"><span>☀</span><small>Light${gmTag(care,"light")}</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div class="glance-tile" data-ico="drop"><span>💧</span><small>Water${gmTag(care,"water")}</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div class="glance-tile" data-ico="soil"><span>♧</span><small>Soil${gmTag(care,"soil")}</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div class="glance-tile" data-ico="snow"><span>❄</span><small>Hardiness${gmTag(care,"hardiness")}</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
       <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p>${gmDesc?`<i class="gm-tag" title="Written by Google Gemini because other sources had no description">✦ Gemini</i>`:""}</div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
@@ -3068,6 +3086,136 @@ function saveCareEdit(id){
   t.title=(document.getElementById("editCareTitle")?.value||t.title).trim();t.type=document.getElementById("editCareType")?.value||t.type;t.due=document.getElementById("editCareDue")?.value||t.due;t.notes=(document.getElementById("editCareNotes")?.value||"").trim();
   saveState();closeModal();toast("Care job updated");renderCareCalendar();
 }
+/* ===================== Look up a plant by name (Discover, via Gemini) ===================== */
+let lastLookup=null;      // {query, result, photo, model}
+let lookupBusy=false;
+const LOOKUP_MONTHS=["J","F","M","A","M","J","J","A","S","O","N","D"];
+
+function lookupCard(){
+  return `<form class="lookup-card" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
+    <div class="lookup-head"><span>⌕</span><div><b>Look up a plant</b><small>Type a name from a label, a magazine or a friend's tip</small></div></div>
+    <div class="lookup-row"><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="e.g. Salvia Hot Lips"><button aria-label="Look up">→</button></div>
+  </form>`;
+}
+async function lookupPlant(q){
+  q=String(q||"").trim();
+  if(!q||lookupBusy) return;
+  if(!API_PROXY_URL){ toast("Plant lookup needs the FloraLens Worker"); return; }
+  lookupBusy=true;
+  currentRoute="discover";
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
+    <div class="lookup-loading"><div class="flower-loader">⌕</div><h2>Looking up “${esc(q)}”</h2><p class="sub">Gemini is finding the plant and its details.</p></div>`;
+  appScrollTo(0);
+  try{
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/lookup`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})});
+    const data=await res.json().catch(()=>null);
+    if(!data) throw new Error(res.status===404?"The Worker doesn't have a /lookup route yet. Upload the new worker.js.":`Lookup failed (${res.status}).`);
+    if(!res.ok||data.error){
+      if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight.");
+      throw new Error(data.error||`Lookup failed (${res.status}).`);
+    }
+    lastLookup={query:q,...data};
+    lookupBusy=false;
+    renderLookupResult();
+  }catch(err){
+    lookupBusy=false;
+    view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
+      <section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Couldn't look it up</span></div><h2>Something went wrong</h2><p>${esc(friendlyNetError(err,"Plant lookup"))}</p></section>
+      <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="lookupPlant(decodeURIComponent('${jsArg(q)}'))">↻ Try again</button><button class="btn secondary" onclick="setRoute('discover')">Back</button></div>`;
+  }
+}
+function lookupAltChips(alts){
+  return (Array.isArray(alts)?alts:[]).filter(a=>a?.scientific).slice(0,3)
+    .map(a=>`<button onclick="lookupPlant(decodeURIComponent('${jsArg(a.scientific)}'))"><b>${esc(a.common||a.scientific)}</b><small><i>${esc(a.scientific)}</i></small></button>`).join("");
+}
+function renderLookupResult(){
+  const L=lastLookup; if(!L) return setRoute("discover");
+  const r=L.result||{};
+  const back=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>`;
+  if(!r.found||!r.scientific){
+    view.innerHTML=`${back}<section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Not found</span></div><h2>Couldn't place “${esc(L.query)}”</h2><p>Check the spelling, or try the name exactly as it's written on the label.</p></section>
+      ${r.alternatives?.length?`<h3 class="lookup-sub">Did you mean</h3><div class="lookup-alts">${lookupAltChips(r.alternatives)}</div>`:""}
+      ${lookupCard()}`;
+    return;
+  }
+  const key=slug(r.scientific);
+  const existing=state.discoveries.find(d=>d.speciesKey===key)||state.plants.find(p=>p.speciesKey===key);
+  const months=(Array.isArray(r.bloomMonths)?r.bloomMonths:[]).map(Number);
+  const tile=(ico,glyph,label,val)=>usable(val)?`<div class="glance-tile" data-ico="${ico}"><span>${glyph}</span><small>${label}</small><b>${esc(val)}</b></div>`:"";
+  const wide=(glyph,label,val)=>usable(val)?`<div class="care-tile care-wide"><span class="care-icon">${glyph}</span><b>${label}</b><small>${esc(val)}</small></div>`:"";
+  view.innerHTML=`${back}
+    <div class="lookup-hero">
+      ${L.photo?.url?`<img src="${esc(L.photo.url)}" data-fallback="${esc(L.photo.fallback||"")}" alt="${esc(r.common||r.scientific)}" onerror="lookupImgFallback(this)">`:`<div class="plant-art"></div>`}
+      <div class="profile-dossier-shade"></div>
+      <div class="profile-dossier-top"><span class="profile-family">${esc(r.family||"Plant")}</span>${L.photo?`<span class="photo-credit">Reference photo</span>`:""}</div>
+      <div class="profile-dossier-copy"><h1>${esc(r.common||r.scientific)}</h1><em>${esc(r.scientific)}</em></div>
+    </div>
+    ${L.photo?`<p class="photo-credit-line">Photo: ${esc(L.photo.credit||L.photo.source)}</p>`:""}
+    ${r.alternatives?.length?`<h3 class="lookup-sub">Not quite? Other matches</h3><div class="lookup-alts">${lookupAltChips(r.alternatives)}</div>`:""}
+    <div class="lookup-actions">${existing
+      ?`<button class="btn primary" onclick="setRoute('profile',{id:'${existing.id}'})">Open ${esc(existing.common)}</button>`
+      :`<button class="btn primary" onclick="addLookupToWishlist()">♡ Add to wishlist</button>`}
+      <button class="btn secondary" onclick="setRoute('discover')">Search again</button></div>
+    ${r.description?`<div class="profile-summary-card"><p>${esc(r.description)}</p><i class="gm-tag">✦ Gemini</i></div>`:""}
+    ${Array.isArray(r.buying_tips)&&r.buying_tips.length?`<section class="buy-card buy-good lookup-buy"><div class="buy-head"><div><div class="eyebrow">At the garden centre</div><h2>Choosing a good one</h2></div><span class="buy-mark">✓</span></div><div class="buy-list pos">${r.buying_tips.slice(0,3).map(t=>`<div><span>✓</span><p>${esc(t)}</p></div>`).join("")}</div></section>`:""}
+    <div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><i class="gm-tag">✦ Gemini</i></div>
+      <div class="care-glance-grid">${tile("sun","☀","Light",r.light)}${tile("drop","💧","Water",r.water)}${tile("soil","♧","Soil",r.soil)}${tile("snow","❄","Hardiness",r.hardiness)}</div></div>
+    ${months.length?`<div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div></div><div class="months">${LOOKUP_MONTHS.map((m,i)=>`<div class="month ${months.includes(i+1)?"on":""}">${m}</div>`).join("")}</div></div>`:""}
+    <div class="care-grid">${wide("↕","Size",r.height)}${wide("✂","Pruning",r.pruning)}${wide("🌱","Propagation",r.propagation)}</div>
+    ${usable(r.safety)?`<div class="good-know"><div class="eyebrow">Good to know</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(r.safety)}</p></div>`:""}
+    <p class="ai-foot">Details from Google Gemini. When it's added, FloraLens also checks its usual botanical sources, and real data replaces Gemini's.</p>`;
+  appScrollTo(0);
+}
+function lookupImgFallback(img){
+  const f=img.dataset.fallback;
+  if(f&&img.src!==f){ img.src=f; img.dataset.fallback=""; }
+  else img.replaceWith(Object.assign(document.createElement("div"),{className:"plant-art"}));
+}
+async function addLookupToWishlist(){
+  const L=lastLookup, r=L?.result; if(!r?.scientific) return;
+  const speciesKey=slug(r.scientific);
+  const id="discovery-"+Date.now(), photoKey=`${id}-hero`;
+  let stored=false;
+  if(L.photo?.url){
+    for(const u of [L.photo.url,L.photo.fallback].filter(Boolean)){
+      try{
+        const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/image?url=${encodeURIComponent(u)}`);
+        if(!res.ok) continue;
+        await savePhoto(photoKey,await res.blob()); stored=true; break;
+      }catch(e){ console.warn("Reference photo",e); }
+    }
+  }
+  // Gemini's details become the species' gap-filled record; real sources still win later.
+  const fieldKeys=["light","water","soil","height","hardiness","growthHabit","growthRate","pruning","propagation","safety","description"];
+  const fields={};
+  fieldKeys.forEach(k=>{ if(usable(r[k])) fields[k]=String(r[k]).trim(); });
+  const months=[...new Set((r.bloomMonths||[]).map(Number).filter(n=>n>=1&&n<=12))].sort((a,b)=>a-b);
+  if(months.length&&months.length<12) fields.bloomMonths=months;
+  const cache=state.speciesCache[speciesKey]||{scientific:r.scientific,common:r.common,family:r.family,genus:r.genus,source:"Plant lookup",fetchedAt:new Date().toISOString(),enrichment:null};
+  state.speciesCache[speciesKey]={...cache,gemini:{fields,asked:Object.keys(fields),fetchedAt:new Date().toISOString(),model:L.model||"gemini"}};
+  state.discoveries.unshift({
+    id,speciesKey,photoKey:stored?photoKey:"",
+    common:r.common||r.scientific,scientific:r.scientific,family:r.family||"",
+    score:null,spotted:new Date().toISOString(),wishlist:true,note:"",
+    source:"lookup",stockPhoto:stored,photoCredit:stored?(L.photo.credit||L.photo.source):null
+  });
+  saveState();
+  toast(`${r.common||r.scientific} added to your wishlist`);
+  setRoute("discover");
+  setTimeout(fillGardenGaps,1500);    // fetch the real botanical sources in the background
+}
+// When she scans the real plant, her photo replaces any reference photo for that species.
+async function replaceStockPhotos(speciesKey,file){
+  let n=0;
+  for(const item of [...state.discoveries,...state.plants]){
+    if(item.speciesKey!==speciesKey||!item.stockPhoto) continue;
+    const key=item.photoKey||`${item.id}-hero`;
+    try{ await savePhoto(key,file); item.photoKey=key; item.stockPhoto=false; item.photoCredit=null; n++; }catch(e){ console.warn(e); }
+  }
+  if(n) saveState();
+  return n;
+}
+
 function renderDiscover(){
   const items=state.discoveries;
   const families=new Set(items.map(d=>d.family).filter(Boolean)).size;
@@ -3077,6 +3225,7 @@ function renderDiscover(){
     <button class="lens-banner discover-banner" onclick="startCamera('discover')">
       <span class="lens-icon">⌾</span><span><strong>Identify while you're out</strong><small>Snap it at the garden centre: FloraLens identifies it and tells you if it's a good buy.</small></span>
     </button>
+    ${lookupCard()}
     <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
     ${items.length
       ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
@@ -3090,7 +3239,7 @@ function renderDiscover(){
           </div>
           <div class="pin-body">
             <b>${esc(d.common)}</b><small><i>${esc(d.scientific)}</i></small>
-            <div class="discovery-meta"><span class="chip">${d.score||"—"}% match</span><span class="chip">${d.wishlist?"Wishlist":"Spotted"}</span></div>
+            <div class="discovery-meta"><span class="chip">${d.score?`${d.score}% match`:d.source==="lookup"?"Looked up":"Saved"}</span><span class="chip">${d.wishlist?"Wishlist":"Spotted"}</span>${d.stockPhoto?`<span class="chip chip-ref">Reference photo</span>`:""}</div>
             <button class="mini-action" onclick="event.stopPropagation();addDiscoveryToGarden('${d.id}')">＋ Add to Garden</button>
           </div>
         </article>`).join("")}</section>`
@@ -3429,7 +3578,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.8 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9 · made for our garden</div>`);
 });
 
 renderHome();

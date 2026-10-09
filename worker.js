@@ -2,6 +2,8 @@
    /identify  Pl@ntNet identification       /enrich   GBIF + Perenual + Trefle
    /check     Pl@ntNet quota                 /doctor   Plant Doctor (Gemini)
    /fill      Gemini gap-filler              /buycheck "Should I buy it?" (Gemini)
+   /lookup    Plant details by name (Gemini + reference photo)
+   /image     Fetches a reference photo (iNaturalist / Wikimedia only)
    Secrets: PLANTNET_API_KEY, PERENUAL_API_KEY, TREFLE_TOKEN, GEMINI_API_KEY */
 
 const PLANTNET_BASE = "https://my-api.plantnet.org/v2/identify/all";
@@ -165,10 +167,13 @@ export default {
     }
 
     // Gemini: Plant Doctor, gap-filling and "Should I buy it?"
-    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck") {
+    if (url.pathname === "/image") return await handleImage(request, url, cors);
+
+    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup") {
       try {
         if (url.pathname === "/doctor") return await handleDoctor(request, env, cors);
         if (url.pathname === "/fill") return await handleFill(request, env, cors);
+        if (url.pathname === "/lookup") return await handleLookup(request, env, cors);
         return await handleBuyCheck(request, env, cors);
       } catch (error) {
         console.error("FloraLens Gemini route error:", error);
@@ -635,4 +640,105 @@ async function handleBuyCheck(request, env, corsHeaders) {
   });
   if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
   return doctorJson({ result: out.result }, 200, corsHeaders);
+}
+
+/* ------------------------------------------------------------------ /lookup */
+
+const LOOKUP_RULES = `You are FloraLens, a careful UK horticulture reference.
+A home gardener in the UK has typed the name of a plant she is thinking about buying. It may be a common name, a botanical name, a cultivar from a garden-centre label, or misspelt.
+
+1. Work out which plant she means. If it is clear, set found to true and give the accepted botanical name in "scientific" (keep a cultivar in single quotes if she named one, e.g. Salvia 'Hot Lips'), plus its usual UK common name, family and genus.
+   Also give "species": the plain two-word species it belongs to, without any cultivar (e.g. Salvia microphylla for Salvia 'Hot Lips'); for a hybrid without a species, repeat the genus.
+2. If the name could mean several plants (e.g. "lavender", "jasmine"), choose the one most often sold in UK garden centres and list up to 3 other likely matches in "alternatives".
+3. If it isn't a plant you recognise, set found to false, leave the other fields empty, and put up to 3 close guesses in "alternatives".
+
+Then fill the care fields for that plant as grown in the UK, in plain British English, one or two sentences each, metric units. Leave a field empty rather than guess.
+- light, water, soil, height (eventual height and spread), hardiness (include the RHS rating if known; for houseplants the minimum temperature), growthHabit (e.g. "Deciduous shrub"), growthRate.
+- pruning: always state the timing with month or season words, or say it needs little pruning.
+- propagation: methods and best time.
+- safety: toxicity to people, cats and dogs; "No known toxicity to people or pets." only if confident.
+- bloomMonths: month numbers (1-12) when it usually flowers in the UK; empty if not grown for flowers.
+- description: two or three sentences: what it is, where it comes from, why gardeners grow it.
+- buying_tips: 2 or 3 short tips for choosing a good one at a garden centre and when to plant it.`;
+
+const LOOKUP_SCHEMA = {
+  type: "object",
+  properties: {
+    found: { type: "boolean" },
+    scientific: { type: "string" }, species: { type: "string" }, common: { type: "string" }, family: { type: "string" }, genus: { type: "string" },
+    alternatives: { type: "array", items: { type: "object", properties: { scientific: { type: "string" }, common: { type: "string" } }, required: ["scientific", "common"] } },
+    light: { type: "string" }, water: { type: "string" }, soil: { type: "string" }, height: { type: "string" },
+    hardiness: { type: "string" }, growthHabit: { type: "string" }, growthRate: { type: "string" },
+    pruning: { type: "string" }, propagation: { type: "string" }, safety: { type: "string" },
+    bloomMonths: { type: "array", items: { type: "integer" } },
+    description: { type: "string" },
+    buying_tips: { type: "array", items: { type: "string" } }
+  },
+  required: ["found", "scientific", "common", "family", "alternatives", "light", "water", "soil", "height", "hardiness", "growthHabit", "pruning", "propagation", "safety", "bloomMonths", "description", "buying_tips"]
+};
+
+const PHOTO_HOSTS = ["inaturalist-open-data.s3.amazonaws.com", "static.inaturalist.org", "upload.wikimedia.org"];
+const UA = { "User-Agent": "FloraLens/1.0 (personal garden app)" };
+
+// A real reference photo of the species: iNaturalist first, then Wikipedia.
+async function findPlantPhoto(scientific) {
+  const clean = String(scientific || "").replace(/'[^']*'|"[^"]*"/g, "").replace(/\s+/g, " ").trim();   // drop cultivar
+  const names = [...new Set([clean, clean.split(" ").slice(0, 2).join(" "), clean.split(" ")[0]].filter(Boolean))];
+  for (const name of names) {
+    try {
+      const r = await fetch(`https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(name)}&per_page=5`, { headers: UA });
+      if (r.ok) {
+        const rows = (await r.json())?.results || [];
+        const best = rows.find(t => t?.name?.toLowerCase() === name.toLowerCase() && t.default_photo) || rows.find(t => t?.default_photo);
+        const ph = best?.default_photo;
+        if (ph?.medium_url) {
+          return { url: ph.medium_url.replace("/medium.", "/large."), fallback: ph.medium_url,
+                   credit: (ph.attribution || "iNaturalist").replace(/\s*\(c\)\s*/i, "© "), source: "iNaturalist" };
+        }
+      }
+    } catch (e) { console.log("iNaturalist photo", String(e)); }
+  }
+  for (const name of names) {
+    try {
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name.replace(/ /g, "_"))}`, { headers: UA });
+      if (r.ok) {
+        const j = await r.json();
+        const src = j?.thumbnail?.source || j?.originalimage?.source;
+        if (src) return { url: src, fallback: src, credit: "Wikipedia / Wikimedia Commons", source: "Wikipedia" };
+      }
+    } catch (e) { console.log("Wikipedia photo", String(e)); }
+  }
+  return null;
+}
+
+async function handleLookup(request, env, corsHeaders) {
+  if (request.method !== "POST") return doctorJson({ error: "Use POST" }, 405, corsHeaders);
+  if (!originAllowed(request)) return doctorJson({ error: "Origin not allowed" }, 403, corsHeaders);
+  if (!env.GEMINI_API_KEY) return doctorJson({ error: "GEMINI_API_KEY is not set on the Worker." }, 500, corsHeaders);
+  let body;
+  try { body = await request.json(); } catch { return doctorJson({ error: "Bad request" }, 400, corsHeaders); }
+  const query = String(body.query || "").trim().slice(0, 120);
+  if (!query) return doctorJson({ error: "Type a plant name" }, 400, corsHeaders);
+
+  const out = await callGemini(env, { system: LOOKUP_RULES, schema: LOOKUP_SCHEMA, input: [{ type: "text", text: `She typed: "${query}"` }] });
+  if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
+  const result = out.result;
+  let photo = null;
+  if (result?.found && result.scientific) {
+    const species = String(result.species || "").trim();
+    photo = (species && species.includes(" ") ? await findPlantPhoto(species) : null) || await findPlantPhoto(result.scientific);
+  }
+  return doctorJson({ result, photo, model: GEMINI_MODEL }, 200, corsHeaders);
+}
+
+/* ------------------------------------------------------------------ /image */
+// Lets the app store a reference photo on the phone (the photo hosts don't all allow that directly).
+async function handleImage(request, url, corsHeaders) {
+  let target;
+  try { target = new URL(url.searchParams.get("url") || ""); } catch { return doctorJson({ error: "Bad url" }, 400, corsHeaders); }
+  if (target.protocol !== "https:" || !PHOTO_HOSTS.includes(target.hostname)) return doctorJson({ error: "Host not allowed" }, 403, corsHeaders);
+  const r = await fetch(target.toString(), { headers: UA, cf: { cacheTtl: 86400, cacheEverything: true } });
+  const type = r.headers.get("Content-Type") || "";
+  if (!r.ok || !type.startsWith("image/")) return doctorJson({ error: `Image fetch failed (${r.status})` }, 502, corsHeaders);
+  return new Response(r.body, { status: 200, headers: { ...corsHeaders, "Content-Type": type, "Cache-Control": "public, max-age=86400" } });
 }
