@@ -1282,7 +1282,92 @@ function traitCareInference(tr){
   else if(gf.includes("herbaceous")){ water="Moderate, even moisture during active growth is a general starting point; adjust for the species and weather."; soil="A reasonably fertile, well-drained garden soil suits many herbaceous plants; verify species-specific exceptions."; }
   return {water,soil};
 }
-function resolvedCare(scientificName,t,pn,speciesKey=null){
+/* ===================== Gemini gap-filler =====================
+   Real sources always win. Gemini is asked once per species, only for the
+   fields every other source left empty, and its answers are tagged "✦ Gemini". */
+const GEMINI_FILL_FIELDS=["light","water","soil","height","hardiness","growthHabit","growthRate","pruning","propagation","safety"];
+const geminiFillInFlight=new Set();
+function geminiCacheFor(sci,key){
+  return (key&&state.speciesCache?.[key]) || Object.values(state.speciesCache||{}).find(x=>x?.scientific===sci) || null;
+}
+function geminiFieldsFor(sci,key){ return geminiCacheFor(sci,key)?.gemini?.fields||{}; }
+function gmTag(care,k){ return care?.geminiFilled?.includes(k)?`<i class="gm-tag" title="Filled in by Google Gemini because other sources had no data">✦ Gemini</i>`:""; }
+function careGapsFor(p){
+  const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
+  const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey,{noGemini:true});
+  const missing=GEMINI_FILL_FIELDS.filter(k=>!care[k]);
+  if(!care.bloomMonths?.length) missing.push("bloomMonths");
+  if(!chooseProfileDescription({pn:intel?.perenual,t:intel?.trefle,g:intel?.gbif,p})) missing.push("description");
+  const known={};
+  GEMINI_FILL_FIELDS.forEach(k=>{ if(care[k]) known[k]=String(care[k]).slice(0,300); });
+  if(care.bloomMonths?.length) known.bloomMonths=care.bloomMonths;
+  return {missing,known};
+}
+async function fillGapsWithGemini(p,{force=false}={}){
+  if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine) return false;
+  const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
+  const g=cache.gemini;
+  if(!force && g?.fetchedAt) return false;                                        // once per species
+  if(!force && g?.failedAt && Date.now()-new Date(g.failedAt).getTime()<6*3600e3) return false;
+  if(geminiFillInFlight.has(p.speciesKey)) return false;
+  const {missing,known}=careGapsFor(p);
+  if(!missing.length) return false;
+  geminiFillInFlight.add(p.speciesKey);
+  try{
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/fill`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({scientific:p.scientific,common:p.common,family:p.family||cache.family||"",missing,known})});
+    const data=await res.json().catch(()=>null);
+    if(!res.ok||!data?.fields) throw new Error(data?.error||`Gap fill failed (${res.status})`);
+    const fields={};
+    for(const k of missing){
+      const v=data.fields[k];
+      if(k==="bloomMonths"){
+        const months=[...new Set((Array.isArray(v)?v:[]).map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=12))].sort((a,b)=>a-b);
+        if(months.length&&months.length<12) fields.bloomMonths=months;
+      }else if(typeof v==="string"&&v.trim()&&!/^(unknown|n\/a|none|not known)\.?$/i.test(v.trim())){
+        fields[k]=v.trim().slice(0,k==="description"?900:500);
+      }
+    }
+    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{fields,asked:missing,fetchedAt:new Date().toISOString(),model:data.model||"gemini"}};
+    saveState();
+    return Object.keys(fields).length>0;
+  }catch(err){
+    console.warn("Gemini gap fill",err);
+    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{...(g||{}),failedAt:new Date().toISOString()}};
+    saveState();
+    return false;
+  }finally{ geminiFillInFlight.delete(p.speciesKey); }
+}
+// Called after a profile renders. Older entries may never have had their botanical
+// lookup, so run that first; then let Gemini fill whatever is still blank.
+async function maybeFillGaps(p){
+  if(!p?.speciesKey||!API_PROXY_URL||!navigator.onLine) return;
+  if(!state.speciesCache[p.speciesKey]){
+    state.speciesCache[p.speciesKey]={scientific:p.scientific,common:p.common,family:p.family||"",source:"FloraLens",fetchedAt:new Date().toISOString(),enrichment:null};
+    saveState();
+  }
+  const cache=state.speciesCache[p.speciesKey];
+  let enriched=false;
+  if(!cache.enrichment && !cache.enrichmentError){
+    enriched=!!(await enrichSpecies(p.scientific,p.speciesKey).catch(()=>null));
+  }
+  const filled=await fillGapsWithGemini(p);
+  if(!(enriched||filled)) return;
+  if(currentRoute==="profile" && document.querySelector(`[data-profile-id="${p.id}"]`)){
+    const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab;
+    const y=window.scrollY;
+    await renderProfile(p.id);
+    if(tab) setProfileTab(tab);
+    window.scrollTo(0,y);
+    const n=filled?Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).length:0;
+    toast(n?`Gemini filled ${n} missing detail${n===1?"":"s"}`:"Botanical notes added");
+  }
+}
+
+function resolvedCare(scientificName,t,pn,speciesKey=null,opts={}){
+  const gm=opts.noGemini?{}:geminiFieldsFor(scientificName,speciesKey);
+  const filled=[];
+  const gmFallback=(k,v)=>{ if(v) return v; const g=usable(gm[k]); if(g){ filled.push(k); return g; } return null; };
   const pa=plantAtlasPhenology(scientificName);
   const tr=traitRecordFor(scientificName,speciesKey);
   const inferred=traitCareInference(tr);
@@ -1311,12 +1396,13 @@ function resolvedCare(scientificName,t,pn,speciesKey=null){
     water:usable(inferred.water), soil:usable(inferred.soil), height:usable(traitHeight(tr)),
     growthHabit:usable(prettyTrait(tr?.growthFormDetailed)||prettyTrait(tr?.growthForm))
   };
-  const pick=(k)=>usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || usable(traitFields[k]) || null;
+  const pick=(k)=>gmFallback(k, usable(exactLocal?.[k]) || usable(pCare[k]) || usable(tCare[k]) || usable(genusLocal?.[k]) || usable(traitFields[k]) || null);
   const bloom = pa?.bloomMonths?.length ? pa.bloomMonths : exactLocal?.bloomMonths?.length ? exactLocal.bloomMonths : pCare.bloomMonths?.length ? pCare.bloomMonths : tCare.bloomMonths?.length ? tCare.bloomMonths : genusLocal?.bloomMonths?.length ? genusLocal.bloomMonths : tr?.floweringMonths?.length ? monthsToNumbers(tr.floweringMonths) : [];
+  const bloomFinal = bloom?.length ? bloom : (Array.isArray(gm.bloomMonths)&&gm.bloomMonths.length ? (filled.push("bloomMonths"), gm.bloomMonths) : bloom);
   return {
-    light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"), bloomMonths:bloom,
-    growthHabit:pick("growthHabit"), growthRate:pick("growthRate"), pruning:usable(exactLocal?.pruning)||usable(genusLocal?.pruning), propagation:usable(exactLocal?.propagation)||usable(genusLocal?.propagation), hardiness:pick("hardiness"),
-    safety:usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety), seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
+    light:pick("light"), water:pick("water"), soil:pick("soil"), height:pick("height"), bloomMonths:bloomFinal,
+    growthHabit:pick("growthHabit"), growthRate:pick("growthRate"), pruning:gmFallback("pruning",usable(exactLocal?.pruning)||usable(genusLocal?.pruning)), propagation:gmFallback("propagation",usable(exactLocal?.propagation)||usable(genusLocal?.propagation)), hardiness:pick("hardiness"),
+    safety:gmFallback("safety",usable(exactLocal?.safety)||pCare.safety||tCare.safety||usable(genusLocal?.safety)), seasonal:exactLocal?.seasonal||genusLocal?.seasonal||null,
     plantAtlas:pa, localSource:local?.source||null, localMatchLevel:local?.matchLevel||null,
     usedPerenual:!!pn && Object.values(pCare).some(v=>Array.isArray(v)?v.length:!!v), usedTrefle:!!t && Object.values(tCare).some(v=>Array.isArray(v)?v.length:!!v), usedLocal:!!local,
     usedTraits:!!tr, traitMatchLevel:tr?.matchLevel||null, traitMatchedName:tr?.matchedName||null,
@@ -1324,7 +1410,8 @@ function resolvedCare(scientificName,t,pn,speciesKey=null){
     traitLifeHistory:prettyTrait(tr?.lifeHistory), traitLeafPhenology:prettyTrait(tr?.leafPhenology), traitFlowerColour:prettyTrait(tr?.flowerColour),
     traitSoilPH:tr?.soilPH||null, traitTolerances:prettyObjectValues(tr?.tolerances), traitClimate:prettyTrait(tr?.climate), traitVegetation:prettyTrait(tr?.vegetation),
     traitEllenberg:formatEllenberg(tr?.ellenberg), traitSubstrate:prettyTrait(tr?.substrate), traitNutrientContext:prettyTrait(tr?.nutrientContext), traitSoilMoistureContext:prettyTrait(tr?.soilMoistureContext),
-    traitDataset:tr?.dataset||null
+    traitDataset:tr?.dataset||null,
+    geminiFilled:filled, usedGemini:filled.length>0
   };
 }
 function botanicalCoverage(care){
@@ -1951,11 +2038,11 @@ function renderLens(){
       </button>
       <button class="lens-choice-card doctor-choice" onclick="openPlantDoctor()">
         <span class="lens-choice-mark">✚</span>
-        <span><small>Pl@ntNet</small><strong>Plant Doctor</strong><em>Photograph an unhealthy leaf to check for common plant diseases.</em></span>
+        <span><small>AI health check</small><strong>Plant Doctor</strong><em>Photograph a poorly plant to find out what's wrong and what to do.</em></span>
         <b>→</b>
       </button>
     </section>
-    <div class="doctor-note"><span>❧</span><p><b>Two photos work best.</b><br>One sharp close-up of the problem and one of the wider plant, in daylight.</p></div>`;
+    <div class="doctor-note"><span>❧</span><p><b>It already knows your plant.</b><br>Plant Doctor uses the plant's care record and your journal notes, so you only need the photos.</p></div>`;
 }
 function beginCapture(organ="auto"){ window.captureOrgan=organ; multiPhotoInput.click(); }
 
@@ -2091,15 +2178,122 @@ async function saveDiscovery(){
     note:""
   });
   saveState();
+  const buyFiles=captures.slice(0,3).map(c=>c.file);
   captures=[];
   pendingResults=null;
   toast(`${x.common} saved to Discover`);
+  runBuyCheck(id,{files:buyFiles});   // "Should I buy it?" runs in the background
 
   // Enrich once so its Discover detail page has the same knowledge as Garden plants.
   if(!state.speciesCache[speciesKey]?.enrichment){
     enrichSpecies(x.sci,speciesKey).catch(()=>{});
   }
   setRoute("discover");
+}
+
+/* ===================== "Should I buy it?" (Discover, via Gemini) ===================== */
+const BUY_RATING={
+  great:{cls:"great",label:"Great buy",icon:"✓"},
+  good:{cls:"good",label:"Good buy",icon:"✓"},
+  caution:{cls:"caution",label:"Check first",icon:"!"},
+  avoid:{cls:"avoid",label:"Avoid",icon:"×"},
+  unclear:{cls:"unclear",label:"Not sure",icon:"?"}
+};
+const buyCheckInFlight=new Set();
+
+async function getPhotoBlob(key){
+  if(!key) return null;
+  try{
+    const db=await photoDB();
+    return await new Promise((resolve,reject)=>{
+      const req=db.transaction(PHOTO_STORE,"readonly").objectStore(PHOTO_STORE).get(key);
+      req.onsuccess=()=>resolve(req.result||null); req.onerror=()=>reject(req.error);
+    });
+  }catch{ return null; }
+}
+function buyContext(d){
+  const intel=state.speciesCache[d.speciesKey]?.enrichment||null;
+  const care=resolvedCare(d.scientific,intel?.trefle||null,intel?.perenual||null,d.speciesKey);
+  const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return [
+    `Plant: ${d.common} (${d.scientific}${d.family?`, ${d.family}`:""})`,
+    `Today: ${new Date().toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})} (${currentSeasonName()}), UK`,
+    care.growthHabit?`Growth form: ${care.growthHabit}`:null,
+    care.hardiness?`Hardiness: ${care.hardiness}`:null,
+    care.light?`Light: ${care.light}`:null,
+    care.height?`Size: ${care.height}`:null,
+    care.bloomMonths?.length?`Usually flowers: ${care.bloomMonths.map(m=>months[m-1]).join(", ")}`:null
+  ].filter(Boolean).join("\n");
+}
+async function runBuyCheck(id,{files=null,extraFile=null}={}){
+  const d=state.discoveries.find(x=>x.id===id);
+  if(!d||buyCheckInFlight.has(id)) return;
+  if(!API_PROXY_URL) return;
+  if(!navigator.onLine){ d.buyCheckError="You're offline. Check its health once you have a signal."; saveState(); refreshBuyCheckUI(id); return; }
+  buyCheckInFlight.add(id); delete d.buyCheckError; refreshBuyCheckUI(id);
+  try{
+    let list=files;
+    if(!list){ const blob=await getPhotoBlob(d.photoKey); list=blob?[blob]:[]; }
+    if(extraFile) list=[...list.slice(0,2),extraFile];
+    if(!list.length) throw new Error("This discovery has no photo to check.");
+    const images=await Promise.all(list.slice(0,3).map(f=>doctorImagePayload(f)));
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/buycheck`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({images,context:buyContext(d)})});
+    const data=await res.json().catch(()=>null);
+    if(!data){ throw new Error(res.status===404?"The Worker doesn't have a /buycheck route yet. Add it from worker-gemini.js.":`The health check failed (${res.status}).`); }
+    if(!res.ok||data.error){
+      if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight.");
+      throw new Error(data.error||`The health check failed (${res.status}).`);
+    }
+    d.buyCheck={...data.result,checkedAt:new Date().toISOString(),photos:list.length};
+    delete d.buyCheckError;
+  }catch(err){
+    d.buyCheckError=friendlyNetError(err,"The health check");
+  }finally{
+    buyCheckInFlight.delete(id);
+    saveState();
+    refreshBuyCheckUI(id);
+  }
+}
+function refreshBuyCheckUI(id){
+  const d=state.discoveries.find(x=>x.id===id); if(!d) return;
+  const card=document.getElementById(`buy-${id}`); if(card) card.outerHTML=renderBuyCheck(d);
+  const badge=document.querySelector(`[data-buy-badge="${id}"]`); if(badge) badge.outerHTML=buyBadge(d);
+}
+function buyCheckAddPhoto(id){
+  let inp=document.getElementById("buyCheckInput");
+  if(!inp){ inp=document.createElement("input"); inp.type="file"; inp.accept="image/*"; inp.setAttribute("capture","environment"); inp.hidden=true; inp.id="buyCheckInput"; document.body.appendChild(inp); }
+  inp.onchange=e=>{ const f=e.target.files?.[0]; e.target.value=""; if(f) runBuyCheck(id,{extraFile:f}); };
+  inp.click();
+}
+function buyBadge(d){
+  if(buyCheckInFlight.has(d.id)) return `<span class="buy-badge checking" data-buy-badge="${d.id}"><i></i>Checking…</span>`;
+  const r=d.buyCheck&&BUY_RATING[d.buyCheck.rating];
+  return r?`<span class="buy-badge ${r.cls}" data-buy-badge="${d.id}">${r.icon} ${r.label}</span>`:`<span data-buy-badge="${d.id}" hidden></span>`;
+}
+function renderBuyCheck(d){
+  const head=`<div class="buy-head"><div><div class="eyebrow">Should I buy it?</div>`;
+  if(buyCheckInFlight.has(d.id)){
+    return `<section class="buy-card buy-checking" id="buy-${d.id}">${head}<h2>Taking a close look…</h2></div><span class="buy-spin"></span></div><p class="buy-sum">Checking the leaves, stems and compost for anything that should put you off.</p></section>`;
+  }
+  const b=d.buyCheck;
+  if(!b){
+    return `<section class="buy-card buy-empty" id="buy-${d.id}">${head}<h2>${d.buyCheckError?"Couldn't check this time":"Check how healthy it looks"}</h2></div><span class="buy-mark">✦</span></div>
+      <p class="buy-sum">${esc(d.buyCheckError||"Gemini looks at the photo for pests, disease, damage and pot-bound roots, and tells you whether it's worth buying.")}</p>
+      <button class="btn primary" style="width:100%;margin-top:12px" onclick="runBuyCheck('${d.id}')">${d.buyCheckError?"↻ Try again":"✦ Check its health"}</button></section>`;
+  }
+  const r=BUY_RATING[b.rating]||BUY_RATING.unclear;
+  const list=(arr,cls,icon)=>Array.isArray(arr)&&arr.length?`<div class="buy-list ${cls}">${arr.slice(0,4).map(x=>`<div><span>${icon}</span><p>${esc(x)}</p></div>`).join("")}</div>`:"";
+  const when=new Date(b.checkedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  return `<section class="buy-card buy-${r.cls}" id="buy-${d.id}">
+    ${head}<h2>${esc(b.headline||r.label)}</h2></div><span class="buy-rating">${r.icon}<small>${r.label}</small></span></div>
+    ${b.summary?`<p class="buy-sum">${esc(b.summary)}</p>`:""}
+    ${b.photo_tip?`<div class="buy-tip photo"><b>📷 A better photo would help</b><p>${esc(b.photo_tip)}</p></div>`:""}
+    ${list(b.positives,"pos","✓")}
+    ${list(b.concerns,"neg","!")}
+    ${Array.isArray(b.check_in_store)&&b.check_in_store.length?`<div class="buy-sub">Before you buy</div>${list(b.check_in_store,"chk","?")}`:""}
+    ${b.first_weeks?`<div class="buy-tip"><b>🌱 Once it's home</b><p>${esc(b.first_weeks)}</p></div>`:""}
+    <div class="buy-foot"><span>✦ Gemini · ${esc(when)} · ${b.photos||1} photo${(b.photos||1)>1?"s":""}</span><button class="mini-action" onclick="buyCheckAddPhoto('${d.id}')">📷 Add photo &amp; recheck</button></div>
+  </section>`;
 }
 
 function confirmDeleteDiscovery(id){
@@ -2181,7 +2375,15 @@ function toggleWishlistFromProfile(id){
 }
 
 
-async function enrichSpecies(scientificName, speciesKey, force=false){
+const enrichInFlight=new Map();
+function enrichSpecies(scientificName, speciesKey, force=false){
+  const k=`${speciesKey}|${force}`;
+  if(enrichInFlight.has(k)) return enrichInFlight.get(k);
+  const job=enrichSpeciesNow(scientificName,speciesKey,force).finally(()=>enrichInFlight.delete(k));
+  enrichInFlight.set(k,job);
+  return job;
+}
+async function enrichSpeciesNow(scientificName, speciesKey, force=false){
   const cached=state.speciesCache[speciesKey]||{};
   if(!force && cached.enrichment?.fetchedAt) return cached.enrichment;
   try{
@@ -2291,6 +2493,7 @@ async function refreshIntel(id){
   if(!p) return;
   toast("Refreshing botanical notes…");
   const intel=await enrichSpecies(p.scientific,p.speciesKey,true);
+  if(state.speciesCache[p.speciesKey]){ delete state.speciesCache[p.speciesKey].gemini; saveState(); }
   if(intel){ toast("Botanical notes refreshed"); renderProfile(id); }
   else toast("Couldn’t refresh botanical notes");
 }
@@ -2496,9 +2699,13 @@ async function renderProfile(id,isNew=false){
   if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
   if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel==="genus"?"genus context":"species"}`);
+  const realDesc=chooseProfileDescription({pn,t,g,p});
+  const gmDesc=realDesc?null:usable(geminiFieldsFor(p.scientific,p.speciesKey).description);
+  const desc=realDesc||gmDesc;
+  const gmCount=(care.geminiFilled?.length||0)+(gmDesc?1:0);
+  if(gmCount) sourceNames.push(`✦ Google Gemini · ${gmCount} gap${gmCount===1?"":"s"} filled`);
   const uniqueSources=[...new Set(sourceNames)];
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
-  const desc=chooseProfileDescription({pn,t,g,p});
   const distributionRecord=buildDistributionRecord({g,p});
   const currentSeason=seasonKey();
   const seasonalLocal=care.seasonal?.[currentSeason]||null;
@@ -2522,7 +2729,7 @@ async function renderProfile(id,isNew=false){
       ${care.traitLifeHistory?`<div class="dossier-fact"><span>◌</span><div><small>Life history</small><b>${esc(care.traitLifeHistory)}</b></div></div>`:""}
       ${care.traitLeafPhenology?`<div class="dossier-fact"><span>❧</span><div><small>Leaf phenology</small><b>${esc(care.traitLeafPhenology)}</b></div></div>`:""}
       ${care.traitFlowerColour?`<div class="dossier-fact"><span>✿</span><div><small>Flower colour</small><b>${esc(care.traitFlowerColour)}</b></div></div>`:""}
-      ${care.height?`<div class="dossier-fact"><span>↕</span><div><small>Height / size</small><b>${esc(care.height)}</b></div></div>`:""}
+      ${care.height?`<div class="dossier-fact"><span>↕</span><div><small>Height / size${gmTag(care,"height")}</small><b>${esc(care.height)}</b></div></div>`:""}
       ${care.traitHabitat?`<div class="dossier-fact"><span>⌂</span><div><small>Habitat</small><b>${esc(care.traitHabitat)}</b></div></div>`:""}
       ${care.traitVegetation?`<div class="dossier-fact"><span>❦</span><div><small>Vegetation</small><b>${esc(care.traitVegetation)}</b></div></div>`:""}
       ${care.traitClimate?`<div class="dossier-fact"><span>◌</span><div><small>Climate context</small><b>${esc(care.traitClimate)}</b></div></div>`:""}
@@ -2556,6 +2763,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-dossier-copy"><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><div class="profile-meta-row"><span>◎ ${esc(confidence)}</span><span>⌂ ${esc(placeLabel)}</span></div></div>
     </div>
 
+    ${isDiscovery?renderBuyCheck(p):""}
     <nav class="profile-tabs" aria-label="Plant profile sections">
       <button class="profile-tab active" data-profile-tab="care" onclick="setProfileTab('care')"><span>☀</span>Care</button>
       <button class="profile-tab" data-profile-tab="botany" onclick="setProfileTab('botany')"><span>❧</span>Botany</button>
@@ -2566,16 +2774,16 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
-      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<button type="button" class="glance-tile" data-ico="sun" aria-expanded="false" onclick="toggleGlance(this)"><span>☀</span><small>Light</small><b>${esc(care.light)}</b><em class="glance-more">More</em></button>`:""}${care.water?`<button type="button" class="glance-tile" data-ico="drop" aria-expanded="false" onclick="toggleGlance(this)"><span>💧</span><small>Water</small><b>${esc(care.water)}</b><em class="glance-more">More</em></button>`:""}${care.soil?`<button type="button" class="glance-tile" data-ico="soil" aria-expanded="false" onclick="toggleGlance(this)"><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b><em class="glance-more">More</em></button>`:""}${care.hardiness?`<button type="button" class="glance-tile" data-ico="snow" aria-expanded="false" onclick="toggleGlance(this)"><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b><em class="glance-more">More</em></button>`:""}</div></div>`:""}
-      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
+      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<button type="button" class="glance-tile" data-ico="sun" aria-expanded="false" onclick="toggleGlance(this)"><span>☀</span><small>Light${gmTag(care,"light")}</small><b>${esc(care.light)}</b><em class="glance-more">More</em></button>`:""}${care.water?`<button type="button" class="glance-tile" data-ico="drop" aria-expanded="false" onclick="toggleGlance(this)"><span>💧</span><small>Water${gmTag(care,"water")}</small><b>${esc(care.water)}</b><em class="glance-more">More</em></button>`:""}${care.soil?`<button type="button" class="glance-tile" data-ico="soil" aria-expanded="false" onclick="toggleGlance(this)"><span>♧</span><small>Soil${gmTag(care,"soil")}</small><b>${esc(care.soil)}</b><em class="glance-more">More</em></button>`:""}${care.hardiness?`<button type="button" class="glance-tile" data-ico="snow" aria-expanded="false" onclick="toggleGlance(this)"><span>❄</span><small>Hardiness${gmTag(care,"hardiness")}</small><b>${esc(care.hardiness)}</b><em class="glance-more">More</em></button>`:""}</div></div>`:""}
+      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p>${gmDesc?`<i class="gm-tag" title="Written by Google Gemini because other sources had no description">✦ Gemini</i>`:""}</div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
-        ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
-        ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
-        ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
+        ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size${gmTag(care,"height")}</b><small>${esc(care.height)}</small></div>`:""}
+        ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning${gmTag(care,"pruning")}</b><small>${esc(care.pruning)}</small></div>`:""}
+        ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation${gmTag(care,"propagation")}</b><small>${esc(care.propagation)}</small></div>`:""}
       </div>
-      <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
-      ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
+      <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering${gmTag(care,"bloomMonths")}</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
+      ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know${gmTag(care,"safety")}</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
       ${isDiscovery?`<div class="profile-card discovery-profile-actions"><div class="eyebrow">Saved inspiration</div><h2>${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2><p class="sub">Keep it for reference or bring it into My Garden when it comes home with you.</p><div class="actions"><button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button><button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button></div></div>`:""}
       <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>
@@ -2587,6 +2795,7 @@ async function renderProfile(id,isNew=false){
       ${renderDistributionCard(distributionRecord)}
       ${botanicalRows}
       <div class="source-dossier"><div class="eyebrow">Provenance</div><h3>Where this record comes from</h3><div class="source-row">${uniqueSources.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh record</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>
+      ${gmCount?`<div class="good-know compact-note gm-note"><div class="eyebrow">✦ Gemini</div><p class="sub">Details marked ✦ Gemini were filled in by Google Gemini because none of FloraLens' botanical sources had them. Real source data always replaces them when it becomes available.</p></div>`:""}
       ${care.usedLocal?`<div class="good-know compact-note"><div class="eyebrow">Care-source note</div><p class="sub">FloraLens prefers species-level practical guidance and uses curated genus guidance only as a cautious fallback.</p></div>`:""}
       ${care.usedTraits?`<div class="good-know compact-note"><div class="eyebrow">TRY v7</div><p class="sub">TRY traits are botanical and ecological context rather than direct growing instructions.${care.traitMatchLevel==="genus"?" This record uses clearly labelled genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
       <div class="profile-dock-reserve" aria-hidden="true"></div>
@@ -2606,6 +2815,8 @@ async function renderProfile(id,isNew=false){
   hydratePhotos();
   hydrateDistributionMaps();
   requestAnimationFrame(()=>markClampedGlance());
+  view.dataset.profileId=p.id; view.setAttribute("data-profile-id",p.id);
+  maybeFillGaps(p);
 }
 
 async function exportBackup(){
@@ -2860,14 +3071,15 @@ function renderDiscover(){
   const wishlist=items.filter(d=>d.wishlist).length;
 
   view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or might want to bring home one day.</p></section>
-    <button class="lens-banner" style="background:linear-gradient(135deg,#91727d,#ba969f)" onclick="startCamera('discover')">
-      <span class="lens-icon">⌾</span><span><strong>Identify while you're out</strong><small>Perfect for garden centres, walks and plants you don't own.</small></span>
+    <button class="lens-banner discover-banner" onclick="startCamera('discover')">
+      <span class="lens-icon">⌾</span><span><strong>Identify while you're out</strong><small>Snap it at the garden centre: FloraLens identifies it and tells you if it's a good buy.</small></span>
     </button>
     <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
     ${items.length
       ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
           <div class="discovery-media">
             <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}"></div>
+            ${buyBadge(d)}
             <div class="discovery-controls">
               <button class="wishlist-heart ${d.wishlist?"active":""}" onclick="event.stopPropagation();toggleWishlist('${d.id}')" aria-label="Wishlist">${d.wishlist?"♥":"♡"}</button>
               <button class="pin-delete" aria-label="Delete ${esc(d.common)}" onclick="event.stopPropagation();confirmDeleteDiscovery('${d.id}')">×</button>
@@ -2883,91 +3095,34 @@ function renderDiscover(){
   hydratePhotos();
 }
 
-/* ===================== Plant Doctor (Pl@ntNet disease identification) ===================== */
-const DOCTOR_MAX_PHOTOS=5;
-const DOCTOR_ORGANS=["leaf","flower","fruit","bark","auto"];
-
-// Pl@ntNet returns pathogen names (often scientific). Map common pathogen groups to
-// friendly names and practical checks so the result reads like garden advice.
-const DOCTOR_GROUPS=[
-  {match:/erysiph|podosphaera|oidium|golovinomyces|sphaerotheca|powdery/i,common:"Powdery mildew",kind:"fungus",
-    checks:["Look for a white or grey dusty coating that rubs off","Remove the worst-affected leaves","Improve airflow; water at the base, not over the leaves"]},
-  {match:/diplocarpon|black ?spot/i,common:"Black spot",kind:"fungus",
-    checks:["Look for black blotches with fringed edges and yellowing around them","Pick off and bin affected leaves (not the compost heap)","Clear fallen leaves from under the plant"]},
-  {match:/puccinia|phragmidium|uromyces|melampsora|gymnosporangium|coleosporium|\brust\b/i,common:"Rust",kind:"fungus",
-    checks:["Check leaf undersides for orange or brown powdery pustules","Remove affected leaves and clear fallen ones","Avoid wetting foliage when watering"]},
-  {match:/peronospora|plasmopara|bremia|downy/i,common:"Downy mildew",kind:"water mould",
-    checks:["Look for yellow patches on top with grey-purple fuzz underneath","Remove affected growth promptly","Give the plant more space and air"]},
-  {match:/botrytis|grey mou?ld|gray mold/i,common:"Grey mould (botrytis)",kind:"fungus",
-    checks:["Look for fluffy grey mould on soft or damaged tissue","Cut out affected parts back to healthy growth","Reduce humidity and remove dead flowers"]},
-  {match:/phytophthora|pythium|blight/i,common:"Blight / root rot",kind:"water mould",
-    checks:["Check whether the soil stays waterlogged","Look for dark, spreading lesions or collapsing stems","Remove badly affected plants and avoid overwatering"]},
-  {match:/septoria|alternaria|cercospora|colletotrichum|ascochyta|entomosporium|marssonina|leaf ?spot|anthracnose/i,common:"Leaf spot",kind:"fungus",
-    checks:["Look for brown or black spots, sometimes with pale halos","Remove spotted leaves and clear debris","Water at soil level and keep foliage dry"]},
-  {match:/venturia|scab/i,common:"Scab",kind:"fungus",
-    checks:["Look for olive-brown, velvety patches on leaves or fruit","Rake up and remove fallen leaves in autumn","Prune to open up the canopy"]},
-  {match:/xanthomonas|pseudomonas|erwinia|bacteri|canker|fire ?blight/i,common:"Bacterial disease",kind:"bacteria",
-    checks:["Look for water-soaked spots or oozing cankers","Prune out affected growth, cleaning tools between cuts","Avoid overhead watering"]},
-  {match:/virus|mosaic|curl|tospo|potyvirus/i,common:"Virus",kind:"virus",
-    checks:["Look for mottled, streaked or distorted new growth","Check for sap-sucking insects such as aphids","Viruses can't be cured; remove badly affected plants"]},
-  {match:/tetranychus|spider ?mite|mite/i,common:"Spider mite",kind:"pest",
-    checks:["Look for fine webbing and pale speckling","Check leaf undersides with a magnifier","Mist or rinse leaves; mites like hot, dry air"]},
-  {match:/aphid|aphis|myzus|macrosiphum/i,common:"Aphids",kind:"pest",
-    checks:["Look for clusters of small insects on shoot tips","Squash or rinse them off","Encourage ladybirds and other predators"]},
-];
-function doctorFriendly(result){
-  const raw=[result?.label,result?.description,result?.name].filter(Boolean).join(" ");
-  const group=DOCTOR_GROUPS.find(g=>g.match.test(raw));
-  const title=doctorTitle(result);
-  return {title, common:group?.common||null, kind:group?.kind||null, checks:group?.checks||null};
-}
-function doctorTitle(r){
-  const d=String(r?.label||r?.description||"").trim();
-  if(d && d.length<=70) return d;
-  return String(r?.name||d||"Possible problem").trim();
-}
-function doctorDescription(r){
-  const d=String(r?.description||"").trim();
-  return d && d.length>70 ? d : "";
-}
-function doctorRefImages(r){
-  const imgs=Array.isArray(r?.images)?r.images:[];
-  return imgs.map(i=>typeof i==="string"?i:(i?.url?.m||i?.url?.s||i?.url?.o||i?.url||null)).filter(u=>typeof u==="string").slice(0,3);
-}
-function doctorConfidence(score){
-  const s=Number(score)||0;
-  if(s>=0.5) return {label:"Strong match",cls:"strong"};
-  if(s>=0.2) return {label:"Possible match",cls:"possible"};
-  return {label:"Weak match",cls:"weak"};
-}
-
-let doctorCaptures=[];
+/* ===================== Plant Doctor (Gemini, via the FloraLens Worker) ===================== */
+const DOCTOR_MAX_PHOTOS=3;
+let doctorCaptures=[];      // [{file,dataUrl}]
+let doctorNote="";
+let doctorAnswers={};       // {question: "Yes"|"No"|"Not sure"}
+let doctorThread=[];        // [{q,a}] follow-up questions in this check
+let doctorBusy=false;
 
 function openPlantDoctor(){
   if(!state.plants.length){
-    modal(`<div class="eyebrow">Plant Doctor</div><h2>Add the plant first</h2><p class="sub">Plant Doctor checks plants in My Garden, so it can show their usual care alongside the result.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant</button>`);
+    modal(`<div class="eyebrow">Plant Doctor</div><h2>Add the plant first</h2><p class="sub">Plant Doctor checks plants in My Garden, so it can use what FloraLens already knows about them.</p><button class="btn primary" style="width:100%" onclick="closeModal();startCamera('identify')">Identify a plant</button>`);
     return;
   }
-  modal(`<div class="eyebrow">Plant Doctor</div><h2>Which plant looks unwell?</h2><p class="sub">Choose it, then photograph the leaves or flowers that worry you.</p>
+  modal(`<div class="eyebrow">Plant Doctor</div><h2>Which plant looks unwell?</h2><p class="sub">Choose it, then photograph whatever is worrying you.</p>
     <div class="doctor-plant-list">${state.plants.map(p=>`<button class="destination-choice" onclick="chooseDoctorPlant('${p.id}')"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><div><b>${esc(p.common)}</b><small>${esc(p.scientific)} · ${esc(p.area||"Unplaced")}</small></div></button>`).join("")}</div>`);
   hydratePhotos();
 }
 function chooseDoctorPlant(id){
-  doctorPlantId=id;
-  doctorCaptures=[];
-  doctorLastResult=null;
+  doctorPlantId=id; doctorCaptures=[]; doctorNote=""; doctorAnswers={}; doctorThread=[]; doctorLastResult=null;
   closeModal();
   document.getElementById("doctorCameraInput")?.click();
 }
 async function handleDoctorPhoto(file){
-  if(!file) return;
-  if(!["image/jpeg","image/png"].includes(file.type)){ toast("Use a JPG or PNG photo"); return; }
+  if(!file||!String(file.type).startsWith("image/")) return;
   if(doctorCaptures.length>=DOCTOR_MAX_PHOTOS) return;
-  const dataUrl=await fileToDataUrl(file);
-  doctorCaptures.push({file,dataUrl,organ:"leaf"});
+  doctorCaptures.push({file,dataUrl:await fileToDataUrl(file)});
   renderDoctorReview();
 }
-function setDoctorOrgan(i,organ){ if(doctorCaptures[i]){ doctorCaptures[i].organ=organ; renderDoctorReview(); } }
 function removeDoctorCapture(i){
   doctorCaptures.splice(i,1);
   if(doctorCaptures.length) renderDoctorReview(); else setRoute("lens");
@@ -2977,117 +3132,236 @@ function renderDoctorReview(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
   if(!p) return setRoute("lens");
   currentRoute="lens";
-  const one=doctorCaptures.length===1;
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1><p class="sub">${one?"Add a second photo for a better result: one close-up of the problem and one of the wider plant.":"Tell FloraLens which part each photo shows, then check its health."}</p></section>
-    <div class="doctor-review-grid">${doctorCaptures.map((c,i)=>`<div class="doctor-review-card">
-      <div class="doctor-review-photo"><img src="${c.dataUrl}" alt="Photo ${i+1}"><button class="capture-remove" aria-label="Remove photo" onclick="removeDoctorCapture(${i})">×</button></div>
-      <div class="doctor-organ-row">${DOCTOR_ORGANS.map(o=>`<button class="${c.organ===o?"active":""}" onclick="setDoctorOrgan(${i},'${o}')">${o==="auto"?"Not sure":o[0].toUpperCase()+o.slice(1)}</button>`).join("")}</div>
-    </div>`).join("")}
-    ${doctorCaptures.length<DOCTOR_MAX_PHOTOS?`<button class="doctor-add-photo" onclick="addDoctorPhoto()"><span>📷</span><b>Add another photo</b><small>${doctorCaptures.length} of ${DOCTOR_MAX_PHOTOS}</small></button>`:""}</div>
-    <div class="doctor-tips"><b>For the best result</b><p>Daylight, no flash. Fill the frame with one affected leaf, in focus. Show both the top and underside if you can.</p></div>
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1><p class="sub">${doctorCaptures.length===1?"A second photo of the whole plant helps a lot.":"Add a note if you've noticed anything, then check its health."}</p></section>
+    <div class="doctor-shots">${doctorCaptures.map((c,i)=>`<div class="doctor-shot"><img src="${c.dataUrl}" alt="Photo ${i+1}"><button class="capture-remove" aria-label="Remove photo" onclick="removeDoctorCapture(${i})">×</button></div>`).join("")}
+      ${doctorCaptures.length<DOCTOR_MAX_PHOTOS?`<button class="doctor-shot doctor-shot-add" onclick="addDoctorPhoto()"><span>📷</span><b>Add photo</b><small>${DOCTOR_MAX_PHOTOS-doctorCaptures.length} more allowed</small></button>`:""}</div>
+    <label class="field-label" for="doctorNote">What have you noticed? <span style="font-weight:500;color:var(--muted)">(optional)</span></label>
+    <textarea id="doctorNote" class="journal-field journal-textarea" maxlength="400" placeholder="e.g. leaves going yellow and dropping off" oninput="doctorNote=this.value">${esc(doctorNote)}</textarea>
+    <div class="doctor-tips"><b>For the best result</b><p>Daylight, no flash. One sharp close-up of the problem, plus one of the whole plant.</p></div>
     <button class="btn primary" style="width:100%;margin-top:14px" onclick="runPlantDoctor()">✚ Check health</button>
     <button class="btn outline" style="width:100%;margin-top:10px" onclick="setRoute('lens')">Cancel</button>`;
 }
+
+// Shrink photos before sending: faster on mobile data and well under request limits.
+async function doctorImagePayload(file,maxSide=1280){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+    const scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement("canvas");
+    c.width=Math.round(img.naturalWidth*scale); c.height=Math.round(img.naturalHeight*scale);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    return {mime_type:"image/jpeg",data:c.toDataURL("image/jpeg",0.84).split(",")[1]};
+  }finally{ URL.revokeObjectURL(url); }
+}
+
+// Everything FloraLens already knows, so she never has to type it.
+function doctorContext(p){
+  const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
+  const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
+  const now=new Date();
+  const lines=[
+    `Plant: ${p.common} (${p.scientific}${p.family?`, ${p.family}`:""})`,
+    `Where: ${p.area||"not recorded"}, UK garden`,
+    `Today: ${now.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"})} (${currentSeasonName()})`,
+    p.added?`In the garden since: ${p.added}`:null
+  ];
+  const careLines=[["Light",care.light],["Water",care.water],["Soil",care.soil],["Hardiness",care.hardiness],["Pruning",care.pruning]].filter(([,v])=>usable(v)).map(([k,v])=>`${k}: ${v}`);
+  if(careLines.length) lines.push("Care record:",...careLines.map(x=>"- "+x));
+  const notes=state.journal.filter(j=>j.plantId===p.id&&j.text).slice(0,6);
+  if(notes.length) lines.push("Recent journal (newest first):",...notes.map(j=>`- ${j.date} [${j.type}] ${j.text.slice(0,220)}`));
+  return lines.filter(Boolean).join("\n");
+}
+
+async function callPlantDoctor(extra={}){
+  if(!API_PROXY_URL) throw new Error("Plant Doctor needs the FloraLens Worker to be set up.");
+  const p=state.plants.find(x=>x.id===doctorPlantId);
+  const images=await Promise.all(doctorCaptures.map(c=>doctorImagePayload(c.file)));
+  const body={
+    images,
+    context:doctorContext(p),
+    note:doctorNote.trim(),
+    answers:Object.entries(doctorAnswers).map(([q,a])=>({q,a})),
+    previous:doctorLastResult?.data||null,
+    history:doctorThread.filter(t=>t.a),
+    ...extra
+  };
+  const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/doctor`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const data=await res.json().catch(()=>null);
+  if(!data){
+    if(res.status===404) throw new Error("The Worker doesn't have a /doctor route yet. Add worker-gemini.js and redeploy.");
+    throw new Error(`Plant Doctor couldn't reach Gemini (${res.status}). Try again in a moment.`);
+  }
+  if(!res.ok||data.error){
+    if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight, so try again tomorrow.");
+    if(res.status===403) throw new Error("This copy of FloraLens isn't on the Worker's allowed list. Check ALLOWED_ORIGINS in the Worker.");
+    throw new Error(data.error||`Plant Doctor failed (${res.status}).`);
+  }
+  return data.result;
+}
+
 function renderDoctorLoading(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>Checking ${p?esc(p.common):"your plant"}…</h1><p class="sub">Comparing your ${doctorCaptures.length===1?"photo":`${doctorCaptures.length} photos`} with known plant diseases.</p></section>
-    <div class="doctor-photo-hero"><img src="${doctorCaptures[0].dataUrl}" alt=""><div class="identify-overlay"><div><div class="flower-loader">✚</div><h2 style="margin:14px 0 5px">Looking for signs of disease</h2><p style="opacity:.85">This usually takes a few seconds.</p></div></div></div>`;
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>Checking ${p?esc(p.common):"your plant"}…</h1><p class="sub">Looking at your ${doctorCaptures.length===1?"photo":`${doctorCaptures.length} photos`} alongside what FloraLens knows about this plant.</p></section>
+    <div class="doctor-photo-hero"><img src="${doctorCaptures[0].dataUrl}" alt=""><div class="identify-overlay"><div><div class="flower-loader">✚</div><h2 style="margin:14px 0 5px">Taking a close look</h2><p style="opacity:.85">This usually takes 5 to 15 seconds.</p></div></div></div>`;
 }
 async function runPlantDoctor(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  if(!p||!doctorCaptures.length) return;
+  if(!p||!doctorCaptures.length||doctorBusy) return;
+  doctorBusy=true;
+  doctorAnswers={}; doctorThread=[]; doctorLastResult=null;
   renderDoctorLoading();
-  const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
-  const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey);
-  let results=[], error=null;
   try{
-    if(!API_PROXY_URL) throw new Error("Plant Doctor needs the FloraLens Worker to be set up.");
-    const fd=new FormData();
-    doctorCaptures.forEach(c=>{ fd.append("images",c.file,c.file.name||"plant.jpg"); fd.append("organs",c.organ); });
-    fd.append("lang","en");
-    fd.append("nb-results","5");
-    fd.append("include-related-images","true");
-    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/diagnose`,{method:"POST",body:fd});
-    if(res.status===404){
-      // Pl@ntNet uses 404 when nothing matched; a missing Worker route returns non-JSON.
-      const body=await res.json().catch(()=>null);
-      if(!body) throw new Error("The Worker doesn't have a /diagnose route yet. Add the snippet from worker-diagnose.js and redeploy.");
-      results=[];
-    }else{
-      if(!res.ok) throw new Error(res.status===429?"Today's Pl@ntNet allowance has run out. Try again tomorrow.":`The health check failed (${res.status}). Try again in a moment.`);
-      const data=await res.json();
-      results=Array.isArray(data.results)?data.results:[];
-      if(Number.isFinite(data.remainingIdentificationRequests)){ state.lastQuota=data.remainingIdentificationRequests; saveState(); }
-    }
-  }catch(err){ error=friendlyNetError(err,"Plant Doctor"); }
-  doctorLastResult={results,care,error,checkedAt:new Date().toISOString()};
+    const data=await callPlantDoctor();
+    doctorLastResult={data,checkedAt:new Date().toISOString(),error:null};
+  }catch(err){
+    doctorLastResult={data:null,error:friendlyNetError(err,"Plant Doctor"),checkedAt:new Date().toISOString()};
+  }finally{ doctorBusy=false; }
   renderDoctorResult();
 }
-function doctorGenericChecks(){
-  return ["Compare affected leaves with healthy new growth","Check whether the soil is soggy or bone dry before changing watering","Look under the leaves for insects, eggs or webbing","Think back: any frost, scorching sun or strong wind recently?"];
+
+function setDoctorAnswer(i,ans){
+  const q=doctorLastResult?.data?.quick_checks?.[i]; if(!q) return;
+  if(doctorAnswers[q]===ans) delete doctorAnswers[q]; else doctorAnswers[q]=ans;
+  document.querySelectorAll(`[data-q="${i}"] button`).forEach(b=>b.classList.toggle("on",b.dataset.a===doctorAnswers[q]));
+  const n=Object.keys(doctorAnswers).length;
+  const btn=document.getElementById("doctorUpdate");
+  if(btn){ btn.hidden=!n; btn.textContent=n===1?"↻ Update with my answer":"↻ Update with my answers"; }
 }
-function renderDoctorResult(){
+async function updateDoctorWithAnswers(){
+  if(doctorBusy||!Object.keys(doctorAnswers).length) return;
+  doctorBusy=true;
+  const btn=document.getElementById("doctorUpdate");
+  if(btn){btn.disabled=true;btn.textContent="Updating…";}
+  try{
+    const data=await callPlantDoctor();
+    const keepAnswers={...doctorAnswers};
+    doctorLastResult={...doctorLastResult,data,error:null};
+    doctorAnswers={};                       // new result brings new quick checks
+    doctorLastResult.answered=[...(doctorLastResult.answered||[]),...Object.entries(keepAnswers).map(([q,a])=>({q,a}))];
+    doctorBusy=false;
+    renderDoctorResult(true);
+  }catch(err){
+    doctorBusy=false;
+    toast(friendlyNetError(err,"Updating").slice(0,80));
+    if(btn){btn.disabled=false;btn.textContent="↻ Try again";}
+  }
+}
+async function askDoctor(q){
+  q=String(q||"").trim();
+  if(!q||doctorBusy||!doctorLastResult?.data) return;
+  doctorBusy=true;
+  const entry={q,a:null};
+  doctorThread.push(entry);
+  renderDoctorThread();
+  const input=document.getElementById("doctorAsk"); if(input) input.value="";
+  try{
+    const data=await callPlantDoctor({question:q,history:doctorThread.filter(t=>t.a)});
+    entry.a=data.answer||"I couldn't find a clear answer to that from these photos.";
+    if(Array.isArray(data.follow_up_questions)&&data.follow_up_questions.length) doctorLastResult.data.follow_up_questions=data.follow_up_questions;
+  }catch(err){
+    entry.a=friendlyNetError(err,"Asking a question"); entry.failed=true;
+  }finally{ doctorBusy=false; }
+  renderDoctorThread();
+}
+function renderDoctorThread(){
+  const box=document.getElementById("doctorThread"); if(!box) return;
+  box.innerHTML=doctorThread.map(t=>`<div class="ai-msg ai-msg-q">${esc(t.q)}</div>${t.a===null?`<div class="ai-msg ai-msg-a ai-typing"><i></i><i></i><i></i></div>`:`<div class="ai-msg ai-msg-a ${t.failed?"failed":""}">${esc(t.a)}</div>`}`).join("");
+  const chips=document.getElementById("doctorChips");
+  const asked=new Set(doctorThread.map(t=>t.q));
+  if(chips) chips.innerHTML=(doctorLastResult?.data?.follow_up_questions||[]).filter(q=>!asked.has(q)).slice(0,3).map(q=>`<button onclick="askDoctor(decodeURIComponent('${jsArg(q)}'))">${esc(q)}</button>`).join("");
+  box.lastElementChild?.scrollIntoView({behavior:"smooth",block:"nearest"});
+}
+
+const DOCTOR_STATUS={
+  healthy:{cls:"ok",label:"Looks healthy"},
+  watch:{cls:"watch",label:"Keep an eye on it"},
+  act:{cls:"act",label:"Act soon"},
+  unclear:{cls:"unclear",label:"Can't tell yet"}
+};
+const DOCTOR_CONF={likely:"Likely",possible:"Possible",unsure:"Unsure"};
+const DOCTOR_LIKELY={higher:72,medium:45,lower:22,ruled_out:6};
+
+function renderDoctorResult(updated=false){
   const p=state.plants.find(x=>x.id===doctorPlantId);
   if(!p||!doctorLastResult) return;
-  const {results,care,error}=doctorLastResult;
-  const top=results[0]||null;
-  const confident=top && Number(top.score)>=0.2;
-  const f=top?doctorFriendly(top):null;
-  const conf=top?doctorConfidence(top.score):null;
-  const refs=top?doctorRefImages(top):[];
-  const others=results.slice(1,4);
-  const checks=(confident&&f?.checks)||doctorGenericChecks();
-  const quota=state.lastQuota!==null&&state.lastQuota!==undefined?`<span class="quota-pill">${state.lastQuota} checks left today</span>`:"";
+  const {data,error}=doctorLastResult;
+  const when=new Date(doctorLastResult.checkedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  const hero=`<div class="ai-hero"><img src="${doctorCaptures[0].dataUrl}" alt="Your photo"><div class="shade"></div>
+    <div class="top"><span>${esc(p.area||"Garden")}</span><span>Checked ${esc(when)}</span></div>
+    <div class="cap"><b>${esc(p.scientific)}</b><small>${doctorCaptures.length} photo${doctorCaptures.length>1?"s":""}</small></div></div>
+    ${doctorNote.trim()?`<div class="ai-note"><span>✎</span><p><i>Your note:</i> “${esc(doctorNote.trim())}”</p></div>`:""}`;
 
-  let headline;
-  if(error){
-    headline=`<section class="doctor-result-card doctor-error"><div class="eyebrow">Couldn't check this time</div><h2>Something went wrong</h2><p class="sub">${esc(error)}</p></section>`;
-  }else if(!top){
-    headline=`<section class="doctor-result-card doctor-healthy"><div class="eyebrow">No disease match</div><h2>Nothing in Pl@ntNet's disease list matched</h2><p class="sub">That's often good news. It can also mean the problem is a pest, watering or weather damage, which this check doesn't cover, or that the photo wasn't close enough.</p></section>`;
-  }else if(!confident){
-    headline=`<section class="doctor-result-card doctor-weak"><div class="eyebrow">Not confident</div><h2>No clear match</h2><p class="sub">The closest suggestion was <b>${esc(f.common||f.title)}</b>, but only at ${Math.round(top.score*100)}%. That's too low to rely on. Try a sharper close-up of one affected leaf in daylight.</p></section>`;
-  }else{
-    headline=`<section class="doctor-result-card doctor-${conf.cls}">
-      <div class="doctor-result-top"><span class="doctor-conf ${conf.cls}">${conf.label}</span><span class="doctor-score">${Math.round(top.score*100)}%</span></div>
-      <h2>${esc(f.common||f.title)}</h2>
-      ${f.common&&f.title!==f.common?`<p class="doctor-latin"><i>${esc(f.title)}</i>${f.kind?` · ${esc(f.kind)}`:""}</p>`:f.kind?`<p class="doctor-latin">${esc(f.kind)}</p>`:""}
-      ${doctorDescription(top)?`<p class="sub">${esc(doctorDescription(top))}</p>`:""}
-      <div class="doctor-meter"><span style="width:${Math.max(4,Math.round(top.score*100))}%"></span></div>
-    </section>`;
+  if(error||!data){
+    view.innerHTML=`<section class="page-head" style="padding-bottom:6px"><div class="eyebrow">Plant Doctor</div><h1 style="font-size:32px">${esc(p.common)}</h1></section>${hero}
+      <section class="ai-verdict ai-unclear"><div class="ai-verdict-top"><span class="ai-pill">Couldn't check</span></div><h2>Something went wrong</h2><p>${esc(error||"No answer came back.")}</p></section>
+      <div class="actions" style="margin-top:16px"><button class="btn primary" onclick="runPlantDoctor()">↻ Try again</button><button class="btn secondary" onclick="retakeDoctorPhoto()">New photos</button></div>
+      <button class="btn outline" style="width:100%" onclick="setRoute('lens')">Done</button>`;
+    return;
   }
 
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1>${quota}</section>
-    ${headline}
-    ${confident&&refs.length?`<section class="profile-card"><h3 style="margin:0 0 4px">Does it look like this?</h3><p class="small" style="margin:0 0 12px">Your photo next to Pl@ntNet's reference images. If they don't look alike, don't treat for it.</p>
-      <div class="doctor-compare"><figure><img src="${doctorCaptures[0].dataUrl}" alt="Your photo"><figcaption>Yours</figcaption></figure>${refs.map((u,i)=>`<figure><img src="${esc(u)}" alt="Reference ${i+1}" loading="lazy" onerror="this.closest('figure').remove()"><figcaption>Reference</figcaption></figure>`).join("")}</div></section>`:""}
-    ${!error?`<section class="profile-card"><h3 style="margin:0 0 10px">What to check next</h3><div class="doctor-check-list">${checks.map(x=>`<div><span>✓</span><p>${esc(x)}</p></div>`).join("")}</div></section>`:""}
-    ${others.length&&!error?`<section class="profile-card"><h3 style="margin:0 0 10px">Other possibilities</h3><div class="doctor-others">${others.map(r=>{const o=doctorFriendly(r);return `<div><span><b>${esc(o.common||o.title)}</b>${o.common&&o.title!==o.common?`<small><i>${esc(o.title)}</i></small>`:""}</span><em>${Math.round((Number(r.score)||0)*100)}%</em></div>`}).join("")}</div></section>`:""}
-    ${(usable(care.water)||usable(care.light)||usable(care.soil))?`<section class="profile-card"><h3 style="margin:0 0 10px">${esc(p.common)}'s usual needs</h3><p class="small" style="margin:-4px 0 10px">Stress from the wrong conditions often looks like disease.</p>
-      <div class="doctor-context-grid">${usable(care.water)?`<div data-ico="drop"><b>Water</b><p>${esc(care.water)}</p></div>`:""}${usable(care.light)?`<div data-ico="sun"><b>Light</b><p>${esc(care.light)}</p></div>`:""}${usable(care.soil)?`<div data-ico="soil"><b>Soil</b><p>${esc(care.soil)}</p></div>`:""}</div></section>`:""}
-    <div class="actions">${error?`<button class="btn primary" onclick="runPlantDoctor()">↻ Try again</button>`:`<button class="btn primary" onclick="saveDoctorToJournal()">Save to plant story</button>`}<button class="btn secondary" onclick="retakeDoctorPhoto()">New photos</button></div>
+  const st=DOCTOR_STATUS[data.status]||DOCTOR_STATUS.unclear;
+  const sev=Math.max(0,Math.min(3,Number(data.seriousness)||0));
+  const list=(arr)=>Array.isArray(arr)?arr.filter(Boolean).slice(0,5):[];
+  const doNow=list(data.do_now), avoid=list(data.avoid), checks=list(data.quick_checks).slice(0,3), alts=list(data.could_also_be);
+  const answered=doctorLastResult.answered||[];
+  const recheck=Number(data.recheck_in_days)||0;
+  const recheckDate=recheck?new Date(Date.now()+recheck*86400000):null;
+
+  view.innerHTML=`<section class="page-head" style="padding-bottom:6px"><div class="eyebrow">Plant Doctor</div><h1 style="font-size:32px">${esc(p.common)}</h1></section>
+    ${hero}
+    <section class="ai-verdict ai-${st.cls}${updated?" ai-flash":""}">
+      <div class="ai-verdict-top"><span class="ai-pill">${esc(DOCTOR_CONF[data.confidence]||st.label)}</span>${data.status!=="unclear"?`<span class="ai-sev">${sev?"Seriousness":"Nothing serious"} <i>${[1,2,3].map(n=>`<b class="${n<=sev?"on":""}"></b>`).join("")}</i></span>`:""}</div>
+      <h2>${esc(data.verdict||st.label)}</h2>
+      ${data.subtitle?`<p class="ai-sci">${esc(data.subtitle)}</p>`:""}
+      ${data.why?`<p>${esc(data.why)}</p>`:""}
+      ${answered.length?`<p class="ai-answered">Updated using your answers: ${answered.map(x=>`${esc(x.q.replace(/\?$/,""))}: <b>${esc(x.a)}</b>`).join(" · ")}</p>`:""}
+    </section>
+    ${data.photo_tip?`<div class="ai-tip ai-tip-photo"><span>📷</span><div><small>A better photo would help</small><p>${esc(data.photo_tip)}</p></div></div>`:""}
+    ${checks.length?`<section class="ai-block" data-ico="question"><div class="ai-block-head"><span>?</span><div><h3>Quick checks</h3><small>Answer any you can to sharpen the result</small></div></div>
+      ${checks.map((q,i)=>`<div class="ai-q" data-q="${i}"><p>${esc(q)}</p><div class="opts">${["Yes","No","Not sure"].map(a=>`<button data-a="${a}" onclick="setDoctorAnswer(${i},'${a}')">${a}</button>`).join("")}</div></div>`).join("")}
+      <button id="doctorUpdate" class="btn primary" style="width:100%;margin-top:12px" hidden onclick="updateDoctorWithAnswers()">↻ Update with my answers</button></section>`:""}
+    ${doNow.length?`<section class="ai-block" data-ico="check"><div class="ai-block-head"><span>✓</span><div><h3>${data.status==="healthy"?"Keep doing":"Do this now"}</h3>${data.effort?`<small>${esc(data.effort)}</small>`:""}</div></div><div class="ai-list">${doNow.map(x=>`<div><span>✓</span><p>${esc(x)}</p></div>`).join("")}</div></section>`:""}
+    ${avoid.length?`<section class="ai-block" data-ico="alert"><div class="ai-block-head"><span>!</span><div><h3>Avoid</h3></div></div><div class="ai-list">${avoid.map(x=>`<div><span>×</span><p>${esc(x)}</p></div>`).join("")}</div></section>`:""}
+    ${alts.length?`<section class="ai-block"><div class="ai-block-head"><span class="ai-ico-violet">⌕</span><div><h3>Could also be</h3></div></div><div class="ai-alts">${alts.map(a=>`<div><div><b>${esc(a.name||"")}</b>${a.note?`<small>${esc(a.note)}</small>`:""}</div><span class="bar"><i style="width:${DOCTOR_LIKELY[a.likelihood]??30}%"></i></span></div>`).join("")}</div></section>`:""}
+    ${data.next_season?`<div class="ai-tip"><span>🌱</span><div><small>For next time</small><p>${esc(data.next_season)}</p></div></div>`:""}
+    ${data.safety_note?`<div class="ai-tip ai-tip-safety"><span>!</span><div><small>Safety</small><p>${esc(data.safety_note)}</p></div></div>`:""}
+    ${recheckDate&&data.status!=="healthy"?`<div class="ai-recheck"><div class="cal"><small>${recheckDate.toLocaleDateString("en-GB",{month:"short"}).toUpperCase()}</small><b>${recheckDate.getDate()}</b></div><div><strong>Re-check in ${recheck} day${recheck>1?"s":""}</strong><em>Added to Care when you save this check.</em></div></div>`:""}
+    <section class="ai-ask"><h3>Ask about this</h3>
+      <div id="doctorThread" class="ai-thread"></div>
+      <div id="doctorChips" class="ai-chips"></div>
+      <form class="ai-input" onsubmit="event.preventDefault();askDoctor(document.getElementById('doctorAsk').value)">
+        <input id="doctorAsk" maxlength="300" autocomplete="off" placeholder="Ask anything about ${esc(p.common)}…"><button aria-label="Ask">→</button></form>
+    </section>
+    <div class="actions" style="margin-top:18px"><button class="btn primary" onclick="saveDoctorToJournal()">Save to plant story</button><button class="btn secondary" onclick="retakeDoctorPhoto()">New photos</button></div>
     <button class="btn outline" style="width:100%" onclick="setRoute('lens')">Done</button>
-    <p class="small doctor-source-note">Disease suggestions come from Pl@ntNet, which covers a limited list of plants and diseases. Always compare with the reference photos before treating.</p>`;
+    <p class="ai-foot">Plant Doctor uses Google Gemini with your photos, the plant's record and your journal. It can be wrong, so check before treating.</p>`;
+  renderDoctorThread();
+  if(updated){ const v=document.querySelector('.ai-verdict'); if(v) window.scrollTo({top:v.getBoundingClientRect().top+window.scrollY-84,behavior:'smooth'}); }
 }
 function retakeDoctorPhoto(){
-  doctorCaptures=[];doctorLastResult=null;
+  doctorCaptures=[];doctorAnswers={};doctorThread=[];doctorLastResult=null;
   document.getElementById("doctorCameraInput")?.click();
 }
 async function saveDoctorToJournal(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
-  if(!p||!doctorCaptures.length||!doctorLastResult) return;
+  const data=doctorLastResult?.data;
+  if(!p||!doctorCaptures.length||!data) return;
   const id="journal-"+Date.now(),photoKey=`${id}-photo`;
   try{await savePhoto(photoKey,doctorCaptures[0].file)}catch(e){console.warn(e)}
-  const top=doctorLastResult.results[0];
-  const confident=top&&Number(top.score)>=0.2;
-  const f=top?doctorFriendly(top):null;
-  const text=confident
-    ? `Plant Doctor: ${doctorConfidence(top.score).label.toLowerCase()} for ${f.common||f.title} (${Math.round(top.score*100)}%).`
-    : `Plant Doctor: no confident disease match. Photo saved to compare over time.`;
-  state.journal.unshift({id,plantId:p.id,date:localISODate(),type:"Problem",text,photoKey,createdAt:new Date().toISOString()});
-  const recheck=new Date(Date.now()+7*86400000);
-  state.careTasks.push({id:"care-"+Date.now(),plantId:p.id,title:`Re-check ${p.common}`,type:"Check",due:localISODate(recheck),notes:confident?`Is the ${(f.common||f.title).toLowerCase()} spreading or improving? Run Plant Doctor again to compare.`:"Has anything changed since the last health check?",completed:false,createdAt:new Date().toISOString()});
+  const parts=[`Plant Doctor: ${data.verdict} (${(DOCTOR_CONF[data.confidence]||"").toLowerCase()||"unsure"}).`];
+  if(data.why) parts.push(data.why);
+  if(doctorNote.trim()) parts.push(`Noticed: ${doctorNote.trim()}`);
+  doctorThread.filter(t=>t.a&&!t.failed).forEach(t=>parts.push(`Q: ${t.q} A: ${t.a}`));
+  state.journal.unshift({id,plantId:p.id,date:localISODate(),type:data.status==="healthy"?"Note":"Problem",text:parts.join(" ").slice(0,1500),photoKey,
+    doctor:{verdict:data.verdict,status:data.status,confidence:data.confidence},createdAt:new Date().toISOString()});
+  const days=Number(data.recheck_in_days)||0;
+  if(days>0&&data.status!=="healthy"){
+    state.careTasks.push({id:"care-"+Date.now(),plantId:p.id,title:`Re-check ${p.common}`,type:"Check",due:localISODate(new Date(Date.now()+days*86400000)),
+      notes:`Plant Doctor thought: ${data.verdict}. Is it spreading or improving? Run Plant Doctor again to compare.`,completed:false,createdAt:new Date().toISOString()});
+  }
   saveState();
-  toast(`Saved, re-check due in 7 days`);
+  toast(days>0&&data.status!=="healthy"?`Saved, re-check in ${days} days`:"Saved to its story");
   setRoute("profile",{id:p.id});
 }
 
@@ -3152,7 +3426,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.3 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.6 · made for our garden</div>`);
 });
 
 renderHome();
@@ -3183,7 +3457,8 @@ function showUpdateReady(worker){
 }
 if("serviceWorker" in navigator && location.protocol!=="file:"){
   let reloading=false;
-  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloading) return; reloading=true; location.reload(); });
+  const hadController=!!navigator.serviceWorker.controller; // first install: no reload needed
+  navigator.serviceWorker.addEventListener("controllerchange",()=>{ if(reloading||!hadController) return; reloading=true; location.reload(); });
   window.addEventListener("load",async()=>{
     try{
       const reg=await navigator.serviceWorker.register("sw.js");
