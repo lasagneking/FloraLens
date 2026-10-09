@@ -325,5 +325,6 @@ No Cloudflare or API-secret changes are required.
 - Loads TRY v7 A–Z JSON shards on demand by scientific-name initial rather than shipping the full dataset into one JavaScript global.
 - Adds TRY v7 growth form, woodiness, life history, leaf phenology, flower colour, cautious height estimate, soil pH and recorded tolerance context to plant profiles when available.
 - Plant Atlas 2020 remains preferred for UK/Ireland flowering phenology; TRY v7 flowering months are a lower-priority fallback.
+- 
 - The existing TRY Archive 81 index remains as a compatibility fallback, including genus-level matching where v7 has no exact species record.
 - TRY ecological/tolerance context remains labelled as botanical evidence, not direct horticultural care advice.
