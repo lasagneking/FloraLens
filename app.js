@@ -1282,6 +1282,19 @@ function traitCareInference(tr){
   else if(gf.includes("herbaceous")){ water="Moderate, even moisture during active growth is a general starting point; adjust for the species and weather."; soil="A reasonably fertile, well-drained garden soil suits many herbaceous plants; verify species-specific exceptions."; }
   return {water,soil};
 }
+// When Google says "limit reached" or the credit is empty, background work pauses
+// until the time Google gives, instead of trying plant after plant.
+function noteGeminiPause(data){
+  const secs=Number(data?.retryAfter);
+  const wait=Number.isFinite(secs)&&secs>0?secs:(data?.error&&/credit/i.test(data.error)?3600:300);
+  state.geminiPausedUntil=new Date(Date.now()+Math.min(wait,24*3600)*1000).toISOString();
+  saveState();
+}
+function clearGeminiPause(){ if(state.geminiPausedUntil){ state.geminiPausedUntil=null; saveState(); setTimeout(fillGardenGaps,3000); } }
+function geminiPaused(){
+  return !!state.geminiPausedUntil && Date.now()<new Date(state.geminiPausedUntil).getTime();
+}
+
 /* ===================== Gemini gap-filler =====================
    Real sources always win. Gemini is asked once per species, only for the
    fields every other source left empty, and its answers are tagged "✦ Gemini". */
@@ -1305,7 +1318,7 @@ function careGapsFor(p){
 }
 async function fillGapsWithGemini(p,{force=false}={}){
   fillGapsWithGemini.lastCalled=false;
-  if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine) return false;
+  if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine||geminiPaused()) return false;
   const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
   const g=cache.gemini;
   if(!force && g?.fetchedAt) return false;                                        // once per species
@@ -1319,6 +1332,7 @@ async function fillGapsWithGemini(p,{force=false}={}){
     const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/fill`,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({scientific:p.scientific,common:p.common,family:p.family||cache.family||"",missing,known})});
     const data=await res.json().catch(()=>null);
+    if(res.status===429||res.status===402){ noteGeminiPause(data); return false; }
     if(!res.ok||!data?.fields) throw new Error(data?.error||`Gap fill failed (${res.status})`);
     const fields={};
     for(const k of missing){
@@ -2255,10 +2269,11 @@ async function runBuyCheck(id,{files=null,extraFile=null}={}){
     const data=await res.json().catch(()=>null);
     if(!data){ throw new Error(res.status===404?"The Worker doesn't have a /buycheck route yet. Add it from worker-gemini.js.":`The health check failed (${res.status}).`); }
     if(!res.ok||data.error){
-      if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight.");
+      if(res.status===429||res.status===402){ noteGeminiPause(data); throw new Error(data.error||"Gemini's limit is reached for now. Try again later."); }
       throw new Error(data.error||`The health check failed (${res.status}).`);
     }
     d.buyCheck={...data.result,checkedAt:new Date().toISOString(),photos:list.length};
+    clearGeminiPause();
     delete d.buyCheckError;
   }catch(err){
     d.buyCheckError=friendlyNetError(err,"The health check");
@@ -3111,10 +3126,11 @@ async function lookupPlant(q){
     const data=await res.json().catch(()=>null);
     if(!data) throw new Error(res.status===404?"The Worker doesn't have a /lookup route yet. Upload the new worker.js.":`Lookup failed (${res.status}).`);
     if(!res.ok||data.error){
-      if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight.");
+      if(res.status===429||res.status===402){ noteGeminiPause(data); throw new Error(data.error||"Gemini's limit is reached for now. Try again later."); }
       throw new Error(data.error||`Lookup failed (${res.status}).`);
     }
     lastLookup={query:q,...data};
+    clearGeminiPause();
     lookupBusy=false;
     renderLookupResult();
   }catch(err){
@@ -3345,10 +3361,11 @@ async function callPlantDoctor(extra={}){
     throw new Error(`Plant Doctor couldn't reach Gemini (${res.status}). Try again in a moment.`);
   }
   if(!res.ok||data.error){
-    if(res.status===429) throw new Error("Gemini's free allowance is used up for now. It resets overnight, so try again tomorrow.");
+    if(res.status===429||res.status===402){ noteGeminiPause(data); throw new Error(data.error||"Gemini's limit is reached for now. Try again later."); }
     if(res.status===403) throw new Error("This copy of FloraLens isn't on the Worker's allowed list. Check ALLOWED_ORIGINS in the Worker.");
     throw new Error(data.error||`Plant Doctor failed (${res.status}).`);
   }
+  clearGeminiPause();
   return data.result;
 }
 
@@ -3578,7 +3595,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.9.1 · made for our garden</div>`);
 });
 
 renderHome();
@@ -3598,7 +3615,7 @@ async function fillGardenGaps(){
     const seen=new Set();
     const items=[...state.plants,...state.discoveries].filter(p=>p?.speciesKey && !seen.has(p.speciesKey) && seen.add(p.speciesKey));
     for(const p of items){
-      if(!navigator.onLine) break;
+      if(!navigator.onLine||geminiPaused()) break;
       const g=state.speciesCache[p.speciesKey]?.gemini;
       if(g?.fetchedAt) continue;                                  // already done
       if(!state.speciesCache[p.speciesKey]){

@@ -409,6 +409,26 @@ function doctorJson(body, status, corsHeaders) {
   });
 }
 
+// Turn Google's 429 into a plain message with the real wait time.
+function geminiLimitReply(detail) {
+  const text = String(detail || "");
+  const m = text.match(/retry in\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i);
+  const secs = m ? (Number(m[1] || 0) * 3600 + Number(m[2] || 0) * 60 + Math.ceil(Number(m[3] || 0))) : 0;
+  const perDay = /per\s*day|perday/i.test(text);
+  let error;
+  if (secs >= 3600) {
+    const h = Math.round(secs / 3600);
+    error = `Today's Gemini allowance is used up. It's available again in about ${h} hour${h === 1 ? "" : "s"}.`;
+  } else if (secs >= 120) {
+    error = `Gemini's limit is reached for now. Try again in about ${Math.round(secs / 60)} minutes.`;
+  } else if (perDay) {
+    error = "Today's Gemini allowance is used up. Try again tomorrow.";
+  } else {
+    error = "Gemini is busy for a moment. Try again in a minute.";
+  }
+  return { status: 429, error, retryAfter: secs || (perDay ? 6 * 3600 : 60) };
+}
+
 // Gemini sometimes answers 503 ("overloaded") or 500 for a moment. Retry those
 // quietly with a short back-off so the app only sees an error if it persists.
 const GEMINI_RETRY_DELAYS_MS = [700, 1600, 3200];
@@ -450,7 +470,8 @@ async function callGemini(env, { system, input, schema }) {
     lastStatus = upstream.status;
     const detail = await upstream.text().catch(() => "");
     console.log(`Gemini error ${upstream.status} (attempt ${attempt + 1})`, detail.slice(0, 300));
-    if (upstream.status === 429) return { status: 429, error: "Gemini quota reached" };
+    if (upstream.status === 429) return geminiLimitReply(detail);
+    if (upstream.status === 402) return { status: 402, error: "The Gemini credit has run out. Top it up in Google AI Studio → Billing, then try again.", retryAfter: 0 };
     if (![500, 502, 503, 504].includes(upstream.status)) {
       return { status: 502, error: `Gemini returned an error (${upstream.status}).` };   // not worth retrying
     }
@@ -517,7 +538,7 @@ async function handleDoctor(request, env, corsHeaders) {
       { type: "text", text: parts.join("\n\n") },
     ],
   });
-  if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
   return doctorJson({ result: out.result }, 200, corsHeaders);
 }
 
@@ -578,7 +599,7 @@ async function handleFill(request, env, corsHeaders) {
     schema: { type: "object", properties, required: missing },
     input: [{ type: "text", text }],
   });
-  if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
   return doctorJson({ fields: out.result, model: GEMINI_MODEL }, 200, corsHeaders);
 }
 
@@ -638,7 +659,7 @@ async function handleBuyCheck(request, env, corsHeaders) {
       { type: "text", text: `What FloraLens knows:\n${String(body.context || "").slice(0, 3000)}\n\nShould she buy this plant? Return the JSON result.` },
     ],
   });
-  if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
   return doctorJson({ result: out.result }, 200, corsHeaders);
 }
 
@@ -721,7 +742,7 @@ async function handleLookup(request, env, corsHeaders) {
   if (!query) return doctorJson({ error: "Type a plant name" }, 400, corsHeaders);
 
   const out = await callGemini(env, { system: LOOKUP_RULES, schema: LOOKUP_SCHEMA, input: [{ type: "text", text: `She typed: "${query}"` }] });
-  if (out.error) return doctorJson({ error: out.error }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
   const result = out.result;
   let photo = null;
   if (result?.found && result.scientific) {
