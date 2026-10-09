@@ -4,7 +4,7 @@
    - Versioned files (?v=…), plant data shards and fonts: cache first.
    - API calls (identify, diagnose, enrich, GBIF): always network, never cached.
    Bump VERSION whenever you deploy; the app then offers "Update ready". */
-const VERSION = "2.6.0";
+const VERSION = "2.6.1";
 const SHELL = `floralens-shell-${VERSION}`;
 const RUNTIME = "floralens-runtime";
 

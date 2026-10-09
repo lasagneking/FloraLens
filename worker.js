@@ -404,27 +404,56 @@ function doctorJson(body, status, corsHeaders) {
   });
 }
 
+// Gemini sometimes answers 503 ("overloaded") or 500 for a moment. Retry those
+// quietly with a short back-off so the app only sees an error if it persists.
+const GEMINI_RETRY_DELAYS_MS = [700, 1600, 3200];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function callGemini(env, { system, input, schema }) {
-  const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      model: GEMINI_MODEL,
-      system_instruction: system,
-      input,
-      response_format: { type: "text", mime_type: "application/json", schema },
-      store: false,
-    }),
+  const body = JSON.stringify({
+    model: GEMINI_MODEL,
+    system_instruction: system,
+    input,
+    response_format: { type: "text", mime_type: "application/json", schema },
+    store: false,
   });
-  if (!upstream.ok) {
+  let lastStatus = 0;
+  for (let attempt = 0; attempt <= GEMINI_RETRY_DELAYS_MS.length; attempt++) {
+    if (attempt > 0) await sleep(GEMINI_RETRY_DELAYS_MS[attempt - 1]);
+    let upstream;
+    try {
+      upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body,
+      });
+    } catch (e) {
+      lastStatus = 0;
+      console.log(`Gemini network error (attempt ${attempt + 1})`, String(e?.message || e));
+      continue;
+    }
+    if (upstream.ok) {
+      const data = await upstream.json();
+      const text = extractGeminiText(data).trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "");
+      try { return { result: JSON.parse(text) }; }
+      catch {
+        console.log(`Unparseable Gemini output (attempt ${attempt + 1})`, text.slice(0, 300));
+        lastStatus = 502;
+        continue;                       // a fresh attempt usually returns clean JSON
+      }
+    }
+    lastStatus = upstream.status;
     const detail = await upstream.text().catch(() => "");
-    console.log("Gemini error", upstream.status, detail.slice(0, 500));
-    return { status: upstream.status === 429 ? 429 : 502, error: upstream.status === 429 ? "Gemini quota reached" : `Gemini returned an error (${upstream.status}).` };
+    console.log(`Gemini error ${upstream.status} (attempt ${attempt + 1})`, detail.slice(0, 300));
+    if (upstream.status === 429) return { status: 429, error: "Gemini quota reached" };
+    if (![500, 502, 503, 504].includes(upstream.status)) {
+      return { status: 502, error: `Gemini returned an error (${upstream.status}).` };   // not worth retrying
+    }
   }
-  const data = await upstream.json();
-  const text = extractGeminiText(data).trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "");
-  try { return { result: JSON.parse(text) }; }
-  catch { console.log("Unparseable Gemini output", text.slice(0, 500)); return { status: 502, error: "Gemini's answer couldn't be read. Try again." }; }
+  if (lastStatus === 503 || lastStatus === 0 || lastStatus >= 500) {
+    return { status: 503, error: "Gemini is busy right now. Try again in a minute." };
+  }
+  return { status: 502, error: "Gemini's answer couldn't be read. Try again." };
 }
 
 function originAllowed(request) {

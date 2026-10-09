@@ -1308,7 +1308,7 @@ async function fillGapsWithGemini(p,{force=false}={}){
   const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
   const g=cache.gemini;
   if(!force && g?.fetchedAt) return false;                                        // once per species
-  if(!force && g?.failedAt && Date.now()-new Date(g.failedAt).getTime()<6*3600e3) return false;
+  if(!force && g?.failedAt && Date.now()-new Date(g.failedAt).getTime()<20*60e3) return false;
   if(geminiFillInFlight.has(p.speciesKey)) return false;
   const {missing,known}=careGapsFor(p);
   if(!missing.length) return false;
@@ -3426,7 +3426,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.6 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.6.1 · made for our garden</div>`);
 });
 
 renderHome();
