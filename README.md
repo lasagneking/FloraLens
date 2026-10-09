@@ -328,3 +328,6 @@ No Cloudflare or API-secret changes are required.
 - 
 - The existing TRY Archive 81 index remains as a compatibility fallback, including genus-level matching where v7 has no exact species record.
 - TRY ecological/tolerance context remains labelled as botanical evidence, not direct horticultural care advice.
+
+
+
