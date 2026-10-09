@@ -1358,10 +1358,10 @@ async function maybeFillGaps(p){
   if(!(enriched||filled)) return;
   if(currentRoute==="profile" && document.querySelector(`[data-profile-id="${p.id}"]`)){
     const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab;
-    const y=window.scrollY;
+    const y=appScrollTop();
     await renderProfile(p.id);
     if(tab) setProfileTab(tab);
-    window.scrollTo(0,y);
+    appScrollTo(y);
     const n=filled?Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).length:0;
     toast(n?`Gemini filled ${n} missing detail${n===1?"":"s"}`:"Botanical notes added");
   }
@@ -1725,7 +1725,7 @@ function setRoute(route, data={}){
   if(route==="care") renderCareCalendar();
   if(route==="discover") renderDiscover();
   if(route==="profile" && data.id) renderProfile(data.id);
-  window.scrollTo({top:0,behavior:"smooth"});
+  appScrollTo(0);   // new screen opens at the top, like a native app
 }
 
 function pin(p,{canDelete=false}={}){
@@ -3340,7 +3340,7 @@ function renderDoctorResult(updated=false){
     <button class="btn outline" style="width:100%" onclick="setRoute('lens')">Done</button>
     <p class="ai-foot">Plant Doctor uses Google Gemini with your photos, the plant's record and your journal. It can be wrong, so check before treating.</p>`;
   renderDoctorThread();
-  if(updated){ const v=document.querySelector('.ai-verdict'); if(v) window.scrollTo({top:v.getBoundingClientRect().top+window.scrollY-84,behavior:'smooth'}); }
+  if(updated){ const v=document.querySelector('.ai-verdict'); if(v) appScrollTo(v.getBoundingClientRect().top-appScroller().getBoundingClientRect().top+appScrollTop()-12,true); }
 }
 function retakeDoctorPhoto(){
   doctorCaptures=[];doctorAnswers={};doctorThread=[];doctorLastResult=null;
@@ -3429,7 +3429,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.7 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 2.8 · made for our garden</div>`);
 });
 
 renderHome();
@@ -3480,14 +3480,34 @@ function refreshCurrentView(){
     else if(currentRoute==="discover") renderDiscover();
     else if(currentRoute==="profile"){
       const id=view.dataset.profileId; if(!id) return;
-      const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab, y=window.scrollY;
-      renderProfile(id).then(()=>{ if(tab) setProfileTab(tab); window.scrollTo(0,y); });
+      const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab, y=appScrollTop();
+      renderProfile(id).then(()=>{ if(tab) setProfileTab(tab); appScrollTo(y); });
     }
   }catch(e){ console.warn("Refresh after gap fill",e); }
 }
 window.addEventListener("load",()=>setTimeout(fillGardenGaps,4000));
 window.addEventListener("online",()=>setTimeout(fillGardenGaps,3000));
 document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") setTimeout(fillGardenGaps,3000); });
+
+/* ===================== Native app behaviour =====================
+   The page itself never scrolls: only the content area between the header and
+   the tab bar does. That removes the whole-page bounce, sideways drift and
+   pinch-zoom that make a web app feel like a website. */
+function appScroller(){ return document.getElementById("view")||document.scrollingElement; }
+function appScrollTop(){ return appScroller().scrollTop; }
+function appScrollTo(top,smooth=false){ appScroller().scrollTo({top:Math.max(0,top),behavior:smooth?"smooth":"auto"}); }
+(function nativeFeel(){
+  // No pinch-zoom (iOS ignores user-scalable=no, so stop its gesture events too)
+  ["gesturestart","gesturechange","gestureend"].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+  document.addEventListener("touchmove",e=>{ if(e.touches.length>1) e.preventDefault(); },{passive:false});
+  // No long-press "Save image / Copy" menus on photos and buttons
+  document.addEventListener("contextmenu",e=>{ if(!e.target.closest("input,textarea,.ai-msg-a,.journal-entry p")) e.preventDefault(); });
+  // Lock to portrait where the platform allows it (Android home-screen apps); iOS shows the rotate screen instead
+  try{ screen.orientation?.lock?.("portrait").catch(()=>{}); }catch{}
+  // Stop any stray sideways scroll offset on the content area
+  const v=document.getElementById("view");
+  if(v) v.addEventListener("scroll",()=>{ if(v.scrollLeft) v.scrollLeft=0; },{passive:true});
+})();
 
 /* ===================== Home-screen app: offline + updates ===================== */
 function updateOnlineState(){

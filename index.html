@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#F3F7F4" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,500..700,0..100;1,9..144,500..700,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=2.7.0" />
+  <link rel="stylesheet" href="styles.css?v=2.8.0" />
 </head>
 <body>
   <div id="app">
@@ -41,13 +41,19 @@
     </nav>
   </div>
 
+  <div id="rotateNotice" aria-hidden="true">
+    <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="8" width="24" height="44" rx="5"/><path d="M29 46h6"/><path d="M50 22a16 16 0 0 1 4 18"/><path d="M54 40l-1-7-6 3"/></svg>
+    <b>Turn your phone upright</b>
+    <small>FloraLens is designed for portrait.</small>
+  </div>
+
   <input id="cameraInput" type="file" accept="image/*" capture="environment" hidden />
   <input id="galleryInput" type="file" accept="image/*" hidden />
   <input id="multiPhotoInput" type="file" accept="image/*" capture="environment" hidden />
   <input id="doctorCameraInput" type="file" accept="image/*" capture="environment" hidden />
-  <script src="icons.js?v=2.7.0"></script>
-  <script src="traits.js?v=2.7.0"></script>
-  <script src="phenology.js?v=2.7.0"></script>
-  <script src="app.js?v=2.7.0"></script>
+  <script src="icons.js?v=2.8.0"></script>
+  <script src="traits.js?v=2.8.0"></script>
+  <script src="phenology.js?v=2.8.0"></script>
+  <script src="app.js?v=2.8.0"></script>
 </body>
 </html>
