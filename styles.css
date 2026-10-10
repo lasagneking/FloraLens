@@ -1140,3 +1140,50 @@ button,a{-webkit-touch-callout:none}
 .plan-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
 .plan-actions .btn{padding:12px;font-size:14px}
 .plan-credit{display:block;margin-top:8px;font-size:10.5px;color:var(--faint)}
+
+/* ======================================================================
+   GARDEN WEATHER
+   ====================================================================== */
+.wx-card{width:100%;border:0;border-radius:22px;padding:14px 16px;margin:0 0 10px;text-align:left;display:flex;flex-direction:column;gap:10px;background:linear-gradient(135deg,#E5F0FF,#E1F7FC);box-shadow:var(--sh-1);color:var(--ink)}
+.wx-row{display:flex;align-items:center;gap:14px}
+.wx-now{display:flex;align-items:center;gap:6px;flex:none}
+.wx-now b{font-family:var(--display);font-size:34px;font-weight:600;line-height:1}
+.wx-big{width:42px;height:42px}
+.wx-meta{flex:1;min-width:0}
+.wx-meta small{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.wx-meta strong{display:block;font-size:16px;font-weight:800}
+.wx-meta em{display:block;font-style:normal;font-size:12.5px;color:var(--ink-2)}
+.wx-go{font-size:19px;color:var(--faint);font-weight:400}
+.wx-ico,.wx-big{fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;stroke:currentColor;flex:none}
+.wx-ico{width:28px;height:28px}
+.wx-sun{color:#F59E0B}.wx-part{color:#E0A100}.wx-cloud{color:#7C8B96}.wx-rain{color:var(--water)}.wx-snow{color:var(--frost)}.wx-storm{color:var(--prune)}
+.wx-alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:15px;background:rgba(255,255,255,.75);text-align:left}
+.wx-alert>i{font-style:normal;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:15px;background:#fff;color:var(--water)}
+.wx-alert b{display:block;font-size:13.5px;font-weight:800}
+.wx-alert small{display:block;font-size:12.5px;color:var(--ink-2);line-height:1.45;margin-top:1px}
+.wx-alert-high .wx-alert>i,.wx-alert.wx-alert-high>i{color:var(--frost)}
+.wx-card.wx-alert-high{background:linear-gradient(135deg,#DDF3FB,#E6ECFF)}
+.wx-alert.wx-alert-medium>i,.wx-card.wx-alert-medium .wx-alert>i{color:#C26510}
+.wx-alert.wx-alert-good>i,.wx-card.wx-alert-good .wx-alert>i{color:var(--water)}
+.wx-more{font-size:12px;font-weight:700;color:var(--water);padding-left:2px}
+.wx-setup{flex-direction:row;align-items:center;gap:14px}
+.wx-setup>span:nth-child(2){flex:1}
+.wx-setup small{display:block;font-size:12px;font-weight:700;color:var(--muted)}
+.wx-setup strong{display:block;font-size:16px;font-weight:800}
+.wx-setup em{display:block;font-style:normal;font-size:12.5px;color:var(--muted)}
+.wx-setup>b{font-size:19px;color:var(--faint);font-weight:400}
+.wx-setup-ico{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;background:#fff;flex:none}
+.wx-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0 14px}
+.wx-week>div{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 2px;border-radius:14px;background:var(--bg)}
+.wx-week>div.frosty{background:var(--frost-bg)}
+.wx-week small{font-size:11px;font-weight:800;color:var(--muted)}
+.wx-week .wx-ico{width:24px;height:24px}
+.wx-week b{font-size:13.5px;font-weight:800}
+.wx-week em{font-style:normal;font-size:12px;color:var(--muted)}
+.wx-week span{font-size:10px;font-weight:700;color:var(--water)}
+.wx-week span.dry{color:var(--faint)}
+.wx-alert-list{display:grid;gap:8px}
+.wx-alert-list .wx-alert{background:var(--bg)}
+.wx-calm{padding:14px;border-radius:15px;background:var(--leaf-soft);color:var(--canopy);font-size:13.5px;font-weight:600}
+.wx-foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:11.5px;color:var(--faint)}
+.wx-results{display:grid;gap:0;margin-top:8px}

@@ -1885,6 +1885,199 @@ function openGardenYear(){
     </div>
     <button class="btn secondary" style="width:100%;margin-top:14px" onclick="closeModal();openBloomMosaic()">View bloom mosaic</button>`);
 }
+/* ===================== Garden weather (Open-Meteo: free, no key) =====================
+   Forecast for the garden's location, cached for an hour. All the garden advice
+   (frost, wind, heat, rain, dry spells) is worked out here from the numbers; no AI calls. */
+const WX_URL="https://api.open-meteo.com/v1/forecast";
+const WX_GEO="https://geocoding-api.open-meteo.com/v1/search";
+const WX_DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+let wxBusy=false;
+
+function wxIcon(code,cls="wx-ico"){
+  const c=Number(code);
+  const sun='<circle cx="12" cy="12" r="4.2"/><path d="M12 2.8v2M12 19.2v2M2.8 12h2M19.2 12h2M5.5 5.5l1.4 1.4M17.1 17.1l1.4 1.4M5.5 18.5l1.4-1.4M17.1 6.9l1.4-1.4"/>';
+  const cloud='<path d="M7 18.5h10.2a3.8 3.8 0 0 0 .5-7.6A5.5 5.5 0 0 0 7.2 9.6 4.5 4.5 0 0 0 7 18.5z"/>';
+  const part='<path d="M8.5 4.5v1.3M4.2 6.3l.9.9M2.8 10.5h1.3"/><path d="M6.4 11.6A3.6 3.6 0 0 1 11.6 7"/><path d="M9 19.5h9a3.3 3.3 0 0 0 .4-6.6 4.8 4.8 0 0 0-9.2-1.2A3.9 3.9 0 0 0 9 19.5z"/>';
+  const rain='<path d="M7 15.5h10.2a3.8 3.8 0 0 0 .5-7.6A5.5 5.5 0 0 0 7.2 6.6 4.5 4.5 0 0 0 7 15.5z"/><path d="M8.5 18.2l-1 2.3M12.5 18.2l-1 2.3M16.5 18.2l-1 2.3"/>';
+  const snow='<path d="M7 15h10.2a3.8 3.8 0 0 0 .5-7.6A5.5 5.5 0 0 0 7.2 6.1 4.5 4.5 0 0 0 7 15z"/><path d="M8.5 18.5h.01M12 20h.01M15.5 18.5h.01" stroke-width="2.6"/>';
+  const storm='<path d="M7 15h10.2a3.8 3.8 0 0 0 .5-7.6A5.5 5.5 0 0 0 7.2 6.1 4.5 4.5 0 0 0 7 15z"/><path d="M12.5 15.5l-2 3.3h3l-2 3.2"/>';
+  const fog='<path d="M7 13h10.2a3.8 3.8 0 0 0 .5-7.6A5.5 5.5 0 0 0 7.2 4.1 4.5 4.5 0 0 0 7 13z"/><path d="M4 16.5h16M6 19.5h12"/>';
+  const body=c===0?sun:c<=2?part:c===3?cloud:c<=48?fog:(c>=71&&c<=77)||c===85||c===86?snow:c>=95?storm:c>=51?rain:cloud;
+  const tone=c===0?"sun":c<=2?"part":(c>=51&&c<=67)||(c>=80&&c<=82)?"rain":(c>=71&&c<=77)||c===85||c===86?"snow":c>=95?"storm":"cloud";
+  return `<svg class="${cls} wx-${tone}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
+}
+function wxLabel(code){
+  const c=Number(code);
+  if(c===0) return "Clear"; if(c<=2) return "Partly cloudy"; if(c===3) return "Cloudy"; if(c<=48) return "Fog";
+  if(c<=57) return "Drizzle"; if(c<=67) return "Rain"; if(c<=77) return "Snow"; if(c<=82) return "Showers"; if(c<=86) return "Snow showers"; return "Thunderstorms";
+}
+
+async function refreshWeather(force=false){
+  const loc=state.weatherLocation;
+  if(!loc||!navigator.onLine||wxBusy) return false;
+  const w=state.weather;
+  if(!force&&w?.fetchedAt&&w.lat===loc.lat&&w.lon===loc.lon&&Date.now()-new Date(w.fetchedAt).getTime()<60*60e3) return false;
+  wxBusy=true;
+  try{
+    const q=new URLSearchParams({latitude:loc.lat,longitude:loc.lon,timezone:"Europe/London",past_days:"2",forecast_days:"7",
+      current:"temperature_2m,weather_code",
+      daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max"});
+    const res=await fetch(`${WX_URL}?${q}`);
+    if(!res.ok) throw new Error(`Weather ${res.status}`);
+    const j=await res.json(); const d=j.daily||{};
+    state.weather={fetchedAt:new Date().toISOString(),lat:loc.lat,lon:loc.lon,
+      current:{temp:j.current?.temperature_2m,code:j.current?.weather_code},
+      days:(d.time||[]).map((t,i)=>({date:t,code:d.weather_code?.[i],max:d.temperature_2m_max?.[i],min:d.temperature_2m_min?.[i],
+        rain:d.precipitation_sum?.[i]??0,chance:d.precipitation_probability_max?.[i]??null,gust:d.wind_gusts_10m_max?.[i]??0}))};
+    saveState();
+    return true;
+  }catch(e){ console.warn("Weather",e); return false; }
+  finally{ wxBusy=false; }
+}
+function wxToday(){ return localISODate(); }
+function wxSplit(){
+  const days=state.weather?.days||[]; const t=wxToday();
+  const i=days.findIndex(d=>d.date===t);
+  return i<0?{past:[],today:null,next:[]}:{past:days.slice(0,i),today:days[i],next:days.slice(i+1)};
+}
+function wxDayName(date,short=false){
+  const t=wxToday(); const tm=localISODate(new Date(Date.now()+86400000));
+  if(date===t) return short?"Today":"today"; if(date===tm) return short?"Tmrw":"tomorrow";
+  const d=new Date(`${date}T12:00:00`); return short?WX_DAYS[d.getDay()]:d.toLocaleDateString("en-GB",{weekday:"long"});
+}
+function isOutdoorPlant(p){ return areaMood(p.area||"").cls!=="indoor"; }
+function isTenderPlant(p){
+  const c=careForPlant(p);
+  const t=`${c?.hardiness||""} ${c?.growthHabit||""}`.toLowerCase();
+  return /tender|not hardy|frost[- ]?(sensitive|tender)|protect from (frost|cold)|houseplant|\bh1[abc]?\b|\bh2\b|\bh3\b|minimum temperature [0-9]{2}/.test(t);
+}
+function weatherAlerts(){
+  const {past,today,next}=wxSplit(); if(!today) return [];
+  const soon=[today,...next.slice(0,2)];
+  const out=[];
+  const outdoor=state.plants.filter(isOutdoorPlant);
+  const frost=soon.find(d=>d.min!=null&&d.min<=2);
+  if(frost){
+    const tender=outdoor.filter(isTenderPlant);
+    const when=frost.date===today.date?"tonight":`${wxDayName(frost.date)} night`;
+    out.push({type:"frost",level:frost.min<=0?"high":"medium",icon:"❄",
+      title:frost.min<=0?`Frost ${when} (${Math.round(frost.min)}°)`:`Near-frost ${when} (${Math.round(frost.min)}°)`,
+      detail:tender.length?`Protect ${tender.slice(0,4).map(p=>p.common).join(", ")}${tender.length>4?` and ${tender.length-4} more`:""}: fleece, or move pots somewhere sheltered.`:"Move tender pots under cover and fleece anything newly planted.",
+      plants:tender.map(p=>p.id),date:frost.date});
+  }
+  const windy=soon.find(d=>d.gust>=55);
+  if(windy) out.push({type:"wind",level:windy.gust>=75?"high":"medium",icon:"⌁",title:`Strong winds ${wxDayName(windy.date)} (gusts ${Math.round(windy.gust)} km/h)`,
+    detail:"Check stakes and ties on tall plants, and move light pots out of exposed spots."});
+  const hot=soon.find(d=>d.max>=27);
+  if(hot) out.push({type:"heat",level:"medium",icon:"☀",title:`Hot ${wxDayName(hot.date)} (${Math.round(hot.max)}°)`,
+    detail:"Water pots and new plants in the evening, and give shade to anything that wilts."});
+  const recentRain=[...past.slice(-2),today].reduce((a,d)=>a+(d?.rain||0),0);
+  const comingRain=next.slice(0,2).reduce((a,d)=>a+(d?.rain||0),0);
+  if(recentRain>=5) out.push({type:"rain",level:"good",icon:"💧",title:`${Math.round(recentRain)} mm of rain recently`,
+    detail:"Plants in the ground won't need watering. Check pots under cover, which the rain may have missed."});
+  else if(comingRain>=5) out.push({type:"rain",level:"good",icon:"💧",title:`Rain on the way (${Math.round(comingRain)} mm by ${wxDayName(next[Math.min(1,next.length-1)]?.date||today.date)})`,
+    detail:"Hold off watering plants in the ground; the rain should do it for you."});
+  else if(recentRain+comingRain<1&&today.max>=18) out.push({type:"dry",level:"medium",icon:"◌",title:"Dry spell",
+    detail:"No real rain for a few days. Water pots and anything planted this year, ideally in the evening."});
+  return out;
+}
+function wxRainedRecently(){ const {past,today}=wxSplit(); return [...past.slice(-2),today].reduce((a,d)=>a+(d?.rain||0),0)>=5; }
+function weatherContextLine(){
+  const {past,today,next}=wxSplit(); if(!today) return null;
+  const recent=[...past,today]; const ahead=next.slice(0,3);
+  const r=a=>Math.round(a.reduce((s,d)=>s+(d.rain||0),0));
+  const lo=a=>Math.round(Math.min(...a.map(d=>d.min))); const hi=a=>Math.round(Math.max(...a.map(d=>d.max)));
+  return `Local weather: last ${recent.length} days ${lo(recent)} to ${hi(recent)}°C with ${r(recent)} mm rain; next ${ahead.length} days ${lo(ahead)} to ${hi(ahead)}°C with ${r(ahead)} mm rain${ahead.some(d=>d.min<=2)?", frost possible":""}.`;
+}
+
+/* ---------- Home card ---------- */
+function weatherHomeCard(){
+  if(!state.weatherLocation){
+    return `<button class="wx-card wx-setup" onclick="openWeatherSetup()"><span class="wx-setup-ico">${wxIcon(2)}</span><span><small>Garden weather</small><strong>Add your local weather</strong><em>Frost, wind and rain warnings for your plants.</em></span><b>→</b></button>`;
+  }
+  const {today}=wxSplit(); const cur=state.weather?.current;
+  if(!today||cur?.temp==null){
+    return `<button class="wx-card" onclick="openWeatherSheet()"><span class="wx-now">${wxIcon(3,"wx-big")}<b>–°</b></span><span class="wx-meta"><small>${esc(state.weatherLocation.name)}</small><strong>Fetching the forecast…</strong></span></button>`;
+  }
+  const alerts=weatherAlerts();
+  const top=alerts[0];
+  return `<button class="wx-card ${top?`wx-alert-${top.level}`:""}" onclick="openWeatherSheet()">
+    <span class="wx-row"><span class="wx-now">${wxIcon(cur.code,"wx-big")}<b>${Math.round(cur.temp)}°</b></span>
+      <span class="wx-meta"><small>${esc(state.weatherLocation.name)}</small><strong>${esc(wxLabel(today.code))}</strong><em>High ${Math.round(today.max)}° · Low ${Math.round(today.min)}°${today.chance!=null?` · Rain ${today.chance}%`:""}</em></span><b class="wx-go">→</b></span>
+    ${top?`<span class="wx-alert"><i>${top.icon}</i><span><b>${esc(top.title)}</b><small>${esc(top.detail)}</small></span></span>`:""}
+    ${alerts.length>1?`<span class="wx-more">+${alerts.length-1} more weather note${alerts.length>2?"s":""}</span>`:""}
+  </button>`;
+}
+function openWeatherSheet(){
+  const days=[wxSplit().today,...wxSplit().next].filter(Boolean).slice(0,7);
+  const alerts=weatherAlerts();
+  const age=state.weather?.fetchedAt?Math.round((Date.now()-new Date(state.weather.fetchedAt).getTime())/60000):null;
+  modal(`<div class="eyebrow">Garden weather</div><h2>${esc(state.weatherLocation?.name||"Your garden")}</h2>
+    ${days.length?`<div class="wx-week">${days.map(d=>`<div class="${d.min<=2?"frosty":""}"><small>${wxDayName(d.date,true)}</small>${wxIcon(d.code)}<b>${Math.round(d.max)}°</b><em>${Math.round(d.min)}°</em>${d.rain>=0.5?`<span>${d.rain<10?d.rain.toFixed(1):Math.round(d.rain)} mm</span>`:`<span class="dry">—</span>`}</div>`).join("")}</div>`:`<p class="sub">No forecast yet.</p>`}
+    ${alerts.length?`<div class="wx-alert-list">${alerts.map(a=>`<div class="wx-alert wx-alert-${a.level}"><i>${a.icon}</i><span><b>${esc(a.title)}</b><small>${esc(a.detail)}</small></span></div>`).join("")}</div>`:`<div class="wx-calm">Nothing to worry about this week. A good time to get out in the garden.</div>`}
+    ${alerts.some(a=>a.type==="frost"&&a.plants.length)?`<button class="btn primary" style="width:100%;margin-top:12px" onclick="addFrostJobs()">❄ Add frost protection to Care</button>`:""}
+    <div class="wx-foot"><button class="link-btn" onclick="openWeatherSetup()">Change location</button><span>Open-Meteo${age!=null?` · updated ${age<2?"just now":age<60?`${age} min ago`:`${Math.round(age/60)} h ago`}`:""}</span></div>`);
+}
+function addFrostJobs(){
+  const a=weatherAlerts().find(x=>x.type==="frost"); if(!a) return;
+  let n=0;
+  for(const id of a.plants){
+    const p=state.plants.find(x=>x.id===id); if(!p) continue;
+    const key=`frost-${id}-${a.date}`;
+    if(state.careTasks.some(t=>t.suggestionKey===key)) continue;
+    state.careTasks.push({id:"care-"+Date.now()+"-"+n,plantId:id,title:`Protect ${p.common} from frost`,type:"Protect",due:a.date,
+      notes:`${a.title}. Fleece it, or move it somewhere sheltered.`,completed:false,createdAt:new Date().toISOString(),suggestionKey:key});
+    n++;
+  }
+  saveState(); closeModal();
+  toast(n?`${n} frost job${n===1?"":"s"} added to Care`:"Frost jobs are already in Care");
+  if(currentRoute==="home") renderHome(); else if(currentRoute==="care") renderCareCalendar();
+}
+
+/* ---------- Location ---------- */
+function openWeatherSetup(){
+  modal(`<div class="eyebrow">Garden weather</div><h2>Where's your garden?</h2>
+    <p class="sub">FloraLens uses this only to fetch the local forecast.</p>
+    <button class="destination-choice" onclick="useMyLocation()"><span>◎</span><div><b>Use my current location</b><small>Best when you're at home.</small></div></button>
+    <label class="field-label" for="wxTown">Or search for a town or village</label>
+    <form class="lookup-row" onsubmit="event.preventDefault();searchWeatherTown(document.getElementById('wxTown').value)"><input id="wxTown" autocomplete="off" placeholder="e.g. Harrogate"><button aria-label="Search">→</button></form>
+    <div id="wxResults" class="wx-results"></div>
+    ${state.weatherLocation?`<button class="link-btn discovery-delete-link" style="width:100%" onclick="clearWeatherLocation()">Turn off weather</button>`:""}`);
+}
+function useMyLocation(){
+  if(!navigator.geolocation){ toast("Location isn't available on this device"); return; }
+  toast("Finding your location…");
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    await setWeatherLocation({name:"Home",lat:+pos.coords.latitude.toFixed(3),lon:+pos.coords.longitude.toFixed(3)});
+  },err=>{ toast(err.code===1?"Location permission was declined. Search for your town instead.":"Couldn't get your location. Search for your town instead."); },{enableHighAccuracy:false,timeout:12000,maximumAge:3600e3});
+}
+async function searchWeatherTown(q){
+  q=String(q||"").trim(); const box=document.getElementById("wxResults"); if(!q||!box) return;
+  box.innerHTML=`<p class="small">Searching…</p>`;
+  try{
+    const res=await fetch(`${WX_GEO}?${new URLSearchParams({name:q,count:"6",language:"en",format:"json",countryCode:"GB"})}`);
+    const j=await res.json(); const rows=j.results||[];
+    box.innerHTML=rows.length?rows.map(r=>`<button class="destination-choice" onclick="setWeatherLocation({name:decodeURIComponent('${jsArg(r.name)}'),lat:${+r.latitude.toFixed(3)},lon:${+r.longitude.toFixed(3)}})"><span>⌂</span><div><b>${esc(r.name)}</b><small>${esc([r.admin2,r.admin1].filter(Boolean).join(", "))}</small></div></button>`).join("")
+      :`<p class="small">No UK places called “${esc(q)}”. Try a nearby town.</p>`;
+  }catch(e){ box.innerHTML=`<p class="small">${esc(friendlyNetError(e,"Searching"))}</p>`; }
+}
+async function setWeatherLocation(loc){
+  state.weatherLocation=loc; state.weather=null; saveState();
+  closeModal(); toast(`Weather set to ${loc.name}`);
+  if(currentRoute==="home") renderHome();
+  if(await refreshWeather(true)){ if(currentRoute==="home") renderHome(); }
+}
+function clearWeatherLocation(){
+  state.weatherLocation=null; state.weather=null; saveState(); closeModal(); toast("Weather turned off");
+  if(currentRoute==="home") renderHome();
+}
+async function weatherTick(){
+  if(await refreshWeather()){ if(currentRoute==="home") renderHome(); else if(currentRoute==="care") renderCareCalendar(); }
+}
+window.addEventListener("load",()=>setTimeout(weatherTick,1200));
+window.addEventListener("online",()=>setTimeout(weatherTick,1500));
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="visible") setTimeout(weatherTick,1500); });
+
 function homeGreeting(){
   const h=new Date().getHours();
   return h<12?"Good morning":h<18?"Good afternoon":"Good evening";
@@ -1922,6 +2115,7 @@ function renderHome(){
       <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
     </div>
     <div class="section-title"><h3>Today in the garden</h3></div>
+    ${weatherHomeCard()}
     ${careHomeCard()}
     ${seasonalHomeCard()}`;
   hydratePhotos();
@@ -2417,7 +2611,8 @@ function buyContext(d){
     care.hardiness?`Hardiness: ${care.hardiness}`:null,
     care.light?`Light: ${care.light}`:null,
     care.height?`Size: ${care.height}`:null,
-    care.bloomMonths?.length?`Usually flowers: ${care.bloomMonths.map(m=>months[m-1]).join(", ")}`:null
+    care.bloomMonths?.length?`Usually flowers: ${care.bloomMonths.map(m=>months[m-1]).join(", ")}`:null,
+    weatherContextLine()
   ].filter(Boolean).join("\n");
 }
 async function runBuyCheck(id,{files=null,extraFile=null}={}){
@@ -3170,13 +3365,16 @@ function smartCareSuggestions(){
     const seasonal=c?.seasonal?.[season];
     if(seasonal) out.push({key:`season-${p.id}-${season}`,plantId:p.id,type:"Check",title:`Seasonal check: ${p.common}`,detail:seasonal});
     const water=String(c?.water||p.water||"").toLowerCase();
-    if((p.area||"").toLowerCase().includes("indoor") || /keep.*moist|regular|evenly moist|consistent moisture/.test(water)){
+    const rainedOn=isOutdoorPlant(p)&&wxRainedRecently();
+    if(!rainedOn && ((p.area||"").toLowerCase().includes("indoor") || /keep.*moist|regular|evenly moist|consistent moisture/.test(water))){
       out.push({key:`water-${p.id}-${month}`,plantId:p.id,type:"Water",title:`Check ${p.common}'s moisture`,detail:c?.water||p.water||"Check the compost/soil before watering rather than watering automatically."});
     }
     if(c?.bloomMonths?.includes(month) && /deadhead|spent|flower/.test(String(c?.pruning||"").toLowerCase())){
       out.push({key:`bloom-${p.id}-${month}`,plantId:p.id,type:"Prune",title:`Flowering care for ${p.common}`,detail:c.pruning});
     }
   }
+  const frost=weatherAlerts().find(x=>x.type==="frost");
+  if(frost) frost.plants.forEach(id=>{ const p=state.plants.find(x=>x.id===id); if(p) out.unshift({key:`frost-${id}-${frost.date}`,plantId:id,type:"Protect",title:`Protect ${p.common} from frost`,detail:`${frost.title}. Fleece it, or move it somewhere sheltered.`}); });
   return out.slice(0,12);
 }
 function activeCareTasks(){
@@ -3543,6 +3741,7 @@ function doctorContext(p){
   const careLines=[["Light",care.light],["Water",care.water],["Soil",care.soil],["Hardiness",care.hardiness],["Pruning",care.pruning]].filter(([,v])=>usable(v)).map(([k,v])=>`${k}: ${v}`);
   if(careLines.length) lines.push("Care record:",...careLines.map(x=>"- "+x));
   const notes=state.journal.filter(j=>j.plantId===p.id&&j.text).slice(0,6);
+  const wx=weatherContextLine(); if(wx) lines.push(wx);
   if(notes.length) lines.push("Recent journal (newest first):",...notes.map(j=>`- ${j.date} [${j.type}] ${j.text.slice(0,220)}`));
   return lines.filter(Boolean).join("\n");
 }
@@ -3801,7 +4000,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.0.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.1 · made for our garden</div>`);
 });
 
 renderHome();
