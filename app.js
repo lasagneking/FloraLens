@@ -1309,7 +1309,7 @@ function gmTag(){ return ""; }
 function geminiFieldList(care,hasDesc){
   const names={light:"light",water:"watering",soil:"soil",height:"size",hardiness:"hardiness",growthHabit:"growth form",growthRate:"growth rate",
     pruning:"pruning",propagation:"propagation",safety:"safety",bloomMonths:"flowering months"};
-  const list=[...(care?.geminiFilled||[]).map(k=>names[k]||k),...(hasDesc?["the description"]:[])];
+  const list=[...(care?.geminiFilled||[]).map(k=>names[k]||k),...(hasDesc?["the description"]:[]),...(care?.geminiAbout?["the introduction"]:[])];
   return list.length<2?list.join(""):`${list.slice(0,-1).join(", ")} or ${list.at(-1)}`;
 }
 function careGapsFor(p){
@@ -1318,6 +1318,7 @@ function careGapsFor(p){
   const missing=GEMINI_FILL_FIELDS.filter(k=>!care[k]);
   if(!care.bloomMonths?.length) missing.push("bloomMonths");
   if(!chooseProfileDescription({pn:intel?.perenual,t:intel?.trefle,g:intel?.gbif,p})) missing.push("description");
+  missing.push("about");                       // the friendly intro under the photo, for every plant
   const known={};
   GEMINI_FILL_FIELDS.forEach(k=>{ if(care[k]) known[k]=String(care[k]).slice(0,300); });
   if(care.bloomMonths?.length) known.bloomMonths=care.bloomMonths;
@@ -1328,10 +1329,13 @@ async function fillGapsWithGemini(p,{force=false}={}){
   if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine||geminiPaused()) return false;
   const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
   const g=cache.gemini;
-  if(!force && g?.fetchedAt) return false;                                        // once per species
   if(!force && g?.failedAt && Date.now()-new Date(g.failedAt).getTime()<20*60e3) return false;
   if(geminiFillInFlight.has(p.speciesKey)) return false;
-  const {missing,known}=careGapsFor(p);
+  let {missing,known}=careGapsFor(p);
+  if(!force && g?.fetchedAt){                                                     // once per species…
+    if((g.asked||[]).includes("about")) return false;
+    missing=["about"];                                                            // …but older records still get the intro
+  }
   if(!missing.length) return false;
   geminiFillInFlight.add(p.speciesKey);
   fillGapsWithGemini.lastCalled=true;
@@ -1348,10 +1352,15 @@ async function fillGapsWithGemini(p,{force=false}={}){
         const months=[...new Set((Array.isArray(v)?v:[]).map(Number).filter(n=>Number.isInteger(n)&&n>=1&&n<=12))].sort((a,b)=>a-b);
         if(months.length&&months.length<12) fields.bloomMonths=months;
       }else if(typeof v==="string"&&v.trim()&&!/^(unknown|n\/a|none|not known)\.?$/i.test(v.trim())){
-        fields[k]=v.trim().slice(0,k==="description"?900:500);
+        fields[k]=v.trim().slice(0,k==="description"||k==="about"?900:500);
       }
     }
-    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{fields,asked:missing,fetchedAt:new Date().toISOString(),model:data.model||"gemini"}};
+    // Only count "about" as asked if this Worker version knows the field.
+    const asked=missing.filter(k=>k!=="about"||k in data.fields);
+    const prev=force?{}:(g?.fetchedAt?g:{});
+    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{
+      fields:{...(prev.fields||{}),...fields},asked:[...new Set([...(prev.asked||[]),...asked])],
+      fetchedAt:new Date().toISOString(),model:data.model||"gemini"}};
     saveState();
     syncPlantsFromSpecies(p.speciesKey);
     return Object.keys(fields).length>0;
@@ -1375,6 +1384,8 @@ async function maybeFillGaps(p){
   if(!cache.enrichment && !cache.enrichmentError){
     enriched=!!(await enrichSpecies(p.scientific,p.speciesKey).catch(()=>null));
   }
+  const gBefore=state.speciesCache[p.speciesKey]?.gemini?.fields||{};
+  const before=Object.keys(gBefore).length;
   const filled=await fillGapsWithGemini(p);
   if(!(enriched||filled)) return;
   if(currentRoute==="profile" && document.querySelector(`[data-profile-id="${p.id}"]`)){
@@ -1383,7 +1394,10 @@ async function maybeFillGaps(p){
     await renderProfile(p.id);
     if(tab) setProfileTab(tab);
     appScrollTo(y);
-    const n=filled?Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).length:0;
+    const after=state.speciesCache[p.speciesKey]?.gemini?.fields||{};
+    const added=Object.keys(after).filter(k=>!(k in gBefore));
+    const n=filled?Math.max(0,Object.keys(after).length-before):0;
+    if(added.length===1&&added[0]==="about") return;              // the intro just appears, no toast needed
     toast(n?`Gemini filled ${n} missing detail${n===1?"":"s"}`:"Botanical notes added");
   }
 }
@@ -3101,7 +3115,10 @@ async function renderProfile(id,isNew=false){
   const realDesc=chooseProfileDescription({pn,t,g,p});
   const gmDesc=realDesc?null:usable(geminiFieldsFor(p.scientific,p.speciesKey).description);
   const desc=realDesc||gmDesc;
-  const gmCount=(care.geminiFilled?.length||0)+(gmDesc?1:0);
+  const gmAbout=usable(geminiFieldsFor(p.scientific,p.speciesKey).about);
+  const aboutText=gmAbout||desc;                 // friendly intro under the photo
+  care.geminiAbout=!!gmAbout;
+  const gmCount=(care.geminiFilled?.length||0)+(gmDesc?1:0)+(gmAbout?1:0);
   if(gmCount) sourceNames.push(`✦ Google Gemini · ${gmCount} gap${gmCount===1?"":"s"} filled`);
   const uniqueSources=[...new Set(sourceNames)];
   const bloom=care.bloomMonths?.length?care.bloomMonths:(p.bloom||[]);
@@ -3162,6 +3179,7 @@ async function renderProfile(id,isNew=false){
       <div class="profile-dossier-copy"><h1>${esc(p.common)}</h1><em>${esc(p.scientific)}</em><div class="profile-meta-row"><span>◎ ${esc(confidence)}</span><span>⌂ ${esc(placeLabel)}</span></div></div>
     </div>
 
+    ${aboutText?`<section class="plant-about"><div class="eyebrow">About this plant</div><p>${esc(aboutText)}</p></section>`:""}
     ${isDiscovery?renderBuyCheck(p):""}
     <nav class="profile-tabs" aria-label="Plant profile sections">
       <button class="profile-tab active" data-profile-tab="care" onclick="setProfileTab('care')"><span>☀</span>Care</button>
@@ -3174,7 +3192,7 @@ async function renderProfile(id,isNew=false){
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
       ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div class="glance-tile" data-ico="sun"><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div class="glance-tile" data-ico="drop"><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div class="glance-tile" data-ico="soil"><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div class="glance-tile" data-ico="snow"><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
-      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
+      ${desc&&desc!==aboutText?`<div class="profile-summary-card"><p>${esc(desc)}</p></div>`:!aboutText?`<div class="profile-summary-card"><p>The species is identified, but the connected botanical records do not currently include a fuller description.</p></div>`:""}
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
         ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
@@ -3611,6 +3629,7 @@ async function addLookupToWishlist(){
   fieldKeys.forEach(k=>{ if(usable(r[k])) fields[k]=String(r[k]).trim(); });
   const months=[...new Set((r.bloomMonths||[]).map(Number).filter(n=>n>=1&&n<=12))].sort((a,b)=>a-b);
   if(months.length&&months.length<12) fields.bloomMonths=months;
+  if(fields.description) fields.about=fields.description;
   const cache=state.speciesCache[speciesKey]||{scientific:r.scientific,common:r.common,family:r.family,genus:r.genus,source:"Plant lookup",fetchedAt:new Date().toISOString(),enrichment:null};
   state.speciesCache[speciesKey]={...cache,gemini:{fields,asked:Object.keys(fields),fetchedAt:new Date().toISOString(),model:L.model||"gemini"}};
   state.discoveries.unshift({
@@ -4000,7 +4019,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.3 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.4 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4023,7 +4042,7 @@ async function fillGardenGaps(){
     for(const p of items){
       if(!navigator.onLine||geminiPaused()) break;
       const g=state.speciesCache[p.speciesKey]?.gemini;
-      if(g?.fetchedAt) continue;                                  // already done
+      if(g?.fetchedAt && (g.asked||[]).includes("about")) continue;   // already done
       if(!state.speciesCache[p.speciesKey]){
         state.speciesCache[p.speciesKey]={scientific:p.scientific,common:p.common,family:p.family||"",source:"FloraLens",fetchedAt:new Date().toISOString(),enrichment:null};
       }
@@ -4033,15 +4052,16 @@ async function fillGardenGaps(){
         await enrichSpecies(p.scientific,p.speciesKey).catch(()=>null);
         called=true;
       }
+      const gBefore=state.speciesCache[p.speciesKey]?.gemini?.fields||{};
       const filled=await fillGapsWithGemini(p);
       called=called||fillGapsWithGemini.lastCalled;
-      if(filled){ plantsFilled++; details+=Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).length; }
+      if(filled){ plantsFilled++; details+=Object.keys(state.speciesCache[p.speciesKey]?.gemini?.fields||{}).filter(k=>k!=="about"&&!(k in gBefore)).length; }
       if(called) await pause(2500);                               // go easy on the free tier
     }
   }finally{ gardenFillRunning=false; }
   if(plantsFilled){
     refreshCurrentView();
-    toast(`Gemini filled ${details} missing detail${details===1?"":"s"} across ${plantsFilled} plant${plantsFilled===1?"":"s"}`);
+    if(details) toast(`Gemini filled ${details} missing detail${details===1?"":"s"} across ${plantsFilled} plant${plantsFilled===1?"":"s"}`);
   }
 }
 function refreshCurrentView(){

@@ -1212,3 +1212,10 @@ html[data-season="winter"] body{background-image:url("icons/bg-winter.jpg")}
 /* keep headings crisp over the busier corners of the seasonal art */
 .page-head h1,.page-head .eyebrow,.page-head .sub,.page-head .link-btn,.section-title h3,.section-title .link-btn,.planner-hero,.lookup-sub,.map-intro h2,.map-intro p,.map-intro .eyebrow{
   text-shadow:0 0 2px rgba(255,255,255,.95),0 0 10px rgba(255,255,255,.85),0 0 22px rgba(255,255,255,.6)}
+
+/* ===== About this plant (intro under the hero) ===== */
+.plant-about{position:relative;margin:14px 0 4px;padding:18px 20px 20px 22px;border-radius:var(--r-lg);background:rgba(255,255,255,.9);
+  backdrop-filter:saturate(1.2) blur(14px);-webkit-backdrop-filter:saturate(1.2) blur(14px);box-shadow:var(--sh-1);overflow:hidden}
+.plant-about::before{content:"";position:absolute;left:0;top:16px;bottom:16px;width:4px;border-radius:0 4px 4px 0;background:linear-gradient(180deg,var(--leaf-2,#2E9E6A),#F2B33D)}
+.plant-about .eyebrow{margin-bottom:6px}
+.plant-about p{margin:0;font-family:var(--display);font-size:17px;line-height:1.55;color:var(--ink-2);font-variation-settings:"SOFT" 80;-webkit-user-select:text;user-select:text}
