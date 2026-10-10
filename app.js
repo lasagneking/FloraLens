@@ -1304,7 +1304,14 @@ function geminiCacheFor(sci,key){
   return (key&&state.speciesCache?.[key]) || Object.values(state.speciesCache||{}).find(x=>x?.scientific===sci) || null;
 }
 function geminiFieldsFor(sci,key){ return geminiCacheFor(sci,key)?.gemini?.fields||{}; }
-function gmTag(care,k){ return care?.geminiFilled?.includes(k)?`<i class="gm-tag" title="Filled in by Google Gemini because other sources had no data">✦ Gemini</i>`:""; }
+// Gemini details are credited once, in Botany → "Where this record comes from", not on each box.
+function gmTag(){ return ""; }
+function geminiFieldList(care,hasDesc){
+  const names={light:"light",water:"watering",soil:"soil",height:"size",hardiness:"hardiness",growthHabit:"growth form",growthRate:"growth rate",
+    pruning:"pruning",propagation:"propagation",safety:"safety",bloomMonths:"flowering months"};
+  const list=[...(care?.geminiFilled||[]).map(k=>names[k]||k),...(hasDesc?["the description"]:[])];
+  return list.length<2?list.join(""):`${list.slice(0,-1).join(", ")} or ${list.at(-1)}`;
+}
 function careGapsFor(p){
   const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
   const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey,{noGemini:true});
@@ -2926,7 +2933,7 @@ async function renderProfile(id,isNew=false){
       ${care.traitLifeHistory?`<div class="dossier-fact"><span>◌</span><div><small>Life history</small><b>${esc(care.traitLifeHistory)}</b></div></div>`:""}
       ${care.traitLeafPhenology?`<div class="dossier-fact"><span>❧</span><div><small>Leaf phenology</small><b>${esc(care.traitLeafPhenology)}</b></div></div>`:""}
       ${care.traitFlowerColour?`<div class="dossier-fact"><span>✿</span><div><small>Flower colour</small><b>${esc(care.traitFlowerColour)}</b></div></div>`:""}
-      ${care.height?`<div class="dossier-fact"><span>↕</span><div><small>Height / size${gmTag(care,"height")}</small><b>${esc(care.height)}</b></div></div>`:""}
+      ${care.height?`<div class="dossier-fact"><span>↕</span><div><small>Height / size</small><b>${esc(care.height)}</b></div></div>`:""}
       ${care.traitHabitat?`<div class="dossier-fact"><span>⌂</span><div><small>Habitat</small><b>${esc(care.traitHabitat)}</b></div></div>`:""}
       ${care.traitVegetation?`<div class="dossier-fact"><span>❦</span><div><small>Vegetation</small><b>${esc(care.traitVegetation)}</b></div></div>`:""}
       ${care.traitClimate?`<div class="dossier-fact"><span>◌</span><div><small>Climate context</small><b>${esc(care.traitClimate)}</b></div></div>`:""}
@@ -2971,16 +2978,16 @@ async function renderProfile(id,isNew=false){
       <div class="profile-section-intro"><div><div class="eyebrow">Practical care</div><h2>How to look after ${esc(p.common)}</h2></div><div class="profile-completeness care"><span>❧</span><div><b>${careCoverage}%</b><small>care guide</small></div></div></div>
       ${renderPlantTodayCard(plantToday,p)}
       ${renderPruningAssistant(pruningAssistant,p)}
-      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div class="glance-tile" data-ico="sun"><span>☀</span><small>Light${gmTag(care,"light")}</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div class="glance-tile" data-ico="drop"><span>💧</span><small>Water${gmTag(care,"water")}</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div class="glance-tile" data-ico="soil"><span>♧</span><small>Soil${gmTag(care,"soil")}</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div class="glance-tile" data-ico="snow"><span>❄</span><small>Hardiness${gmTag(care,"hardiness")}</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
-      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p>${gmDesc?`<i class="gm-tag" title="Written by Google Gemini because other sources had no description">✦ Gemini</i>`:""}</div>
+      ${(care.light||care.water||care.soil||care.hardiness)?`<div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><em>${careAvailable}/7 care fields</em></div><div class="care-glance-grid">${care.light?`<div class="glance-tile" data-ico="sun"><span>☀</span><small>Light</small><b>${esc(care.light)}</b></div>`:""}${care.water?`<div class="glance-tile" data-ico="drop"><span>💧</span><small>Water</small><b>${esc(care.water)}</b></div>`:""}${care.soil?`<div class="glance-tile" data-ico="soil"><span>♧</span><small>Soil</small><b>${esc(care.soil)}</b></div>`:""}${care.hardiness?`<div class="glance-tile" data-ico="snow"><span>❄</span><small>Hardiness</small><b>${esc(care.hardiness)}</b></div>`:""}</div></div>`:""}
+      <div class="profile-summary-card"><p>${esc(desc||"The species is identified, but the connected botanical records do not currently include a fuller description.")}</p></div>
       ${seasonalText?`<div class="season-card premium-season"><div class="eyebrow">Right now · ${atlasSeasonal?"Plant Atlas 2020":"FloraLens care"}</div><h2>${esc(seasonalTitle)}</h2><p class="sub" style="margin:0">${esc(seasonalText)}</p></div>`:""}
       <div class="care-grid dossier-care-grid">
-        ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size${gmTag(care,"height")}</b><small>${esc(care.height)}</small></div>`:""}
-        ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning${gmTag(care,"pruning")}</b><small>${esc(care.pruning)}</small></div>`:""}
-        ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation${gmTag(care,"propagation")}</b><small>${esc(care.propagation)}</small></div>`:""}
+        ${care.height?`<div class="care-tile care-wide"><span class="care-icon">↕</span><b>Size</b><small>${esc(care.height)}</small></div>`:""}
+        ${care.pruning?`<div class="care-tile care-wide"><span class="care-icon">✂</span><b>Pruning</b><small>${esc(care.pruning)}</small></div>`:""}
+        ${care.propagation?`<div class="care-tile care-wide"><span class="care-icon">🌱</span><b>Propagation</b><small>${esc(care.propagation)}</small></div>`:""}
       </div>
-      <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering${gmTag(care,"bloomMonths")}</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
-      ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know${gmTag(care,"safety")}</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
+      <div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div><span>${esc(bloomStatus)}</span></div><div class="months">${["J","F","M","A","M","J","J","A","S","O","N","D"].map((m,i)=>`<div class="month ${bloom.includes(i+1)?"on":""}">${m}</div>`).join("")}</div>${!bloom.length?`<p class="small data-missing">Flowering months are not yet available for this plant.</p>`:""}</div>
+      ${care.safety?`<div class="good-know"><div class="eyebrow">Good to know</div><h2>Safety</h2><p class="sub" style="margin:0">${esc(care.safety)}</p></div>`:""}
       ${isDiscovery?`<div class="profile-card discovery-profile-actions"><div class="eyebrow">Saved inspiration</div><h2>${p.wishlist?"On your wishlist":"Spotted in Discover"}</h2><p class="sub">Keep it for reference or bring it into My Garden when it comes home with you.</p><div class="actions"><button class="btn primary" onclick="addDiscoveryToGarden('${p.id}')">＋ Add to Garden</button><button class="btn secondary" onclick="toggleWishlistFromProfile('${p.id}')">${p.wishlist?"♥ Remove wishlist":"♡ Add to wishlist"}</button></div></div>`:""}
       <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>
@@ -2992,7 +2999,7 @@ async function renderProfile(id,isNew=false){
       ${renderDistributionCard(distributionRecord)}
       ${botanicalRows}
       <div class="source-dossier"><div class="eyebrow">Provenance</div><h3>Where this record comes from</h3><div class="source-row">${uniqueSources.map(s=>`<span class="source-pill">${esc(s)}</span>`).join("")}${care.localMatchLevel?`<span class="source-pill">Care match: ${esc(care.localMatchLevel)}</span>`:""}</div><div class="action-row"><button class="mini-action" onclick="refreshIntel('${p.id}')">↻ Refresh record</button><button class="mini-action" onclick="exportBackup()">⇩ Backup garden</button></div></div>
-      ${gmCount?`<div class="good-know compact-note gm-note"><div class="eyebrow">✦ Gemini</div><p class="sub">Details marked ✦ Gemini were filled in by Google Gemini because none of FloraLens' botanical sources had them. Real source data always replaces them when it becomes available.</p></div>`:""}
+      ${gmCount?`<div class="good-know compact-note gm-note"><div class="eyebrow">✦ Filled in by Gemini</div><p class="sub">None of FloraLens' botanical sources had ${esc(geminiFieldList(care,gmDesc))} for this plant, so Google Gemini filled ${gmCount===1?"it":"them"} in. Real source data replaces Gemini's automatically when it becomes available.</p></div>`:""}
       ${care.usedLocal?`<div class="good-know compact-note"><div class="eyebrow">Care-source note</div><p class="sub">FloraLens prefers species-level practical guidance and uses curated genus guidance only as a cautious fallback.</p></div>`:""}
       ${care.usedTraits?`<div class="good-know compact-note"><div class="eyebrow">TRY v7</div><p class="sub">TRY traits are botanical and ecological context rather than direct growing instructions.${care.traitMatchLevel==="genus"?" This record uses clearly labelled genus-level context because a safe exact species match was not available.":""}</p></div>`:""}
       <div class="profile-dock-reserve" aria-hidden="true"></div>
@@ -3339,9 +3346,9 @@ function renderLookupResult(){
       ?`<button class="btn primary" onclick="setRoute('profile',{id:'${existing.id}'})">Open ${esc(existing.common)}</button>`
       :`<button class="btn primary" onclick="addLookupToWishlist()">♡ Add to wishlist</button>`}
       <button class="btn secondary" onclick="setRoute('discover')">Search again</button></div>
-    ${r.description?`<div class="profile-summary-card"><p>${esc(r.description)}</p><i class="gm-tag">✦ Gemini</i></div>`:""}
+    ${r.description?`<div class="profile-summary-card"><p>${esc(r.description)}</p></div>`:""}
     ${Array.isArray(r.buying_tips)&&r.buying_tips.length?`<section class="buy-card buy-good lookup-buy"><div class="buy-head"><div><div class="eyebrow">At the garden centre</div><h2>Choosing a good one</h2></div><span class="buy-mark">✓</span></div><div class="buy-list pos">${r.buying_tips.slice(0,3).map(t=>`<div><span>✓</span><p>${esc(t)}</p></div>`).join("")}</div></section>`:""}
-    <div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div><i class="gm-tag">✦ Gemini</i></div>
+    <div class="care-glance"><div class="care-glance-head"><div><span>At a glance</span><b>The essentials</b></div></div>
       <div class="care-glance-grid">${tile("sun","☀","Light",r.light)}${tile("drop","💧","Water",r.water)}${tile("soil","♧","Soil",r.soil)}${tile("snow","❄","Hardiness",r.hardiness)}</div></div>
     ${months.length?`<div class="profile-card flowering-card"><div class="profile-card-head"><div><div class="eyebrow">Flowering</div><h2>Flowering year</h2></div></div><div class="months">${LOOKUP_MONTHS.map((m,i)=>`<div class="month ${months.includes(i+1)?"on":""}">${m}</div>`).join("")}</div></div>`:""}
     <div class="care-grid">${wide("↕","Size",r.height)}${wide("✂","Pruning",r.pruning)}${wide("🌱","Propagation",r.propagation)}</div>
@@ -3794,7 +3801,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.0 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.0.1 · made for our garden</div>`);
 });
 
 renderHome();
