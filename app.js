@@ -1329,11 +1329,11 @@ async function fillGapsWithGemini(p,{force=false}={}){
   if(!API_PROXY_URL||!p?.speciesKey||!navigator.onLine||geminiPaused()) return false;
   const cache=state.speciesCache[p.speciesKey]; if(!cache) return false;
   const g=cache.gemini;
-  if(!force && g?.failedAt && Date.now()-new Date(g.failedAt).getTime()<20*60e3) return false;
+  if(!force && g?.retryAt && Date.now()<g.retryAt) return false;
   if(geminiFillInFlight.has(p.speciesKey)) return false;
   let {missing,known}=careGapsFor(p);
   if(!force && g?.fetchedAt){                                                     // once per species…
-    if((g.asked||[]).includes("about")) return false;
+    if(g.fields?.about||(g.aboutMisses||0)>=3) return false;
     missing=["about"];                                                            // …but older records still get the intro
   }
   if(!missing.length) return false;
@@ -1355,18 +1355,23 @@ async function fillGapsWithGemini(p,{force=false}={}){
         fields[k]=v.trim().slice(0,k==="description"||k==="about"?900:500);
       }
     }
-    // Only count "about" as asked if this Worker version knows the field.
-    const asked=missing.filter(k=>k!=="about"||k in data.fields);
+    // "about" only counts as done once Gemini actually wrote one; otherwise try again later (max 3 times).
+    const gotAbout=!!fields.about;
+    const asked=missing.filter(k=>k!=="about"||gotAbout);
     const prev=force?{}:(g?.fetchedAt?g:{});
+    const misses=gotAbout?0:(prev.aboutMisses||0)+(missing.includes("about")?1:0);
     state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{
       fields:{...(prev.fields||{}),...fields},asked:[...new Set([...(prev.asked||[]),...asked])],
-      fetchedAt:new Date().toISOString(),model:data.model||"gemini"}};
+      fetchedAt:new Date().toISOString(),model:data.model||"gemini",
+      ...(misses?{aboutMisses:misses,retryAt:Date.now()+6*3600e3}:{})}};
     saveState();
     syncPlantsFromSpecies(p.speciesKey);
     return Object.keys(fields).length>0;
   }catch(err){
     console.warn("Gemini gap fill",err);
-    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{...(g||{}),failedAt:new Date().toISOString()}};
+    // A Worker that is still deploying answers 400 ("Nothing to fill"), so retry that soon.
+    const soon=/Nothing to fill/i.test(String(err?.message||""));
+    state.speciesCache[p.speciesKey]={...state.speciesCache[p.speciesKey],gemini:{...(g||{}),failedAt:new Date().toISOString(),retryAt:Date.now()+(soon?2:20)*60e3}};
     saveState();
     return false;
   }finally{ geminiFillInFlight.delete(p.speciesKey); }
@@ -4019,7 +4024,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.4 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.4.1 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4042,7 +4047,7 @@ async function fillGardenGaps(){
     for(const p of items){
       if(!navigator.onLine||geminiPaused()) break;
       const g=state.speciesCache[p.speciesKey]?.gemini;
-      if(g?.fetchedAt && (g.asked||[]).includes("about")) continue;   // already done
+      if(g?.fetchedAt && (g.fields?.about||(g.aboutMisses||0)>=3)) continue;   // already done
       if(!state.speciesCache[p.speciesKey]){
         state.speciesCache[p.speciesKey]={scientific:p.scientific,common:p.common,family:p.family||"",source:"FloraLens",fetchedAt:new Date().toISOString(),enrichment:null};
       }

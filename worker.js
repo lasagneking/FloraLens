@@ -576,7 +576,7 @@ Field formats:
 - safety: toxicity to people, cats and dogs. Say "No known toxicity to people or pets." only if confident.
 - bloomMonths: month numbers (1–12) when it usually flowers in the UK. Empty list if it isn't normally grown for flowers or rarely flowers in cultivation.
 - description: two or three sentences: what the plant is, where it comes from, and why gardeners grow it.
-- about: a friendly introduction to the plant for the top of its page, written for a keen home gardener rather than a botanist. Two to four sentences, about 50–90 words: what kind of plant it is, its most recognisable features (flowers, foliage, size, scent), where it comes from, and what it brings to a UK garden or home (wildlife, colour, cut flowers, fast growth). If the common name is shared by several plants, describe this exact species. No care instructions, no headings, no lists.`;
+- about: a friendly introduction to the plant for the top of its page, written for a keen home gardener rather than a botanist. Two to four sentences, about 50–90 words: what kind of plant it is, its most recognisable features (flowers, foliage, size, scent), where it comes from, and what it brings to a UK garden or home (wildlife, colour, cut flowers, fast growth). If the common name is shared by several plants, describe this exact species. No care instructions, no headings, no lists. Never leave "about" empty: if you are unsure of the exact species, describe the plant group it belongs to and say that varieties differ.`;
 
 const FILL_FIELD_SCHEMA = {
   light: { type: "string" }, water: { type: "string" }, soil: { type: "string" },
