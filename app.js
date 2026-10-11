@@ -4195,7 +4195,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.7 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.7.1 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4282,6 +4282,39 @@ function appScrollTo(top,smooth=false){ appScroller().scrollTo({top:Math.max(0,t
   // Stop any stray sideways scroll offset on the content area
   const v=document.getElementById("view");
   if(v) v.addEventListener("scroll",()=>{ if(v.scrollLeft) v.scrollLeft=0; },{passive:true});
+
+  // iOS: turning the phone sideways and back can leave the page zoomed or shifted a little,
+  // so what you see and where your taps land no longer line up (every tap hits the weather
+  // card, the camera screen looks stuck). After any rotation, put the page back exactly
+  // where it belongs.
+  const typing=()=>!!document.activeElement?.closest?.("input,textarea,select,[contenteditable]");
+  const snapBack=()=>{
+    if(typing()) return;                                   // the keyboard legitimately moves the page
+    if(window.scrollX||window.scrollY) window.scrollTo(0,0);
+    document.documentElement.scrollTop=0; document.documentElement.scrollLeft=0;
+    document.body.scrollTop=0; document.body.scrollLeft=0;
+  };
+  const meta=document.querySelector('meta[name="viewport"]');
+  const baseViewport=meta?.getAttribute("content")||"";
+  let rotateTimers=[];
+  const afterRotate=()=>{
+    rotateTimers.forEach(clearTimeout);
+    // Re-applying the viewport makes iOS drop any zoom it picked up while sideways
+    if(meta){ meta.setAttribute("content",baseViewport.replace(/initial-scale=[\d.]+/,"initial-scale=1.0001")); }
+    rotateTimers=[0,80,250,500,900].map(t=>setTimeout(()=>{
+      if(meta&&t>=250) meta.setAttribute("content",baseViewport);
+      snapBack();
+    },t));
+    // Nudge iOS to recompute the fixed header, tab bar and sheets
+    requestAnimationFrame(()=>{ document.body.style.transform="translateZ(0)"; requestAnimationFrame(()=>{ document.body.style.transform=""; }); });
+  };
+  window.addEventListener("orientationchange",afterRotate);
+  screen.orientation?.addEventListener?.("change",afterRotate);
+  window.matchMedia("(orientation: portrait)").addEventListener?.("change",afterRotate);
+  window.addEventListener("resize",()=>{ if(!typing()) snapBack(); });
+  // The page itself never scrolls, so any window scroll is a glitch: undo it
+  window.addEventListener("scroll",snapBack,{passive:true});
+  window.visualViewport?.addEventListener("scroll",()=>{ if(!typing()&&window.visualViewport.offsetTop) snapBack(); });
 })();
 
 /* ===================== Home-screen app: offline + updates ===================== */
