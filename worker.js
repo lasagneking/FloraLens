@@ -453,6 +453,14 @@ async function callGemini(env, { system, input, schema }) {
     store: false,
   });
   let lastStatus = 0;
+  // Token usage across every billed attempt, passed back so the app can show it.
+  const usage = { input: 0, output: 0, thought: 0, cached: 0, total: 0, attempts: 0 };
+  const addUsage = (u) => {
+    if (!u) return;
+    usage.input += u.total_input_tokens || 0; usage.output += u.total_output_tokens || 0;
+    usage.thought += u.total_thought_tokens || 0; usage.cached += u.total_cached_tokens || 0;
+    usage.total += u.total_tokens || 0; usage.attempts++;
+  };
   for (let attempt = 0; attempt <= GEMINI_RETRY_DELAYS_MS.length; attempt++) {
     if (attempt > 0) await sleep(GEMINI_RETRY_DELAYS_MS[attempt - 1]);
     let upstream;
@@ -469,8 +477,9 @@ async function callGemini(env, { system, input, schema }) {
     }
     if (upstream.ok) {
       const data = await upstream.json();
+      addUsage(data?.usage);
       const text = extractGeminiText(data).trim().replace(/^```(?:json)?\s*/i, "").replace(/```$/, "");
-      try { return { result: JSON.parse(text) }; }
+      try { return { result: JSON.parse(text), usage }; }
       catch {
         console.log(`Unparseable Gemini output (attempt ${attempt + 1})`, text.slice(0, 300));
         lastStatus = 502;
@@ -480,16 +489,16 @@ async function callGemini(env, { system, input, schema }) {
     lastStatus = upstream.status;
     const detail = await upstream.text().catch(() => "");
     console.log(`Gemini error ${upstream.status} (attempt ${attempt + 1})`, detail.slice(0, 300));
-    if (upstream.status === 429) return geminiLimitReply(detail);
+    if (upstream.status === 429) return { ...geminiLimitReply(detail), usage };
     if (upstream.status === 402) return { status: 402, error: "The Gemini credit has run out. Top it up in Google AI Studio → Billing, then try again.", retryAfter: 0 };
     if (![500, 502, 503, 504].includes(upstream.status)) {
       return { status: 502, error: `Gemini returned an error (${upstream.status}).` };   // not worth retrying
     }
   }
   if (lastStatus === 503 || lastStatus === 0 || lastStatus >= 500) {
-    return { status: 503, error: "Gemini is busy right now. Try again in a minute." };
+    return { status: 503, error: "Gemini is busy right now. Try again in a minute.", usage };
   }
-  return { status: 502, error: "Gemini's answer couldn't be read. Try again." };
+  return { status: 502, error: "Gemini's answer couldn't be read. Try again.", usage };
 }
 
 function originAllowed(request) {
@@ -548,8 +557,8 @@ async function handleDoctor(request, env, corsHeaders) {
       { type: "text", text: parts.join("\n\n") },
     ],
   });
-  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
-  return doctorJson({ result: out.result }, 200, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
+  return doctorJson({ result: out.result, usage: out.usage }, 200, corsHeaders);
 }
 
 /* ------------------------------------------------------------------ /fill */
@@ -610,8 +619,8 @@ async function handleFill(request, env, corsHeaders) {
     schema: { type: "object", properties, required: missing },
     input: [{ type: "text", text }],
   });
-  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
-  return doctorJson({ fields: out.result, model: GEMINI_MODEL }, 200, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
+  return doctorJson({ fields: out.result, model: GEMINI_MODEL, usage: out.usage }, 200, corsHeaders);
 }
 
 /* ------------------------------------------------------------------ /buycheck */
@@ -670,8 +679,8 @@ async function handleBuyCheck(request, env, corsHeaders) {
       { type: "text", text: `What FloraLens knows:\n${String(body.context || "").slice(0, 3000)}\n\nShould she buy this plant? Return the JSON result.` },
     ],
   });
-  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
-  return doctorJson({ result: out.result }, 200, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
+  return doctorJson({ result: out.result, usage: out.usage }, 200, corsHeaders);
 }
 
 /* ------------------------------------------------------------------ /lookup */
@@ -753,14 +762,14 @@ async function handleLookup(request, env, corsHeaders) {
   if (!query) return doctorJson({ error: "Type a plant name" }, 400, corsHeaders);
 
   const out = await callGemini(env, { system: LOOKUP_RULES, schema: LOOKUP_SCHEMA, input: [{ type: "text", text: `She typed: "${query}"` }] });
-  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
   const result = out.result;
   let photo = null;
   if (result?.found && result.scientific) {
     const species = String(result.species || "").trim();
     photo = (species && species.includes(" ") ? await findPlantPhoto(species) : null) || await findPlantPhoto(result.scientific);
   }
-  return doctorJson({ result, photo, model: GEMINI_MODEL }, 200, corsHeaders);
+  return doctorJson({ result, photo, model: GEMINI_MODEL, usage: out.usage }, 200, corsHeaders);
 }
 
 /* ------------------------------------------------------------------ /image */
@@ -845,7 +854,7 @@ async function handleSuggest(request, env, corsHeaders) {
   input.push({ type: "text", text });
 
   const out = await callGemini(env, { system: SUGGEST_RULES, schema: SUGGEST_SCHEMA, input });
-  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null }, out.status, corsHeaders);
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
   const suggestions = (out.result?.suggestions || []).slice(0, 6);
   const photos = await Promise.all(suggestions.map(async s => {
     try {
@@ -853,5 +862,5 @@ async function handleSuggest(request, env, corsHeaders) {
       return (sp.includes(" ") ? await findPlantPhoto(sp) : null) || await findPlantPhoto(s.scientific);
     } catch { return null; }
   }));
-  return doctorJson({ result: { ...out.result, suggestions }, photos, model: GEMINI_MODEL }, 200, corsHeaders);
+  return doctorJson({ result: { ...out.result, suggestions }, photos, model: GEMINI_MODEL, usage: out.usage }, 200, corsHeaders);
 }

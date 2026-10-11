@@ -1095,8 +1095,8 @@ function perenualSoil(p){
   return p?.soil?.length ? p.soil.join(" · ") : null;
 }
 function perenualHardiness(p){
-  if(!p || (p.hardinessMin===null && p.hardinessMax===null)) return null;
-  if(p.hardinessMin!==null && p.hardinessMax!==null) return `USDA zones ${p.hardinessMin}–${p.hardinessMax}`;
+  if(!p || (p.hardinessMin==null && p.hardinessMax==null)) return null;
+  if(p.hardinessMin!=null && p.hardinessMax!=null) return `USDA zones ${p.hardinessMin}–${p.hardinessMax}`;
   return `USDA zone ${p.hardinessMin ?? p.hardinessMax}`;
 }
 function floweringSeasonMonths(season){
@@ -1312,12 +1312,19 @@ function geminiFieldList(care,hasDesc){
   const list=[...(care?.geminiFilled||[]).map(k=>names[k]||k),...(hasDesc?["the description"]:[]),...(care?.geminiAbout?["the introduction"]:[])];
   return list.length<2?list.join(""):`${list.slice(0,-1).join(", ")} or ${list.at(-1)}`;
 }
+// Description candidates, minus Perenual/Trefle (and notes copied from them) in Gemini-only mode.
+function descSources(intel,p){
+  if(!state.geminiOnly) return {pn:intel?.perenual,t:intel?.trefle,g:intel?.gbif,p};
+  const copied=[intel?.perenual?.description,intel?.trefle?.growthDescription,intel?.trefle?.observations].filter(Boolean);
+  const notes=p?.notes&&!copied.includes(p.notes)?p.notes:"";
+  return {pn:null,t:null,g:intel?.gbif,p:{...p,notes}};
+}
 function careGapsFor(p){
   const intel=state.speciesCache[p.speciesKey]?.enrichment||null;
   const care=resolvedCare(p.scientific,intel?.trefle||null,intel?.perenual||null,p.speciesKey,{noGemini:true});
   const missing=GEMINI_FILL_FIELDS.filter(k=>!care[k]);
   if(!care.bloomMonths?.length) missing.push("bloomMonths");
-  if(!chooseProfileDescription({pn:intel?.perenual,t:intel?.trefle,g:intel?.gbif,p})) missing.push("description");
+  if(!chooseProfileDescription(descSources(intel,p))) missing.push("description");
   missing.push("about");                       // the friendly intro under the photo, for every plant
   const known={};
   GEMINI_FILL_FIELDS.forEach(k=>{ if(care[k]) known[k]=String(care[k]).slice(0,300); });
@@ -1332,9 +1339,9 @@ async function fillGapsWithGemini(p,{force=false}={}){
   if(!force && g?.retryAt && Date.now()<g.retryAt) return false;
   if(geminiFillInFlight.has(p.speciesKey)) return false;
   let {missing,known}=careGapsFor(p);
-  if(!force && g?.fetchedAt){                                                     // once per species…
-    if(g.fields?.about||(g.aboutMisses||0)>=3) return false;
-    missing=["about"];                                                            // …but older records still get the intro
+  if(!force && g?.fetchedAt){              // each field is only ever asked once per species
+    const asked=new Set(g.asked||[]);
+    missing=missing.filter(k=>k==="about"?(!g.fields?.about&&(g.aboutMisses||0)<3):!asked.has(k));
   }
   if(!missing.length) return false;
   geminiFillInFlight.add(p.speciesKey);
@@ -1408,11 +1415,12 @@ async function maybeFillGaps(p){
 }
 
 function resolvedCare(scientificName,t,pn,speciesKey=null,opts={}){
+  if(state.geminiOnly){ t=null; pn=null; }        // Gemini-only test mode: no Perenual or Trefle
   const gm=opts.noGemini?{}:geminiFieldsFor(scientificName,speciesKey);
   const filled=[];
   const gmFallback=(k,v)=>{ if(v) return v; const g=usable(gm[k]); if(g){ filled.push(k); return g; } return null; };
   const pa=plantAtlasPhenology(scientificName);
-  const tr=traitRecordFor(scientificName,speciesKey);
+  const tr=state.geminiOnly?null:traitRecordFor(scientificName,speciesKey);   // …and no TRY traits
   const inferred=traitCareInference(tr);
   const localMatches=floralensCareMatches(scientificName);
   const exactLocal=localMatches.exact;
@@ -2839,6 +2847,7 @@ async function enrichSpeciesNow(scientificName, speciesKey, force=false){
 }
 
 function syncPlantsFromSpecies(speciesKey){
+  if(state.geminiOnly) return;                    // keep stored records based on the real sources
   const cache=state.speciesCache[speciesKey];
   if(!cache) return;
   const intel=cache.enrichment||{};
@@ -3127,15 +3136,16 @@ async function renderProfile(id,isNew=false){
   const cached=state.speciesCache[p.speciesKey]||{};
   const intel=cached.enrichment||null;
   const hasBotanicalIntel=!!(intel||cached.tryV7);
-  const t=intel?.trefle||null;
-  const pn=intel?.perenual||null;
+  const t=state.geminiOnly?null:(intel?.trefle||null);
+  const pn=state.geminiOnly?null:(intel?.perenual||null);
   const g=intel?.gbif||null;
   const care=resolvedCare(p.scientific,t,pn,p.speciesKey);
-  const sourceNames=[...(intel?.sources||[])];
+  const sourceNames=[...(intel?.sources||[])].filter(s=>!state.geminiOnly||!/perenual|trefle|try/i.test(s));
+  if(state.geminiOnly) sourceNames.unshift("Gemini-only test mode");
   if(care.plantAtlas && !sourceNames.includes("Plant Atlas 2020")) sourceNames.push("Plant Atlas 2020");
   if(care.localSource && !sourceNames.includes(care.localSource)) sourceNames.push(care.localSource);
   if(care.usedTraits) sourceNames.push(`${care.traitDataset||"TRY traits"} · ${care.traitMatchLevel==="genus"?"genus context":"species"}`);
-  const realDesc=chooseProfileDescription({pn,t,g,p});
+  const realDesc=chooseProfileDescription(descSources(intel,p));
   const gmDesc=realDesc?null:usable(geminiFieldsFor(p.scientific,p.speciesKey).description);
   const desc=realDesc||gmDesc;
   const gmAbout=usable(geminiFieldsFor(p.scientific,p.speciesKey).about);
@@ -4051,8 +4061,103 @@ async function backgroundEnrichTryV7SavedRecords(){
 }
 
 
+/* ===================== Gemini lab: Gemini-only test mode + token usage ===================== */
+// Gemini 3.8 Flash paid-tier rates in US$ per 1M tokens (output includes thinking). Rates are set to
+// double on 1 Jan 2027; update these then.
+const GEMINI_RATE={input:0.75,output:3.75};
+const GBP_PER_USD=0.75;   // rough, for showing pence
+const GEMINI_ROUTES={doctor:"Plant Doctor",fill:"Filling gaps",buycheck:"Should I buy it?",lookup:"Plant lookup",suggest:"Garden planner"};
+(function trackGeminiCalls(){
+  const base=String(API_PROXY_URL||"").replace(/\/$/,"");
+  if(!base||!window.fetch) return;
+  const realFetch=window.fetch.bind(window);
+  window.fetch=async function(input,init){
+    const res=await realFetch(input,init);
+    try{
+      const url=typeof input==="string"?input:input?.url||"";
+      const m=url.startsWith(base)&&url.slice(base.length).match(/^\/(doctor|fill|buycheck|lookup|suggest)\b/);
+      if(m) res.clone().json().then(d=>recordGeminiUsage(m[1],d?.usage,res.status)).catch(()=>{});
+    }catch(e){}
+    return res;
+  };
+})();
+function geminiUsageStore(){
+  if(!state.geminiUsage||!Array.isArray(state.geminiUsage.log)) state.geminiUsage={since:new Date().toISOString(),log:[],totals:{}};
+  if(!state.geminiUsage.totals) state.geminiUsage.totals={};
+  return state.geminiUsage;
+}
+function geminiCost(u){ return ((u.in||0)*GEMINI_RATE.input+((u.out||0)+(u.th||0))*GEMINI_RATE.output)/1e6; }
+function recordGeminiUsage(route,usage,status){
+  const store=geminiUsageStore();
+  const mode=state.geminiOnly?"geminiOnly":"normal";
+  const e={t:Date.now(),r:route,m:mode,ok:status<400?1:0};
+  if(usage){ e.in=usage.input||0; e.out=usage.output||0; e.th=usage.thought||0; e.tot=usage.total||(e.in+e.out+e.th); }
+  else e.nt=1;                                     // older Worker: call counted, tokens unknown
+  store.log.push(e);
+  if(store.log.length>1500) store.log=store.log.slice(-1500);
+  const tot=store.totals[mode]||(store.totals[mode]={calls:0,in:0,out:0,th:0,tot:0,untracked:0});
+  tot.calls++; if(e.nt) tot.untracked++; else { tot.in+=e.in; tot.out+=e.out; tot.th+=e.th; tot.tot+=e.tot; }
+  saveState();
+  if(document.querySelector("#modal .gm-lab")) renderGeminiLab();
+}
+function sumUsage(list){
+  return list.reduce((a,e)=>{ a.calls++; if(e.nt) a.untracked++; else { a.in+=e.in; a.out+=e.out; a.th+=e.th; a.tot+=e.tot; } return a; },{calls:0,in:0,out:0,th:0,tot:0,untracked:0});
+}
+function fmtTokens(n){ return n>=1e6?`${(n/1e6).toFixed(2)}M`:n>=1e4?`${Math.round(n/1e3)}k`:n>=1e3?`${(n/1e3).toFixed(1)}k`:String(n||0); }
+function fmtCost(usd){
+  const p=usd*GBP_PER_USD*100;
+  return `${p<0.1&&p>0?"<0.1":p<10?p.toFixed(1):Math.round(p)}p`;
+}
+function usageTile(label,u){
+  return `<div class="gm-usage-tile"><small>${label}</small><b>${fmtTokens(u.tot)}</b><span>tokens · ${u.calls} call${u.calls===1?"":"s"}</span><em>≈ ${fmtCost(geminiCost(u))}</em></div>`;
+}
+function openGeminiLab(){ closeModal(); modal(`<div class="gm-lab"></div>`); renderGeminiLab(); }
+function renderGeminiLab(){
+  const host=document.querySelector("#modal .gm-lab"); if(!host) return;
+  const store=geminiUsageStore(), log=store.log, now=new Date();
+  const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate()).getTime();
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1).getTime();
+  const today=sumUsage(log.filter(e=>e.t>=dayStart));
+  const week=sumUsage(log.filter(e=>e.t>=Date.now()-7*864e5));
+  const month=sumUsage(log.filter(e=>e.t>=monthStart));
+  const T=store.totals, all=["normal","geminiOnly"].reduce((a,k)=>{const x=T[k]||{};for(const f of ["calls","in","out","th","tot","untracked"])a[f]+=x[f]||0;return a;},{calls:0,in:0,out:0,th:0,tot:0,untracked:0});
+  const byRoute=Object.keys(GEMINI_ROUTES).map(r=>({r,u:sumUsage(log.filter(e=>e.t>=monthStart&&e.r===r))})).filter(x=>x.u.calls);
+  const modeRow=(k,label)=>{const x=T[k]; if(!x||!x.calls) return `<div class="gm-mode-row"><b>${label}</b><span>No calls yet</span></div>`;
+    const tracked=x.calls-(x.untracked||0); const avg=tracked?Math.round(x.tot/tracked):0;
+    return `<div class="gm-mode-row"><b>${label}</b><span>${x.calls} call${x.calls===1?"":"s"} · ${fmtTokens(x.tot)} tokens · avg ${fmtTokens(avg)}/call · ≈ ${fmtCost(geminiCost(x))}</span></div>`;};
+  const recent=log.slice(-8).reverse();
+  const on=!!state.geminiOnly;
+  host.innerHTML=`<div class="eyebrow">Gemini lab</div><h2>Test &amp; usage</h2>
+    <div class="gm-switch-card ${on?"on":""}">
+      <div><b>Gemini-only mode</b><small>${on?"On: Perenual, Trefle and TRY are ignored, so Gemini fills those gaps.":"Off: FloraLens uses all its botanical sources, with Gemini as the last resort."}</small></div>
+      <button class="gm-switch" role="switch" aria-checked="${on}" aria-label="Gemini-only mode" onclick="setGeminiOnly(${!on})"><i></i></button>
+    </div>
+    <p class="gm-lab-note">Pl@ntNet, GBIF, Plant Atlas and FloraLens' own care notes stay in both modes. Switching off brings the real sources straight back, and nothing is lost. The first time a plant is opened in Gemini-only mode, Gemini is asked for whatever is missing, once per plant.</p>
+    <div class="gm-usage-grid">${usageTile("Today",today)}${usageTile("Last 7 days",week)}${usageTile("This month",month)}${usageTile("All time",all)}</div>
+    <div class="gm-lab-sub">By mode, all time</div>
+    ${modeRow("normal","Normal")}${modeRow("geminiOnly","Gemini-only")}
+    ${byRoute.length?`<div class="gm-lab-sub">This month by feature</div>${byRoute.map(x=>`<div class="gm-mode-row"><b>${GEMINI_ROUTES[x.r]}</b><span>${x.u.calls} call${x.u.calls===1?"":"s"} · ${fmtTokens(x.u.tot)} tokens · ≈ ${fmtCost(geminiCost(x.u))}</span></div>`).join("")}`:""}
+    ${recent.length?`<div class="gm-lab-sub">Latest calls</div><div class="gm-recent">${recent.map(e=>`<div><span>${new Date(e.t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})} · ${new Date(e.t).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</span><b>${GEMINI_ROUTES[e.r]||e.r}${e.m==="geminiOnly"?` <i>G-only</i>`:""}${e.ok?"":` <i class="err">failed</i>`}</b><em>${e.nt?"—":fmtTokens(e.tot)}</em></div>`).join("")}</div>`:`<p class="gm-lab-note">No Gemini calls recorded yet.</p>`}
+    ${all.untracked?`<p class="gm-lab-note">${all.untracked} call${all.untracked===1?" was":"s were"} made before the Worker reported tokens, so ${all.untracked===1?"it's":"they're"} counted but not sized.</p>`:""}
+    <p class="gm-lab-note">Costs are estimates at $${GEMINI_RATE.input} per million input tokens and $${GEMINI_RATE.output} per million output tokens (thinking included), shown in pence at roughly ${GBP_PER_USD} £/$. Google's billing page is the final word. Counting since ${new Date(store.since).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}.</p>
+    <div class="actions"><button class="btn secondary" onclick="resetGeminiUsage()">Reset counter</button><button class="btn primary" onclick="closeModal()">Done</button></div>`;
+}
+function setGeminiOnly(on){
+  state.geminiOnly=!!on;
+  saveState();
+  renderGeminiLab();
+  toast(on?"Gemini-only mode on":"Gemini-only mode off: all sources back");
+  refreshCurrentView();
+  if(on) setTimeout(fillGardenGaps,800);
+}
+function resetGeminiUsage(){
+  if(!confirm("Reset the Gemini usage counter? This only clears FloraLens' own tally.")) return;
+  state.geminiUsage={since:new Date().toISOString(),log:[],totals:{}};
+  saveState(); renderGeminiLab(); toast("Usage counter reset");
+}
+
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.5 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.6 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4075,7 +4180,6 @@ async function fillGardenGaps(){
     for(const p of items){
       if(!navigator.onLine||geminiPaused()) break;
       const g=state.speciesCache[p.speciesKey]?.gemini;
-      if(g?.fetchedAt && (g.fields?.about||(g.aboutMisses||0)>=3)) continue;   // already done
       if(!state.speciesCache[p.speciesKey]){
         state.speciesCache[p.speciesKey]={scientific:p.scientific,common:p.common,family:p.family||"",source:"FloraLens",fetchedAt:new Date().toISOString(),enrichment:null};
       }
