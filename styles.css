@@ -1276,7 +1276,7 @@ html[data-season="winter"] body{background-image:url("icons/bg-winter.jpg")}
 .doctor-guide-bar .btn{width:100%;font-size:17px;padding:16px}
 @keyframes guideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
 .doctor-guide{isolation:isolate;overflow:hidden}
-.doctor-guide::before{content:"";position:absolute;inset:-40px;z-index:-1;background:url("icons/doctor-guide.jpg?v=2") center/cover;filter:blur(28px) saturate(1.1);opacity:.75}
+.doctor-guide::before{content:"";position:absolute;inset:-40px;z-index:-1;background:var(--guide-bg) center/cover;filter:blur(28px) saturate(1.1);opacity:.75}
 .doctor-guide img{border-radius:0;filter:drop-shadow(0 10px 30px rgba(60,50,30,.18))}
 .doctor-guide-bar{background:linear-gradient(to top,rgba(246,241,231,.9),rgba(246,241,231,0))}
 /* 9:16 artwork: fill the space between the status bar and the OK button */

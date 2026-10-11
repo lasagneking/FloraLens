@@ -2422,11 +2422,19 @@ function filterByArea(area,btn){
   hydratePhotos(gardenPins);
 }
 
-function startCamera(intent="identify"){
+function startCamera(intent="identify",{guide=true}={}){
   captures=[];
   pendingResults=null;
   captureIntent=intent;
   window.captureOrgan="auto";
+  if(guide){   // "How to photograph it" first; its OK button opens the camera
+    const gc=intent==="discover";
+    showPhotoGuide(gc?"icons/guide-garden-centre.jpg?v=1":"icons/guide-identify.jpg?v=1",
+      gc?"How to photograph it at the garden centre: 1, the whole plant in its pot. 2, a close-up of the leaves, and turn one over. 3, the base of the pot, where roots poking out mean it's pot-bound. Snap the label too."
+        :"How to photograph it: 1, one part per photo, such as a flower, leaf or fruit. 2, flowers first if it's in bloom. 3, add another view of a leaf or the stem.",
+      ()=>cameraInput.click());
+    return;
+  }
   // Called directly from a user tap so iOS opens the rear camera immediately.
   cameraInput.click();
 }
@@ -2473,10 +2481,10 @@ function renderCaptureReview(){
     <div class="capture-stack">${captures.map((c,i)=>`<div class="capture-card"><button class="capture-remove" onclick="removeCapture(${i})">×</button><img src="${c.dataUrl}"><span class="organ">${esc(c.organ)}</span></div>`).join("")}${captures.length<5?`<button class="add-capture" onclick="chooseOrganForNext()">＋<br>Add view</button>`:""}</div>
     <div class="result-hero" style="min-height:330px"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${captures.length} of 5 photos</div><h1>Ready to identify?</h1><span class="confidence">${captures.map(c=>c.organ).join(" · ")}</span></div></div>
     <div class="actions"><button class="btn primary" onclick="identifyPlant()">✿ Identify plant</button><button class="btn secondary" onclick="chooseOrganForNext()" ${captures.length>=5?"disabled":""}>＋ Another view</button></div>
-    <button class="btn outline" style="width:100%" onclick="startCamera(captureIntent)">Start again</button>
+    <button class="btn outline" style="width:100%" onclick="startCamera(captureIntent,{guide:false})">Start again</button>
     ${!API_PROXY_URL?`<div class="setup-card"><div class="eyebrow">Demo mode</div><p class="sub" style="margin:6px 0 0">The complete flow works now. Deploy the included free Cloudflare Worker and set <code>API_PROXY_URL</code> to switch on real Pl@ntNet results.</p></div>`:""}`;
 }
-function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():startCamera(captureIntent); }
+function removeCapture(i){ captures.splice(i,1); captures.length?renderCaptureReview():startCamera(captureIntent,{guide:false}); }
 function chooseOrganForNext(){
   if(captures.length>=5) return;
   modal(`<div class="eyebrow">Add another view</div><h2>What will you photograph?</h2><div class="organ-grid">
@@ -3764,15 +3772,22 @@ function chooseDoctorPlant(id){
 }
 // Full-screen "How to photograph it" card; OK opens the camera (still a direct tap, so iOS allows it).
 function showDoctorPhotoGuide(){
+  showPhotoGuide("icons/doctor-guide.jpg?v=2","How to photograph it: 1, a sharp close-up of the problem. 2, the whole plant with its pot or soil. 3, in daylight without flash.",
+    ()=>document.getElementById("doctorCameraInput")?.click());
+}
+// Full-screen photo guide. OK runs onOk inside the tap, so iOS still lets it open the camera.
+let photoGuideOk=null;
+function showPhotoGuide(src,alt,onOk){
   document.getElementById("doctorGuide")?.remove();
-  document.body.insertAdjacentHTML("beforeend",`<div class="doctor-guide" id="doctorGuide" role="dialog" aria-label="How to photograph it">
-    <img src="icons/doctor-guide.jpg?v=2" alt="How to photograph it: 1, a sharp close-up of the problem. 2, the whole plant with its pot or soil. 3, in daylight without flash.">
-    <div class="doctor-guide-bar"><button class="btn primary" onclick="doctorGuideOk()">OK</button></div>
+  photoGuideOk=onOk;
+  document.body.insertAdjacentHTML("beforeend",`<div class="doctor-guide" id="doctorGuide" role="dialog" aria-label="How to photograph it" style="--guide-bg:url('${src}')">
+    <img src="${src}" alt="${esc(alt)}">
+    <div class="doctor-guide-bar"><button class="btn primary" onclick="photoGuideConfirm()">OK</button></div>
   </div>`);
 }
-function doctorGuideOk(){
+function photoGuideConfirm(){
   document.getElementById("doctorGuide")?.remove();
-  document.getElementById("doctorCameraInput")?.click();
+  const fn=photoGuideOk; photoGuideOk=null; fn?.();
 }
 async function handleDoctorPhoto(file){
   if(!file||!String(file.type).startsWith("image/")) return;
@@ -4180,7 +4195,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.6.5 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.7 · made for our garden</div>`);
 });
 
 renderHome();
