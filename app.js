@@ -2355,7 +2355,7 @@ function openAreaMap(area){
   const plants=state.plants.filter(p=>p.area===area);
   const mood=areaMood(area);
   modal(`<div class="area-detail-head"><span>${mood.icon}</span><div><div class="eyebrow">${esc(mood.note)}</div><h2>${esc(area)}</h2><p class="sub">${plants.length} ${plants.length===1?"plant":"plants"} here</p></div></div>
-    ${plants.length?`<div class="area-plant-list">${plants.map(p=>`<button onclick="closeModal();setRoute('profile',{id:'${p.id}'})"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small></span><b>→</b></button>`).join("")}</div>`:`<div class="empty-card" style="text-align:center"><p class="sub">There aren't any plants in this area yet.</p></div>`}
+    ${plants.length?`<div class="area-plant-list">${plants.map(p=>`<div class="area-plant-row"><button onclick="closeModal();setRoute('profile',{id:'${p.id}'})"><span class="area-list-photo ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}"></span><span><b>${esc(p.common)}</b><small><i>${esc(p.scientific)}</i></small></span><b>→</b></button><button class="area-row-delete" aria-label="Delete ${esc(p.common)}" onclick="confirmDeletePlant('${p.id}')">×</button></div>`).join("")}</div>`:`<div class="empty-card" style="text-align:center"><p class="sub">There aren't any plants in this area yet.</p></div>`}
     ${area!=="Unplaced"?`<button class="btn primary" style="width:100%;margin-top:12px" onclick="closeModal();openPlanner(decodeURIComponent('${jsArg(area)}'))">✦ What should I plant here?</button>`:""}
     <button class="btn secondary" style="width:100%;margin-top:10px" onclick="closeModal();startCamera('identify')">⌾ Identify a plant</button>`);
   hydratePhotos(document);
@@ -2727,6 +2727,24 @@ async function deleteDiscovery(id){
   closeModal();
   await deletePhoto(d.photoKey);
   toast("Discovery removed");
+  renderDiscover();
+}
+
+function confirmClearDiscoveries(){
+  const spotted=state.discoveries.filter(d=>!d.wishlist);
+  if(!spotted.length) return;
+  const kept=state.discoveries.length-spotted.length;
+  modal(`<div class="eyebrow">Tidy up Discover</div><h2>Clear ${spotted.length} spotted plant${spotted.length===1?"":"s"}?</h2>
+    <p class="sub">Everything in Discover that isn't on the wishlist is removed, with its photos. ${kept?`Your ${kept} wishlist plant${kept===1?" stays":"s stay"}`:"Nothing is on the wishlist, so Discover will be empty"}. Plants already in My Garden aren't affected. It can't be undone.</p>
+    <div class="actions"><button class="btn secondary" onclick="closeModal()">Keep them</button><button class="btn danger" onclick="clearDiscoveries()">Clear ${spotted.length}</button></div>`);
+}
+async function clearDiscoveries(){
+  const spotted=state.discoveries.filter(d=>!d.wishlist);
+  state.discoveries=state.discoveries.filter(d=>d.wishlist);
+  saveState();
+  closeModal();
+  for(const d of spotted) if(d.photoKey) await deletePhoto(d.photoKey);
+  toast(`${spotted.length} discover${spotted.length===1?"y":"ies"} cleared`);
   renderDiscover();
 }
 
@@ -3226,7 +3244,7 @@ async function renderProfile(id,isNew=false){
     <section class="profile-panel" data-profile-panel="history">
       <div class="profile-section-intro"><div><div class="eyebrow">Plant history</div><h2>${isDiscovery?"Discovery story":"Your story together"}</h2></div><div class="profile-completeness history"><span>◷</span><div><b>${isDiscovery?"Saved":state.journal.filter(j=>j.plantId===p.id).length}</b><small>${isDiscovery?"discovery":"garden moments"}</small></div></div></div>
       ${storyHtml}
-      ${isDiscovery?`<button class="link-btn discovery-delete-link history-delete" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>`:""}
+      ${isDiscovery?`<button class="link-btn discovery-delete-link history-delete" onclick="confirmDeleteDiscovery('${p.id}')">Remove from Discover</button>`:`<button class="link-btn discovery-delete-link history-delete" onclick="confirmDeletePlant('${p.id}')">Remove from My Garden</button>`}
       <div class="profile-dock-reserve" aria-hidden="true"></div>
     </section>`;
 
@@ -3273,17 +3291,26 @@ function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new F
 function confirmDeletePlant(id){
   const p=state.plants.find(x=>x.id===id);
   if(!p) return;
-  modal(`<div class="eyebrow">Remove from your garden</div><h2>Delete ${esc(p.common)}?</h2><p class="sub">This removes the plant entry and its saved identification photo from this device. The shared species knowledge stays cached for future identifications.</p><div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deletePlant('${p.id}')">Delete plant</button></div>`);
+  const moments=state.journal.filter(j=>j.plantId===id).length;
+  closeModal();                                   // e.g. the Garden Map area sheet it was opened from
+  modal(`<div class="eyebrow">Remove from your garden</div><h2>Delete ${esc(p.common)}?</h2>
+    <p class="sub">This removes ${esc(p.common)}${p.area&&p.area!=="Unplaced"?` from ${esc(p.area)} on the Garden Map`:" from My Garden"}, along with its photo${moments?` and its ${moments} garden moment${moments===1?"":"s"} in the Journal`:""}. It can't be undone. Species knowledge stays saved for future identifications.</p>
+    <div class="actions"><button class="btn secondary" onclick="closeModal()">Keep it</button><button class="btn danger" onclick="deletePlant('${p.id}')">Delete plant</button></div>`);
 }
 async function deletePlant(id){
   const p=state.plants.find(x=>x.id===id);
   if(!p) return;
+  const moments=state.journal.filter(j=>j.plantId===id);
   state.plants=state.plants.filter(x=>x.id!==id);
+  state.journal=state.journal.filter(j=>j.plantId!==id);          // its moments only show on its own page
+  state.careTasks=(state.careTasks||[]).filter(t=>t.plantId!==id);
   saveState();
   closeModal();
   await deletePhoto(p.photoKey);
+  for(const j of moments) if(j.photoKey) await deletePhoto(j.photoKey);
   toast(`${p.common} removed`);
-  if(currentRoute==="garden") renderGarden(); else renderHome();
+  if(currentRoute==="profile") setRoute("garden");
+  else if(currentRoute==="garden") renderGarden(); else renderHome();
 }
 
 function journalTypeIcon(type){
@@ -3671,6 +3698,7 @@ function renderDiscover(){
     </button>
     ${lookupCard()}
     <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
+    ${items.length-wishlist>0?`<div class="discover-clear"><span>Back from a day out?</span><button class="mini-action" onclick="confirmClearDiscoveries()">Clear ${items.length-wishlist} spotted · keep wishlist</button></div>`:""}
     ${items.length
       ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
           <div class="discovery-media">
@@ -4024,7 +4052,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.4.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.5 · made for our garden</div>`);
 });
 
 renderHome();
