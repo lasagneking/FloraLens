@@ -2460,8 +2460,16 @@ async function addCapture(file, organ="auto"){
 }
 function fileToDataUrl(file){ return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file);}); }
 
+// Leave the identify flow from any step, without saving anything.
+let identifyRun=0;
+function cancelIdentify(){
+  identifyRun++;                                  // ignore any identification still in flight
+  closeModal();
+  captures=[]; pendingResults=null;
+  setRoute(captureIntent==="discover"?"discover":"home");
+}
 function renderCaptureReview(){
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Closer look</div><h1>${captures.length===1?"Lovely shot.":"More clues."}</h1><p class="sub">Label each view if you know the plant part, or leave it on Auto.</p></section>
+  view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()">✕ Cancel</button></section><section class="page-head"><div class="eyebrow">Closer look</div><h1>${captures.length===1?"Lovely shot.":"More clues."}</h1><p class="sub">Label each view if you know the plant part, or leave it on Auto.</p></section>
     <div class="capture-stack">${captures.map((c,i)=>`<div class="capture-card"><button class="capture-remove" onclick="removeCapture(${i})">×</button><img src="${c.dataUrl}"><span class="organ">${esc(c.organ)}</span></div>`).join("")}${captures.length<5?`<button class="add-capture" onclick="chooseOrganForNext()">＋<br>Add view</button>`:""}</div>
     <div class="result-hero" style="min-height:330px"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${captures.length} of 5 photos</div><h1>Ready to identify?</h1><span class="confidence">${captures.map(c=>c.organ).join(" · ")}</span></div></div>
     <div class="actions"><button class="btn primary" onclick="identifyPlant()">✿ Identify plant</button><button class="btn secondary" onclick="chooseOrganForNext()" ${captures.length>=5?"disabled":""}>＋ Another view</button></div>
@@ -2484,7 +2492,8 @@ function pickOrgan(o){ closeModal(); beginCapture(o); }
 async function identifyPlant(){
   if(!captures.length) return;
   const first=captures[0].dataUrl;
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens</div><h1>Looking closely…</h1></section><div class="result-hero"><img class="preview-img" src="${first}"><div class="identify-overlay"><div><div class="flower-loader">✿</div><h2 style="margin:12px 0 5px">Comparing the details</h2><p style="opacity:.8">${captures.length} ${captures.length===1?"view":"views"} of the same plant.</p></div></div></div>`;
+  const run=++identifyRun;
+  view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()">✕ Cancel</button></section><section class="page-head"><div class="eyebrow">FloraLens</div><h1>Looking closely…</h1></section><div class="result-hero"><img class="preview-img" src="${first}"><div class="identify-overlay"><div><div class="flower-loader">✿</div><h2 style="margin:12px 0 5px">Comparing the details</h2><p style="opacity:.8">${captures.length} ${captures.length===1?"view":"views"} of the same plant.</p></div></div></div>`;
   try{
     if(API_PROXY_URL){
       const fd=new FormData();
@@ -2504,10 +2513,12 @@ async function identifyPlant(){
         {score:.516,species:{scientificNameWithoutAuthor:"Lavandula × intermedia",family:{scientificNameWithoutAuthor:"Lamiaceae"},genus:{scientificNameWithoutAuthor:"Lavandula"},commonNames:["Lavandin"]}}
       ];
     }
+    if(run!==identifyRun) return;                 // she cancelled while it was working
     if(!pendingResults.length) throw new Error("No plant match was returned");
     renderResult();
   }catch(err){
-    view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens</div><h1>Couldn’t settle on a match</h1><p class="sub">${esc(friendlyNetError(err,"Identifying a plant"))}</p></section><button class="btn primary" style="width:100%" onclick="renderCaptureReview()">Try these photos again</button>`;
+    if(run!==identifyRun) return;
+    view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()">✕ Cancel</button></section><section class="page-head"><div class="eyebrow">FloraLens</div><h1>Couldn’t settle on a match</h1><p class="sub">${esc(friendlyNetError(err,"Identifying a plant"))}</p></section><button class="btn primary" style="width:100%" onclick="renderCaptureReview()">Try these photos again</button>`;
   }
 }
 
@@ -2517,14 +2528,14 @@ function resultInfo(r){
 }
 function renderResult(){
   const r=pendingResults[0], info=resultInfo(r);
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">FloraLens match</div><h1>I think I found it!</h1>${state.lastQuota!==null?`<span class="quota-pill">❧ ${state.lastQuota} identifications left today</span>`:""}</section>
+  view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()">✕ Cancel</button></section><section class="page-head"><div class="eyebrow">FloraLens match</div><h1>I think I found it!</h1>${state.lastQuota!==null?`<span class="quota-pill">❧ ${state.lastQuota} identifications left today</span>`:""}</section>
     <div class="result-hero"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(info.family)}</div><h1>${esc(info.common)}</h1><em>${esc(info.sci)}</em><br><span class="confidence">${Math.round(r.score*100)}% match</span></div></div>
     <div class="actions">
       ${captureIntent==="discover"
         ? `<button class="btn primary" onclick="saveDiscovery()">♡ Save to Discover</button><button class="btn secondary" onclick="chooseSaveArea()">Add to Garden</button>`
         : `<button class="btn primary" onclick="chooseDestination()">✓ That’s it</button><button class="btn secondary" onclick="showMatches()">Other matches</button>`}
     </div>
-    ${captureIntent==="discover"?`<button class="link-btn" style="width:100%;margin:8px 0 2px" onclick="finishWithoutSaving()">Just looking — don't save</button>`:""}
+    <button class="link-btn" style="width:100%;margin:8px 0 2px" onclick="finishWithoutSaving()">${captureIntent==="discover"?"Just looking — don't save":"Not now — don't save"}</button>
     <div class="profile-card"><div class="eyebrow">Identification evidence</div><h2 style="font-size:25px;margin-top:7px">${captures.length} ${captures.length===1?"photo":"photos"} considered</h2><div class="photo-strip">${captures.map(c=>`<div><img class="thumb" src="${c.dataUrl}"><div class="small" style="text-align:center">${esc(c.organ)}</div></div>`).join("")}</div><p class="small">Confidence is Pl@ntNet's ranked identification score, not a guarantee. Confirming the visual match keeps FloraLens's garden records cleaner.</p></div>`;
 }
 function showMatches(){
@@ -3762,11 +3773,12 @@ function removeDoctorCapture(i){
   if(doctorCaptures.length) renderDoctorReview(); else setRoute("lens");
 }
 function addDoctorPhoto(){ if(doctorCaptures.length<DOCTOR_MAX_PHOTOS) document.getElementById("doctorCameraInput")?.click(); }
+function cancelDoctor(){ doctorCaptures=[]; doctorNote=""; doctorAnswers={}; doctorThread=[]; setRoute("lens"); }
 function renderDoctorReview(){
   const p=state.plants.find(x=>x.id===doctorPlantId);
   if(!p) return setRoute("lens");
   currentRoute="lens";
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1><p class="sub">${doctorCaptures.length===1?"A second photo of the whole plant helps a lot.":"Add a note if you've noticed anything, then check its health."}</p></section>
+  view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelDoctor()">✕ Cancel</button></section><section class="page-head"><div class="eyebrow">Plant Doctor</div><h1>${esc(p.common)}</h1><p class="sub">${doctorCaptures.length===1?"A second photo of the whole plant helps a lot.":"Add a note if you've noticed anything, then check its health."}</p></section>
     <div class="doctor-shots">${doctorCaptures.map((c,i)=>`<div class="doctor-shot"><img src="${c.dataUrl}" alt="Photo ${i+1}"><button class="capture-remove" aria-label="Remove photo" onclick="removeDoctorCapture(${i})">×</button></div>`).join("")}
       ${doctorCaptures.length<DOCTOR_MAX_PHOTOS?`<button class="doctor-shot doctor-shot-add" onclick="addDoctorPhoto()"><span>📷</span><b>Add photo</b><small>${DOCTOR_MAX_PHOTOS-doctorCaptures.length} more allowed</small></button>`:""}</div>
     <label class="field-label" for="doctorNote">What have you noticed? <span style="font-weight:500;color:var(--muted)">(optional)</span></label>
@@ -4157,7 +4169,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.6 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.6.1 · made for our garden</div>`);
 });
 
 renderHome();

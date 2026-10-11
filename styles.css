@@ -1260,3 +1260,6 @@ html[data-season="winter"] body{background-image:url("icons/bg-winter.jpg")}
 .gm-recent b i{font-style:normal;font-size:10.5px;font-weight:700;color:#6B4FD8;background:#EFEAFF;padding:1px 6px;border-radius:999px;margin-left:4px}
 .gm-recent b i.err{color:#B3261E;background:#FDE7E5}
 .gm-recent em{font-style:normal;font-weight:700}
+.id-cancel-bar{padding:4px 0 0}
+.id-cancel-bar+.page-head{padding-top:4px}
+.id-cancel-bar .link-btn{font-weight:700}
