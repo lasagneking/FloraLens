@@ -2772,6 +2772,7 @@ async function clearDiscoveries(){
   closeModal();
   for(const d of spotted) if(d.photoKey) await deletePhoto(d.photoKey);
   toast(`${spotted.length} discover${spotted.length===1?"y":"ies"} cleared`);
+  window.discoverFilter="all";
   renderDiscover();
 }
 
@@ -3553,6 +3554,7 @@ function saveCareEdit(id){
 /* ===================== Look up a plant by name (Discover, via Gemini) ===================== */
 let lastLookup=null;      // {query, result, photo, model}
 let lookupBusy=false;
+var discoverFilter="all";   // Discover: all · wish · spotted
 const LOOKUP_MONTHS=["J","F","M","A","M","J","J","A","S","O","N","D"];
 
 let lookupFrom=null;
@@ -3721,15 +3723,26 @@ function renderDiscover(){
   const families=new Set(items.map(d=>d.family).filter(Boolean)).size;
   const wishlist=items.filter(d=>d.wishlist).length;
 
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1><p class="sub">Plants you've spotted, loved or might want to bring home one day.</p></section>
-    <button class="lens-banner discover-banner" onclick="startCamera('discover')">
-      <span class="lens-icon">⌾</span><span><strong>Identify while you're out</strong><small>Snap it at the garden centre: FloraLens identifies it and tells you if it's a good buy.</small></span>
-    </button>
-    ${lookupCard()}
-    <div class="stats-strip"><div class="stat"><b>${items.length}</b><small>discoveries</small></div><div class="stat"><b>${families}</b><small>families</small></div><div class="stat"><b>${wishlist}</b><small>wishlist</small></div></div>
-    ${items.length-wishlist>0?`<div class="discover-clear"><span>Back from a day out?</span><button class="mini-action" onclick="confirmClearDiscoveries()">Clear ${items.length-wishlist} spotted · keep wishlist</button></div>`:""}
-    ${items.length
-      ? `<section class="masonry discovery-masonry">${items.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
+  const spotted=items.length-wishlist;
+  const f=window.discoverFilter||"all";
+  const shown=f==="wish"?items.filter(d=>d.wishlist):f==="spotted"?items.filter(d=>!d.wishlist):items;
+  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1></section>
+    <div class="disc-actions">
+      <button class="disc-scan" onclick="startCamera('discover')"><span>⌾</span><b>Scan</b></button>
+      <form class="disc-search" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
+        <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="Look up a plant by name">
+      </form>
+    </div>
+    <div class="disc-chips">
+      <button class="${f==="all"?"on":""}" onclick="discoverFilter='all';renderDiscover()">All <i>${items.length}</i></button>
+      <button class="${f==="wish"?"on":""}" onclick="discoverFilter='wish';renderDiscover()">♥ Wishlist <i>${wishlist}</i></button>
+      <button class="${f==="spotted"?"on":""}" onclick="discoverFilter='spotted';renderDiscover()">Spotted <i>${spotted}</i></button>
+      ${spotted&&f==="spotted"?`<button class="disc-clear" onclick="confirmClearDiscoveries()">Clear all</button>`:""}
+    </div>
+    ${!shown.length&&items.length
+      ? `<div class="empty-card disc-empty"><p class="sub">${f==="wish"?"Nothing on the wishlist yet. Tap ♡ on a plant to save it here.":"No spotted plants right now."}</p><button class="mini-action" onclick="discoverFilter='all';renderDiscover()">Show all</button></div>`
+      : shown.length
+      ? `<section class="masonry discovery-masonry">${shown.map(d=>`<article class="pin discovery-pin" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${d.id}'})">
           <div class="discovery-media">
             <div class="plant-art" data-photo-key="${esc(d.photoKey||"")}" data-photo-url="${esc(d.photoUrl||"")}"></div>
             ${buyBadge(d)}
@@ -3740,7 +3753,7 @@ function renderDiscover(){
           </div>
           <div class="pin-body">
             <b>${esc(d.common)}</b><small><i>${esc(d.scientific)}</i></small>
-            <div class="discovery-meta"><span class="chip">${d.score?`${d.score}% match`:d.source==="lookup"?"Looked up":"Saved"}</span><span class="chip">${d.wishlist?"Wishlist":"Spotted"}</span>${d.stockPhoto?`<span class="chip chip-ref">Reference photo</span>`:""}</div>
+            <div class="discovery-meta"><span class="chip">${d.score?`${d.score}% match`:d.source==="lookup"?"Looked up":"Saved"}</span>${d.stockPhoto?`<span class="chip chip-ref">Reference photo</span>`:""}</div>
             <button class="mini-action" onclick="event.stopPropagation();addDiscoveryToGarden('${d.id}')">＋ Add to Garden</button>
           </div>
         </article>`).join("")}</section>`
@@ -4195,7 +4208,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.7.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.8 · made for our garden</div>`);
 });
 
 renderHome();
