@@ -3840,65 +3840,84 @@ const DIY_RE=/\b(b\s*&\s*q|homebase|the range)\b/i;
 const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 // Fast: OpenStreetMap's place search inside a box around her. Its rules allow about one
 // request a second, so the DIY brand searches follow the garden-centre one, a second apart.
-async function nearbyFromNominatim(pos,collect){
+async function nearbyFromNominatim(pos,collect,typed=""){
   const boxFor=m=>{ const dLat=m/111000, dLon=dLat/Math.cos(pos.lat*Math.PI/180); return [pos.lon-dLon,pos.lat+dLat,pos.lon+dLon,pos.lat-dLat].join(","); };
   // The place search ranks by importance, not distance, and returns at most 40, so ask about
   // the closest mile and a half first: the nearest garden centre can never be crowded out.
   const searches=[["garden centre",2400],["garden centre",NEAR_RADIUS_M],...DIY_BRANDS.map(b=>[b,NEAR_RADIUS_M])];
+  if(typed) searches.unshift([typed,NEAR_RADIUS_M,"typed"]);   // a name she typed is looked up first, however it's mapped
   let ok=false;
-  for(const [i,[term,radius]] of searches.entries()){
+  for(const [i,[term,radius,typedSearch]] of searches.entries()){
     if(i) await sleepMs(1100);                     // OpenStreetMap asks for no more than one request a second
     try{
       const res=await fetchWithin(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=40&bounded=1&viewbox=${boxFor(radius)}&q=${encodeURIComponent(term)}`,{headers:{"Accept-Language":"en-GB"}},5000);
       if(!res.ok) continue;
       ok=true;
-      const brand=i>=2;
+      const brand=DIY_BRANDS.includes(term);
       for(const r of await res.json()){
         const a=r.address||{};
-        if(brand&&(!DIY_RE.test(r.name||"")||r.category!=="shop")) continue;   // brand searches: only that brand's shops
-        if(!brand&&r.category!=="shop"&&r.type!=="plant_nursery") continue;
+        if(typedSearch){
+          // Only places that sell plants: never childcare nurseries, schools, streets or towns.
+          if(!r.name||!(r.category==="shop"||r.type==="plant_nursery")) continue;
+          if(/kindergarten|childcare|school|nursery_school/.test(r.type)) continue;
+        }
+        else if(brand){ if(!DIY_RE.test(r.name||"")||r.category!=="shop") continue; }   // brand searches: only that brand's shops
+        else if(r.category!=="shop"&&r.type!=="plant_nursery") continue;
         const place=[a.road,a.village||a.town||a.suburb||a.city].filter(Boolean).join(", ");
         collect({name:r.name||"Garden centre (no name on the map)",unnamed:!r.name,lat:+r.lat,lon:+r.lon,
-          kind:brand||r.type==="doityourself"?"diy":r.type==="plant_nursery"?"nursery":"garden",address:place,osm:`${r.osm_type}/${r.osm_id}`});
+          kind:brand||r.type==="doityourself"?"diy":r.type==="plant_nursery"?"nursery":"garden",address:place,osm:`${r.osm_type}/${r.osm_id}`,typed:!!typedSearch});
       }
     }catch(e){ console.warn("Nominatim",term,e?.name||e); }
   }
   if(!ok) throw new Error("Place search unavailable");
 }
-// Thorough: Overpass also finds plant nurseries and DIY stores, but its servers are often busy,
-// so two are asked at once and the first answer wins.
-async function nearbyFromOverpass(pos,collect){
-  const R=NEAR_RADIUS_M, at=`(around:${R},${pos.lat},${pos.lon})`;
-  const q=`[out:json][timeout:8];(nwr["shop"="garden_centre"]${at};nwr["landuse"="plant_nursery"]["name"]${at};nwr["shop"="doityourself"]["name"~"B&Q|Homebase|The Range",i]${at};nwr["shop"="doityourself"]["brand"~"B&Q|Homebase|The Range",i]${at};);out center tags 40;`;
+// Thorough: Overpass (the OpenStreetMap database itself) finds everything tagged as a garden
+// centre or plant nursery, not just what the place search ranks highly. Its servers are often
+// busy, so the questions are kept small: a quick close-range one (what found Elm Court in 3.10.1)
+// and a separate wider one. Each goes to two servers at once; the first answer wins.
+function overpassElements(q,ms){
   const ask=async host=>{
-    const res=await fetchWithin(host,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}},6000);
+    const res=await fetchWithin(host,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}},ms);
     if(!res.ok) throw new Error(`Overpass ${res.status}`);
     return (await res.json()).elements||[];
   };
-  const els=await Promise.any(["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"].map(ask));
+  return Promise.any(["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"].map(ask));
+}
+function collectOverpass(els,collect){
   for(const e of els){
     const lat=e.lat??e.center?.lat, lon=e.lon??e.center?.lon, t=e.tags||{};
-    const name=t.name||t.brand; if(!name||lat==null) continue;
-    collect({name,lat,lon,kind:t.shop==="doityourself"?"diy":t.landuse==="plant_nursery"?"nursery":"garden",
+    const name=t.name||t.brand; if(lat==null) continue;
+    collect({name:name||`${t.landuse==="plant_nursery"?"Plant nursery":"Garden centre"} (no name on the map)`,unnamed:!name,lat,lon,kind:t.shop==="doityourself"?"diy":t.landuse==="plant_nursery"?"nursery":"garden",
       address:[t["addr:street"],t["addr:city"]||t["addr:town"]||t["addr:village"]||t["addr:suburb"]].filter(Boolean).join(", "),osm:`${e.type}/${e.id}`});
   }
 }
-// Both searches run together; after 7 seconds she gets whatever has come back.
+async function nearbyFromOverpass(pos,collect){
+  const near=`(around:3500,${pos.lat},${pos.lon})`, far=`(around:${NEAR_RADIUS_M},${pos.lat},${pos.lon})`;
+  const closeQ=`[out:json][timeout:10];(nwr["shop"="garden_centre"]${near};nwr["landuse"="plant_nursery"]${near};);out center tags 30;`;
+  const wideQ=`[out:json][timeout:20];(nwr["shop"="garden_centre"]${far};nwr["landuse"="plant_nursery"]["name"]${far};`
+    +DIY_BRANDS.map(b=>`nwr["shop"="doityourself"]["brand"="${b}"]${far};nwr["shop"="doityourself"]["name"="${b}"]${far};`).join("")
+    +`);out center tags 60;`;
+  const results=await Promise.allSettled([
+    overpassElements(closeQ,7000).then(els=>collectOverpass(els,collect)),
+    overpassElements(wideQ,9000).then(els=>collectOverpass(els,collect)),
+  ]);
+  if(results.every(r=>r.status==="rejected")) throw new Error("Overpass unavailable");
+}
 function rankNearby(found,pos){
   const seen=[];
   return found.map(x=>({...x,dist:distanceM(pos,x)})).filter(x=>x.dist<=NEAR_RADIUS_M+300)
     .sort((a,b)=>(a.unnamed-b.unnamed)||(a.dist-b.dist))       // named first within the same pass…
     .filter(x=>{ if(seen.some(y=>distanceM(x,y)<120&&(y.unnamed||x.unnamed||y.name.toLowerCase()===x.name.toLowerCase()))) return false; seen.push(x); return true; })
-    .sort((a,b)=>a.dist-b.dist)                                  // …then nearest first
+    .sort((a,b)=>(b.typed?1:0)-(a.typed?1:0)||a.dist-b.dist)   // …then anything matching her typed name, then nearest first
     .slice(0,10);
 }
 // Both searches run together. The list updates as results come in (onUpdate), nearest first;
-// after 9 seconds she gets whatever has arrived.
-async function findNearbyCentres(pos,onUpdate){
+// after 10 seconds she gets whatever has arrived.
+async function findNearbyCentres(pos,onUpdate,typed=""){
   const found=[];
   const collect=x=>{ if(x&&x.name&&Number.isFinite(x.lat)&&Number.isFinite(x.lon)){ found.push(x); onUpdate?.(rankNearby(found,pos)); } };
-  const both=Promise.allSettled([nearbyFromNominatim(pos,collect),nearbyFromOverpass(pos,collect)]);
-  const settled=await Promise.race([both,sleepMs(9000).then(()=>null)]);
+  const both=Promise.allSettled([nearbyFromNominatim(pos,collect,typed),nearbyFromOverpass(pos,collect)]);
+  const settled=await Promise.race([both,sleepMs(10000).then(()=>null)]);
   if(!found.length&&settled&&settled.every(r=>r.status==="rejected")) throw new Error("Map search unavailable");
   return rankNearby(found,pos);
 }
@@ -3920,13 +3939,14 @@ async function tripFindNearby(btn){
     const draw=(items,searching)=>{
       window._nearbyCentres=items;
       const chosen=pendingTripLoc?.osm;
-      box.innerHTML=`<div class="trip-near-head">Within 5 miles</div>${items.map((c,i)=>`<button class="trip-near-item ${chosen&&chosen===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}${searching?`<p class="trip-near-msg small">🔎 Still looking for more…</p>`:""}`;
+      box.innerHTML=`<div class="trip-near-head">Within 5 miles</div>${items.map((c,i)=>`<button class="trip-near-item ${chosen&&chosen===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Plant nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}${searching?`<p class="trip-near-msg small">🔎 Still looking for more…</p>`:""}`;
     };
-    try{ list=await findNearbyCentres(pos,items=>draw(items,true)); }catch(e){ console.warn(e); searchFailed=true; }
+    const typed=(document.getElementById("tripCentre")?.value||"").trim();
+    try{ list=await findNearbyCentres(pos,items=>draw(items,true),typed.length>=3?typed:""); }catch(e){ console.warn(e); searchFailed=true; }
     reverseGeocode(pos).then(addr=>{ if(pendingTripLoc&&pendingTripLoc.source==="gps"&&!pendingTripLoc.address) pendingTripLoc.address=addr; });
     window._nearbyCentres=list;
     box.innerHTML=list.length
-      ?`<div class="trip-near-head">Within 5 miles</div>${list.map((c,i)=>`<button class="trip-near-item ${pendingTripLoc?.osm&&pendingTripLoc.osm===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type the name above. The trip is pinned to where you are now.</p>`
+      ?`<div class="trip-near-head">Within 5 miles</div>${list.map((c,i)=>`<button class="trip-near-item ${pendingTripLoc?.osm&&pendingTripLoc.osm===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Plant nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type part of its name above and tap Find again, or just type the name. The trip is pinned to where you are now.</p>`
       :`<p class="trip-near-msg">📍 Location saved. ${searchFailed?"The map search isn't answering right now,":"No garden centres are mapped within 5 miles,"} so type its name above. The trip is pinned to where you are.</p>`;
   }catch(err){
     box.innerHTML=`<p class="trip-near-msg">${esc(friendlyNetError(err,"Finding your location"))}</p>`;
@@ -4648,7 +4668,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.3 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.5 · made for our garden</div>`);
 });
 
 renderHome();
