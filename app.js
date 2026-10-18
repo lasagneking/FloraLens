@@ -3841,20 +3841,25 @@ const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 // Fast: OpenStreetMap's place search inside a box around her. Its rules allow about one
 // request a second, so the DIY brand searches follow the garden-centre one, a second apart.
 async function nearbyFromNominatim(pos,collect){
-  const dLat=NEAR_RADIUS_M/111000, dLon=dLat/Math.cos(pos.lat*Math.PI/180);
-  const box=[pos.lon-dLon,pos.lat+dLat,pos.lon+dLon,pos.lat-dLat].join(",");
+  const boxFor=m=>{ const dLat=m/111000, dLon=dLat/Math.cos(pos.lat*Math.PI/180); return [pos.lon-dLon,pos.lat+dLat,pos.lon+dLon,pos.lat-dLat].join(","); };
+  // The place search ranks by importance, not distance, and returns at most 40, so ask about
+  // the closest mile and a half first: the nearest garden centre can never be crowded out.
+  const searches=[["garden centre",2400],["garden centre",NEAR_RADIUS_M],...DIY_BRANDS.map(b=>[b,NEAR_RADIUS_M])];
   let ok=false;
-  for(const [i,term] of ["garden centre",...DIY_BRANDS].entries()){
-    if(i) await sleepMs(1100);
+  for(const [i,[term,radius]] of searches.entries()){
+    if(i) await sleepMs(1100);                     // OpenStreetMap asks for no more than one request a second
     try{
-      const res=await fetchWithin(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&bounded=1&viewbox=${box}&q=${encodeURIComponent(term)}`,{headers:{"Accept-Language":"en-GB"}},5000);
+      const res=await fetchWithin(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=40&bounded=1&viewbox=${boxFor(radius)}&q=${encodeURIComponent(term)}`,{headers:{"Accept-Language":"en-GB"}},5000);
       if(!res.ok) continue;
       ok=true;
+      const brand=i>=2;
       for(const r of await res.json()){
-        const a=r.address||{}, name=r.name||(r.display_name||"").split(",")[0];
-        if(i&&(!DIY_RE.test(name)||r.category!=="shop")) continue;   // brand searches: only that brand's shops
-        collect({name,lat:+r.lat,lon:+r.lon,kind:i||r.type==="doityourself"?"diy":"garden",
-          address:[a.road,a.village||a.town||a.suburb||a.city].filter(Boolean).join(", "),osm:`${r.osm_type}/${r.osm_id}`});
+        const a=r.address||{};
+        if(brand&&(!DIY_RE.test(r.name||"")||r.category!=="shop")) continue;   // brand searches: only that brand's shops
+        if(!brand&&r.category!=="shop"&&r.type!=="plant_nursery") continue;
+        const place=[a.road,a.village||a.town||a.suburb||a.city].filter(Boolean).join(", ");
+        collect({name:r.name||"Garden centre (no name on the map)",unnamed:!r.name,lat:+r.lat,lon:+r.lon,
+          kind:brand||r.type==="doityourself"?"diy":r.type==="plant_nursery"?"nursery":"garden",address:place,osm:`${r.osm_type}/${r.osm_id}`});
       }
     }catch(e){ console.warn("Nominatim",term,e?.name||e); }
   }
@@ -3879,16 +3884,23 @@ async function nearbyFromOverpass(pos,collect){
   }
 }
 // Both searches run together; after 7 seconds she gets whatever has come back.
-async function findNearbyCentres(pos){
-  const found=[]; const collect=x=>{ if(x&&x.name&&Number.isFinite(x.lat)&&Number.isFinite(x.lon)) found.push(x); };
-  const both=Promise.allSettled([nearbyFromNominatim(pos,collect),nearbyFromOverpass(pos,collect)]);
-  const settled=await Promise.race([both,sleepMs(7000).then(()=>null)]);
-  if(!found.length&&settled&&settled.every(r=>r.status==="rejected")) throw new Error("Map search unavailable");
-  const seen=new Set();
+function rankNearby(found,pos){
+  const seen=[];
   return found.map(x=>({...x,dist:distanceM(pos,x)})).filter(x=>x.dist<=NEAR_RADIUS_M+300)
-    .sort((a,b)=>a.dist-b.dist)
-    .filter(x=>{ const k=x.name.toLowerCase().replace(/[^a-z0-9]/g,"")+"|"+Math.round(x.lat*200)+","+Math.round(x.lon*200); if(seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a,b)=>(a.unnamed-b.unnamed)||(a.dist-b.dist))       // named first within the same pass…
+    .filter(x=>{ if(seen.some(y=>distanceM(x,y)<120&&(y.unnamed||x.unnamed||y.name.toLowerCase()===x.name.toLowerCase()))) return false; seen.push(x); return true; })
+    .sort((a,b)=>a.dist-b.dist)                                  // …then nearest first
     .slice(0,10);
+}
+// Both searches run together. The list updates as results come in (onUpdate), nearest first;
+// after 9 seconds she gets whatever has arrived.
+async function findNearbyCentres(pos,onUpdate){
+  const found=[];
+  const collect=x=>{ if(x&&x.name&&Number.isFinite(x.lat)&&Number.isFinite(x.lon)){ found.push(x); onUpdate?.(rankNearby(found,pos)); } };
+  const both=Promise.allSettled([nearbyFromNominatim(pos,collect),nearbyFromOverpass(pos,collect)]);
+  const settled=await Promise.race([both,sleepMs(9000).then(()=>null)]);
+  if(!found.length&&settled&&settled.every(r=>r.status==="rejected")) throw new Error("Map search unavailable");
+  return rankNearby(found,pos);
 }
 async function reverseGeocode(pos){
   try{
@@ -3905,11 +3917,16 @@ async function tripFindNearby(btn){
     pendingTripLoc={...pos,source:"gps"};
     box.innerHTML=`<p class="trip-near-msg">🔎 Looking for garden centres and DIY stores within 5 miles…</p>`;
     let list=[], searchFailed=false;
-    try{ list=await findNearbyCentres(pos); }catch(e){ console.warn(e); searchFailed=true; }
+    const draw=(items,searching)=>{
+      window._nearbyCentres=items;
+      const chosen=pendingTripLoc?.osm;
+      box.innerHTML=`<div class="trip-near-head">Within 5 miles</div>${items.map((c,i)=>`<button class="trip-near-item ${chosen&&chosen===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}${searching?`<p class="trip-near-msg small">🔎 Still looking for more…</p>`:""}`;
+    };
+    try{ list=await findNearbyCentres(pos,items=>draw(items,true)); }catch(e){ console.warn(e); searchFailed=true; }
     reverseGeocode(pos).then(addr=>{ if(pendingTripLoc&&pendingTripLoc.source==="gps"&&!pendingTripLoc.address) pendingTripLoc.address=addr; });
     window._nearbyCentres=list;
     box.innerHTML=list.length
-      ?`<div class="trip-near-head">Within 5 miles</div>${list.map((c,i)=>`<button class="trip-near-item" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type the name above. The trip is pinned to where you are now.</p>`
+      ?`<div class="trip-near-head">Within 5 miles</div>${list.map((c,i)=>`<button class="trip-near-item ${pendingTripLoc?.osm&&pendingTripLoc.osm===c.osm?"on":""}" onclick="pickNearbyCentre(${i},this)"><span>${c.kind==="diy"?"🛠️":"🌿"}</span><div><b>${esc(c.name)}</b><small>${c.kind==="diy"?"DIY & garden":c.kind==="nursery"?"Nursery":"Garden centre"}${c.address?` · ${esc(c.address)}`:""}</small></div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type the name above. The trip is pinned to where you are now.</p>`
       :`<p class="trip-near-msg">📍 Location saved. ${searchFailed?"The map search isn't answering right now,":"No garden centres are mapped within 5 miles,"} so type its name above. The trip is pinned to where you are.</p>`;
   }catch(err){
     box.innerHTML=`<p class="trip-near-msg">${esc(friendlyNetError(err,"Finding your location"))}</p>`;
@@ -3917,7 +3934,7 @@ async function tripFindNearby(btn){
 }
 function pickNearbyCentre(i,el){
   const c=window._nearbyCentres?.[i]; if(!c) return;
-  document.getElementById("tripCentre").value=c.name;
+  document.getElementById("tripCentre").value=c.unnamed?(c.address?`Garden centre, ${c.address.split(",")[0]}`:""):c.name;
   pendingTripLoc={lat:c.lat,lon:c.lon,source:"osm",address:c.address||"",osm:c.osm};
   document.querySelectorAll(".trip-near-item").forEach(b=>b.classList.toggle("on",b===el));
   if(!c.address) reverseGeocode(c).then(a=>{ if(pendingTripLoc?.osm===c.osm) pendingTripLoc.address=a; if(state.activeTrip?.location?.osm===c.osm&&a){ state.activeTrip.location.address=a; saveState(); } });
@@ -4631,7 +4648,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.2 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.3 · made for our garden</div>`);
 });
 
 renderHome();
