@@ -1765,6 +1765,7 @@ async function deletePhoto(key){
 
 function setRoute(route, data={}){
   currentRoute=route;
+  document.body.dataset.page=route;   // lets the camera button take Discover's colour
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
   if(route==="home") renderHome();
   if(route==="garden") renderGarden();
@@ -1772,6 +1773,7 @@ function setRoute(route, data={}){
   if(route==="journal") renderJournal();
   if(route==="care") renderCareCalendar();
   if(route==="discover") renderDiscover();
+  if(route==="trip") renderTrip();
   if(route==="profile" && data.id) renderProfile(data.id);
   appScrollTo(0);   // new screen opens at the top, like a native app
 }
@@ -2474,9 +2476,10 @@ function cancelIdentify(){
   identifyRun++;                                  // ignore any identification still in flight
   closeModal();
   captures=[]; pendingResults=null;
-  setRoute(captureIntent==="discover"?"discover":"home");
+  setRoute(captureIntent==="discover"?(state.activeTrip?"trip":"discover"):"home");
 }
 function renderCaptureReview(){
+  currentRoute="capture";   // background refreshes leave the identify screens alone
   view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()"><span aria-hidden="true">✕</span>Cancel</button></section><section class="page-head"><div class="eyebrow">Closer look</div><h1>${captures.length===1?"Lovely shot.":"More clues."}</h1><p class="sub">Label each view if you know the plant part, or leave it on Auto.</p></section>
     <div class="capture-stack">${captures.map((c,i)=>`<div class="capture-card"><button class="capture-remove" onclick="removeCapture(${i})">×</button><img src="${c.dataUrl}"><span class="organ">${esc(c.organ)}</span></div>`).join("")}${captures.length<5?`<button class="add-capture" onclick="chooseOrganForNext()">＋<br>Add view</button>`:""}</div>
     <div class="result-hero" style="min-height:330px"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${captures.length} of 5 photos</div><h1>Ready to identify?</h1><span class="confidence">${captures.map(c=>c.organ).join(" · ")}</span></div></div>
@@ -2501,6 +2504,7 @@ async function identifyPlant(){
   if(!captures.length) return;
   const first=captures[0].dataUrl;
   const run=++identifyRun;
+  currentRoute="capture";
   view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()"><span aria-hidden="true">✕</span>Cancel</button></section><section class="page-head"><div class="eyebrow">FloraLens</div><h1>Looking closely…</h1></section><div class="result-hero"><img class="preview-img" src="${first}"><div class="identify-overlay"><div><div class="flower-loader">✿</div><h2 style="margin:12px 0 5px">Comparing the details</h2><p style="opacity:.8">${captures.length} ${captures.length===1?"view":"views"} of the same plant.</p></div></div></div>`;
   try{
     if(API_PROXY_URL){
@@ -2535,12 +2539,14 @@ function resultInfo(r){
   return {common:s.commonNames?.[0]||s.scientificNameWithoutAuthor||"Possible match", sci:s.scientificNameWithoutAuthor||"", family:s.family?.scientificNameWithoutAuthor||"Plant", genus:s.genus?.scientificNameWithoutAuthor||""};
 }
 function renderResult(){
+  currentRoute="capture";
   const r=pendingResults[0], info=resultInfo(r);
   view.innerHTML=`<section class="page-head profile-back id-cancel-bar"><button class="link-btn" onclick="cancelIdentify()"><span aria-hidden="true">✕</span>Cancel</button></section><section class="page-head"><div class="eyebrow">FloraLens match</div><h1>I think I found it!</h1>${state.lastQuota!==null?`<span class="quota-pill">❧ ${state.lastQuota} identifications left today</span>`:""}</section>
     <div class="result-hero"><img class="preview-img" src="${captures[0].dataUrl}"><div class="result-gradient"></div><div class="result-copy"><div class="eyebrow" style="color:white">${esc(info.family)}</div><h1>${esc(info.common)}</h1><em>${esc(info.sci)}</em><br><span class="confidence">${Math.round(r.score*100)}% match</span></div></div>
     <div class="actions">
+      ${captureIntent==="discover"&&state.activeTrip?`<label class="trip-price-field"><span>Price on the tag</span><b>£</b><input id="tripPrice" inputmode="decimal" autocomplete="off" placeholder="0.00"></label>`:""}
       ${captureIntent==="discover"
-        ? `<button class="btn primary" onclick="saveDiscovery()">♡ Save to Discover</button><button class="btn secondary" onclick="chooseSaveArea()">Add to Garden</button>`
+        ? `<button class="btn primary" onclick="saveDiscovery()">${state.activeTrip?"🛒 Add to trip":"♡ Save to Discover"}</button><button class="btn secondary" onclick="chooseSaveArea()">Add to Garden</button>`
         : `<button class="btn primary" onclick="chooseDestination()">✓ That’s it</button><button class="btn secondary" onclick="showMatches()">Other matches</button>`}
     </div>
     <button class="link-btn" style="width:100%;margin:8px 0 2px" onclick="finishWithoutSaving()">${captureIntent==="discover"?"Just looking — don't save":"Not now — don't save"}</button>
@@ -2563,7 +2569,7 @@ function finishWithoutSaving(){
   captures=[];
   pendingResults=null;
   toast("Identification complete");
-  setRoute(captureIntent==="discover"?"discover":"home");
+  setRoute(captureIntent==="discover"?(state.activeTrip?"trip":"discover"):"home");
 }
 
 function chooseSaveArea(){
@@ -2589,15 +2595,17 @@ async function saveDiscovery(){
     };
   }
 
+  const tripPrice=parsePrice(document.getElementById("tripPrice")?.value);
   const looked=state.discoveries.find(d=>d.speciesKey===speciesKey&&d.stockPhoto);
   if(looked){
+    if(state.activeTrip){ looked.tripId=state.activeTrip.id; looked.price=tripPrice; looked.picked=false; }
     const buyFiles=captures.slice(0,3).map(c=>c.file);
     await replaceStockPhotos(speciesKey,captures[0].file);
     looked.score=Math.round((r.score||0)*100); looked.spotted=new Date().toISOString(); delete looked.buyCheck;
     saveState(); captures=[]; pendingResults=null;
     toast(`Your photo of ${looked.common} replaced the reference photo`);
     runBuyCheck(looked.id,{files:buyFiles});
-    setRoute("discover");
+    setRoute(state.activeTrip?"trip":"discover");
     return;
   }
   const id="discovery-"+Date.now();
@@ -2610,8 +2618,10 @@ async function saveDiscovery(){
     score:Math.round((r.score||0)*100),
     spotted:new Date().toISOString(),
     wishlist:false,
-    note:""
+    note:"",
+    ...(state.activeTrip?{tripId:state.activeTrip.id,price:tripPrice,picked:false}:{})
   });
+  if(state.activeTrip&&!state.activeTrip.location) pinTripHereQuietly();
   saveState();
   const buyFiles=captures.slice(0,3).map(c=>c.file);
   captures=[];
@@ -2623,7 +2633,7 @@ async function saveDiscovery(){
   if(!state.speciesCache[speciesKey]?.enrichment){
     enrichSpecies(x.sci,speciesKey).catch(()=>{});
   }
-  setRoute("discover");
+  setRoute(state.activeTrip?"trip":"discover");
 }
 
 /* ===================== "Should I buy it?" (Discover, via Gemini) ===================== */
@@ -2695,6 +2705,7 @@ function refreshBuyCheckUI(id){
   const d=state.discoveries.find(x=>x.id===id); if(!d) return;
   const card=document.getElementById(`buy-${id}`); if(card) card.outerHTML=renderBuyCheck(d);
   const badge=document.querySelector(`[data-buy-badge="${id}"]`); if(badge) badge.outerHTML=buyBadge(d);
+  if(currentRoute==="trip") renderTrip();
 }
 function buyCheckAddPhoto(id){
   let inp=document.getElementById("buyCheckInput");
@@ -2789,8 +2800,16 @@ function addDiscoveryToGarden(id){
 async function confirmDiscoveryToGarden(id){
   const d=state.discoveries.find(x=>x.id===id);
   if(!d) return;
+  await discoveryToPlant(d,chosenArea);
+  saveState();
+  closeModal();
+  toast(`${d.common} added to ${chosenArea}`);
+  setRoute("garden");
+}
+// Copies a discovery (and its photo) into My Garden as a new plant.
+async function discoveryToPlant(d,area,n=0){
   const cached=state.speciesCache[d.speciesKey]||{};
-  const newId="plant-"+Date.now();
+  const newId="plant-"+Date.now()+(n?`-${n}`:"");
   const newPhotoKey=`${newId}-hero`;
   const oldUrl=await getPhotoUrl(d.photoKey);
   if(oldUrl){
@@ -2803,7 +2822,7 @@ async function confirmDiscoveryToGarden(id){
   state.plants.unshift({
     id:newId,speciesKey:d.speciesKey,photoKey:newPhotoKey,
     common:d.common,scientific:d.scientific,family:d.family,
-    area:chosenArea,status:"New",added:new Date().toISOString().slice(0,10),
+    area,status:"New",added:new Date().toISOString().slice(0,10),
     notes:cached.notes||"First spotted in Discover.",
     sun:cached.sun||"Gathering botanical notes…",
     water:cached.water||"Gathering botanical notes…",
@@ -2811,12 +2830,10 @@ async function confirmDiscoveryToGarden(id){
     height:cached.height||"Gathering botanical notes…",
     bloom:cached.bloom||[],
     stockPhoto:!!d.stockPhoto, photoCredit:d.photoCredit||null,
-    ...(d.source==="lookup"&&!oldUrl?{source:"lookup",species:d.species||"",photoUrl:d.photoUrl||null,photoKey:""}:{})
+    ...(d.source==="lookup"&&!oldUrl?{source:"lookup",species:d.species||"",photoUrl:d.photoUrl||null,photoKey:""}:{}),
+    ...(d.price!=null?{price:d.price}:{})
   });
-  saveState();
-  closeModal();
-  toast(`${d.common} added to ${chosenArea}`);
-  setRoute("garden");
+  return newId;
 }
 
 function toggleWishlist(id){
@@ -3728,17 +3745,18 @@ function renderDiscover(){
   const shown=f==="wish"?items.filter(d=>d.wishlist):f==="spotted"?items.filter(d=>!d.wishlist):items;
   view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1></section>
     <div class="disc-actions">
-      <button class="disc-scan" onclick="startCamera('discover')"><span>⌾</span><b>Scan</b></button>
       <form class="disc-search" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
         <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="Look up a plant by name">
       </form>
     </div>
+    ${tripStrip()}
     <div class="disc-chips">
       <button class="${f==="all"?"on":""}" onclick="discoverFilter='all';renderDiscover()">All <i>${items.length}</i></button>
       <button class="${f==="wish"?"on":""}" onclick="discoverFilter='wish';renderDiscover()">♥ Wishlist <i>${wishlist}</i></button>
       <button class="${f==="spotted"?"on":""}" onclick="discoverFilter='spotted';renderDiscover()">Spotted <i>${spotted}</i></button>
       ${spotted&&f==="spotted"?`<button class="disc-clear" onclick="confirmClearDiscoveries()">Clear all</button>`:""}
     </div>
+    ${(state.trips||[]).length?`<button class="link-btn trip-history-link" onclick="openTripHistory()">🛒 Past trips (${state.trips.length})</button>`:""}
     ${!shown.length&&items.length
       ? `<div class="empty-card disc-empty"><p class="sub">${f==="wish"?"Nothing on the wishlist yet. Tap ♡ on a plant to save it here.":"No spotted plants right now."}</p><button class="mini-action" onclick="discoverFilter='all';renderDiscover()">Show all</button></div>`
       : shown.length
@@ -3759,6 +3777,360 @@ function renderDiscover(){
         </article>`).join("")}</section>`
       : `<div class="empty-card" style="text-align:center;padding:38px 22px"><div style="font-size:52px;color:var(--rose)">❀</div><h2 style="font-size:27px">Your botanical scrapbook</h2><p class="sub">Identify something you like without adding it to your garden. Save it here, wishlist it, or bring it into My Garden later.</p><button class="btn primary" onclick="startCamera('discover')">Find something</button></div>`}`;
   hydratePhotos();
+}
+
+/* ===================== Garden centre trips (Discover) =====================
+   Start a trip with the garden centre's name and a budget. Every plant scanned in
+   Discover while the trip is on joins it with its price; she shortlists, asks Gemini
+   what to buy, then finishes: bought plants can go straight into My Garden and the
+   trip is kept in her trip history. */
+function parsePrice(v){
+  const n=parseFloat(String(v??"").replace(/[£\s]/g,"").replace(",","."));
+  return Number.isFinite(n)&&n>=0?Math.round(n*100)/100:null;
+}
+function money(n){ return n==null?"no price":`£${Number(n).toFixed(2).replace(/\.00$/,"")}`; }
+function tripItems(){ const t=state.activeTrip; return t?state.discoveries.filter(d=>d.tripId===t.id):[]; }
+function tripTotals(){
+  const items=tripItems(), picked=items.filter(d=>d.picked);
+  const pickedTotal=picked.reduce((a,d)=>a+(d.price||0),0);
+  return {items,picked,pickedTotal,allTotal:items.reduce((a,d)=>a+(d.price||0),0),unpriced:picked.filter(d=>d.price==null).length};
+}
+function budgetBar(spent,budget){
+  if(!budget) return "";
+  const pct=Math.min(100,Math.round(spent/budget*100)), cls=spent>budget?"over":pct>=85?"near":"";
+  return `<div class="trip-bar ${cls}"><span style="width:${pct}%"></span></div>`;
+}
+function tripStrip(){
+  const t=state.activeTrip;
+  if(!t) return `<button class="trip-start" onclick="openTripStart()"><span>🛒</span><div><b>Off to a garden centre?</b><small>Start a trip: set a budget and price what you find</small></div><i>›</i></button>`;
+  const {items,pickedTotal}=tripTotals();
+  return `<button class="trip-strip" onclick="setRoute('trip')">
+    <div class="trip-strip-top"><span>🛒</span><div><b>${esc(t.centre)}</b><small>${items.length} plant${items.length===1?"":"s"} · ${money(pickedTotal)} shortlisted${t.budget?` of ${money(t.budget)}`:""}</small></div><i>Open ›</i></div>
+    ${budgetBar(pickedTotal,t.budget)}
+  </button>`;
+}
+/* ----- Trip locations & maps -----
+   The trip is pinned to where she is: from a nearby garden centre found on
+   OpenStreetMap, or her phone's position. Location stays on this phone; only the
+   coordinates are sent to OpenStreetMap to find names and draw the map. */
+let pendingTripLoc=null;
+function getPosition(){
+  return new Promise((resolve,reject)=>{
+    if(!navigator.geolocation) return reject(new Error("Location isn't available on this phone."));
+    navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lon:p.coords.longitude,acc:Math.round(p.coords.accuracy||0)}),
+      e=>reject(new Error(e.code===1?"Location permission was turned down. You can allow it for FloraLens in Settings.":"Couldn't get your location just now.")),
+      {enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+  });
+}
+function distanceM(a,b){
+  const R=6371000,toR=x=>x*Math.PI/180,dLat=toR(b.lat-a.lat),dLon=toR(b.lon-a.lon);
+  const h=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h)));
+}
+function fmtDistance(m){ return m<1000?`${Math.round(m/10)*10} m`:`${(m/1609.34).toFixed(1)} miles`; }
+async function findNearbyCentres(pos){
+  const q=`[out:json][timeout:12];(nwr["shop"="garden_centre"](around:3000,${pos.lat},${pos.lon});nwr["landuse"="plant_nursery"]["name"](around:3000,${pos.lat},${pos.lon});nwr["shop"="florist"]["name"~"nursery|garden",i](around:3000,${pos.lat},${pos.lon}););out center tags 25;`;
+  const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}});
+  if(!res.ok) throw new Error("Map search unavailable");
+  const data=await res.json();
+  const seen=new Set();
+  return (data.elements||[]).map(e=>{
+    const lat=e.lat??e.center?.lat, lon=e.lon??e.center?.lon, t=e.tags||{};
+    const name=t.name||t.brand; if(!name||lat==null) return null;
+    const town=t["addr:city"]||t["addr:town"]||t["addr:village"]||t["addr:suburb"]||"";
+    return {name,lat,lon,dist:distanceM(pos,{lat,lon}),address:[t["addr:street"],town].filter(Boolean).join(", "),osm:`${e.type}/${e.id}`};
+  }).filter(x=>x&&!seen.has(x.name.toLowerCase())&&seen.add(x.name.toLowerCase())).sort((a,b)=>a.dist-b.dist).slice(0,6);
+}
+async function reverseGeocode(pos){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat=${pos.lat}&lon=${pos.lon}`,{headers:{"Accept-Language":"en-GB"}});
+    const d=await r.json(), a=d.address||{};
+    return [a.road,a.village||a.town||a.suburb||a.city,a.county&&!(a.town||a.city)?a.county:""].filter(Boolean).slice(0,2).join(", ");
+  }catch(e){ return ""; }
+}
+async function tripFindNearby(btn){
+  const box=document.getElementById("tripNearby"); if(!box) return;
+  btn.disabled=true; box.innerHTML=`<p class="trip-near-msg">📍 Finding where you are…</p>`;
+  try{
+    const pos=await getPosition();
+    pendingTripLoc={...pos,source:"gps"};
+    box.innerHTML=`<p class="trip-near-msg">🔎 Looking for garden centres nearby…</p>`;
+    let list=[];
+    try{ list=await findNearbyCentres(pos); }catch(e){ console.warn(e); }
+    reverseGeocode(pos).then(addr=>{ if(pendingTripLoc&&pendingTripLoc.source==="gps"&&!pendingTripLoc.address) pendingTripLoc.address=addr; });
+    window._nearbyCentres=list;
+    box.innerHTML=list.length
+      ?`<div class="trip-near-head">Nearby</div>${list.map((c,i)=>`<button class="trip-near-item" onclick="pickNearbyCentre(${i},this)"><span>📍</span><div><b>${esc(c.name)}</b>${c.address?`<small>${esc(c.address)}</small>`:""}</div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type the name above. The trip is pinned to where you are now.</p>`
+      :`<p class="trip-near-msg">📍 Location saved. No garden centres are mapped nearby, so type its name above.</p>`;
+  }catch(err){
+    box.innerHTML=`<p class="trip-near-msg">${esc(friendlyNetError(err,"Finding your location"))}</p>`;
+  }finally{ btn.disabled=false; }
+}
+function pickNearbyCentre(i,el){
+  const c=window._nearbyCentres?.[i]; if(!c) return;
+  document.getElementById("tripCentre").value=c.name;
+  pendingTripLoc={lat:c.lat,lon:c.lon,source:"osm",address:c.address||"",osm:c.osm};
+  document.querySelectorAll(".trip-near-item").forEach(b=>b.classList.toggle("on",b===el));
+  if(!c.address) reverseGeocode(c).then(a=>{ if(pendingTripLoc?.osm===c.osm) pendingTripLoc.address=a; if(state.activeTrip?.location?.osm===c.osm&&a){ state.activeTrip.location.address=a; saveState(); } });
+}
+// No location chosen when the trip started (e.g. started at home): pin it at the first scan.
+async function pinTripHereQuietly(){
+  const t=state.activeTrip; if(!t||t.location||pinTripHereQuietly.busy) return;
+  pinTripHereQuietly.busy=true;
+  try{
+    const pos=await getPosition();
+    if(state.activeTrip?.id!==t.id||state.activeTrip.location) return;
+    state.activeTrip.location={...pos,source:"gps"}; saveState();
+    const address=await reverseGeocode(pos);
+    if(state.activeTrip?.location&&address){ state.activeTrip.location.address=address; saveState(); }
+    if(currentRoute==="trip") renderTrip();
+  }catch(e){ console.warn("Trip location",e); }
+  finally{ pinTripHereQuietly.busy=false; }
+}
+async function repinTripHere(){
+  const t=state.activeTrip; if(!t) return;
+  toast("Finding where you are…");
+  try{
+    const pos=await getPosition();
+    t.location={...pos,source:"gps",address:await reverseGeocode(pos)}; saveState(); renderTrip(); toast("Trip pinned here");
+  }catch(err){ toast(friendlyNetError(err,"Finding your location")); }
+}
+function directionsUrl(loc,name){ return `https://maps.apple.com/?daddr=${loc.lat},${loc.lon}&q=${encodeURIComponent(name||"Garden centre")}`; }
+let leafletLoading=null;
+function loadLeaflet(){
+  if(window.L) return Promise.resolve(window.L);
+  if(leafletLoading) return leafletLoading;
+  leafletLoading=new Promise((resolve,reject)=>{
+    const css=document.createElement("link"); css.rel="stylesheet"; css.href="lib/leaflet.css?v=1.9.4"; document.head.appendChild(css);
+    const js=document.createElement("script"); js.src="lib/leaflet.js?v=1.9.4"; js.onload=()=>resolve(window.L); js.onerror=()=>{leafletLoading=null;reject(new Error("Map couldn't load"));};
+    document.head.appendChild(js);
+  });
+  return leafletLoading;
+}
+// points: [{lat,lon,label}]
+async function drawTripMap(el,points,{zoom=15}={}){
+  if(!el||!points.length) return;
+  try{
+    const L=await loadLeaflet();
+    if(!el.isConnected) return;
+    el.innerHTML="";
+    const map=L.map(el,{zoomControl:false,attributionControl:true,dragging:points.length>1,scrollWheelZoom:false,tap:false,touchZoom:points.length>1,doubleClickZoom:points.length>1});
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+    const icon=L.divIcon({className:"trip-pin",html:"<span>🛒</span>",iconSize:[34,34],iconAnchor:[17,32]});
+    const markers=points.map(p=>L.marker([p.lat,p.lon],{icon}).addTo(map).bindTooltip(esc(p.label||""),{direction:"top",offset:[0,-28]}));
+    if(points.length===1) map.setView([points[0].lat,points[0].lon],zoom);
+    else map.fitBounds(L.featureGroup(markers).getBounds().pad(.25),{maxZoom:13});
+    setTimeout(()=>map.invalidateSize(),250);
+  }catch(e){ el.innerHTML=`<div class="trip-map-off">🗺️ The map needs a signal.</div>`; }
+}
+function tripLocationLine(loc,name){
+  if(!loc) return "";
+  return `<div class="trip-loc-line"><span>📍 ${esc(loc.address||(loc.source==="gps"?"Pinned where you were":"Location saved"))}</span><a href="${directionsUrl(loc,name)}" target="_blank" rel="noopener">Directions ›</a></div>`;
+}
+
+function openTripStart(){
+  pendingTripLoc=null; window._nearbyCentres=[];
+  const past=[...new Set((state.trips||[]).map(t=>t.centre).filter(Boolean))].slice(0,5);
+  modal(`<div class="eyebrow">Garden centre trip</div><h2>Where are you off to?</h2>
+    <label class="trip-label">Garden centre</label>
+    <input id="tripCentre" class="search" maxlength="60" autocapitalize="words" placeholder="e.g. Squire's, Hillier, Dobbies">
+    <button class="trip-near-btn" onclick="tripFindNearby(this)">📍 Find garden centres near me</button>
+    <div id="tripNearby"></div>
+    ${past.length?`<div class="trip-label" style="margin-top:10px">Been before</div><div class="trip-past-centres">${past.map(c=>`<button onclick="pickPastCentre(decodeURIComponent('${jsArg(c)}'))">${esc(c)}</button>`).join("")}</div>`:""}
+    <label class="trip-label">Budget (optional)</label>
+    <div class="trip-money-input"><b>£</b><input id="tripBudget" inputmode="decimal" placeholder="40"></div>
+    <p class="sub" style="margin:10px 0 14px">Scan plants with the pink camera as you go. You'll be asked for the price on the tag each time.</p>
+    <button class="btn primary" style="width:100%" onclick="startTrip()">🛒 Start trip</button>`);
+  setTimeout(()=>document.getElementById("tripCentre")?.focus(),250);
+}
+function pickPastCentre(name){
+  document.getElementById("tripCentre").value=name;
+  const prev=(state.trips||[]).find(t=>t.centre===name&&t.location);
+  if(prev) pendingTripLoc={...prev.location};
+}
+function startTrip(){
+  const centre=(document.getElementById("tripCentre")?.value||"").trim()||"Garden centre";
+  const budget=parsePrice(document.getElementById("tripBudget")?.value);
+  state.activeTrip={id:"trip-"+Date.now(),centre,budget,startedAt:new Date().toISOString(),advice:null,location:pendingTripLoc||null};
+  pendingTripLoc=null;
+  saveState(); closeModal();
+  toast(`Trip to ${centre} started`);
+  setRoute("trip");
+}
+function renderTrip(){
+  const t=state.activeTrip;
+  if(!t) return setRoute("discover");
+  currentRoute="trip"; document.body.dataset.page="discover";
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route==="discover"));
+  const {items,picked,pickedTotal,unpriced}=tripTotals();
+  const left=t.budget!=null?t.budget-pickedTotal:null;
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
+    <section class="page-head"><div class="eyebrow">Garden centre trip · ${new Date(t.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</div><h1>${esc(t.centre)}</h1></section>
+    ${t.location?`<div class="trip-map-card"><div class="trip-map" id="tripMap"></div>${tripLocationLine(t.location,t.centre)}</div>`:`<button class="trip-pin-btn" onclick="repinTripHere()">📍 Pin this trip to where you are</button>`}
+    <div class="trip-summary">
+      <div class="trip-sum-row"><div><small>Shortlisted</small><b>${money(pickedTotal)}</b></div>${t.budget!=null?`<div><small>Budget</small><b>${money(t.budget)}</b></div><div class="${left<0?"over":""}"><small>${left<0?"Over by":"Left"}</small><b>${money(Math.abs(left))}</b></div>`:`<div><button class="mini-action" onclick="editTripBudget()">＋ Set budget</button></div>`}</div>
+      ${budgetBar(pickedTotal,t.budget)}
+      ${unpriced?`<p class="trip-note">${unpriced} shortlisted plant${unpriced===1?" has":"s have"} no price yet.</p>`:""}
+    </div>
+    ${items.length?`<p class="trip-hint">Tick the ones you're tempted by. Tap a price to change it.</p>
+    <div class="trip-list">${items.map(d=>{
+      const r=d.buyCheck&&BUY_RATING[d.buyCheck.rating];
+      return `<div class="trip-item ${d.picked?"picked":""}">
+        <button class="trip-tick" aria-label="${d.picked?"Remove from":"Add to"} shortlist" onclick="toggleTripPick('${d.id}')">${d.picked?"✓":""}</button>
+        <span class="trip-thumb plant-art" data-photo-key="${esc(d.photoKey||"")}" data-photo-url="${esc(d.photoUrl||"")}" onclick="setRoute('profile',{id:'${d.id}'})"></span>
+        <div class="trip-item-copy" onclick="setRoute('profile',{id:'${d.id}'})"><b>${esc(d.common)}</b>${r?`<span class="buy-badge mini ${r.cls}">${r.icon} ${r.label}</span>`:buyCheckInFlight.has(d.id)?`<span class="buy-badge mini checking"><i></i>Checking…</span>`:""}</div>
+        <button class="trip-price ${d.price==null?"empty":""}" onclick="editTripPrice('${d.id}')">${d.price==null?"＋ £":money(d.price)}</button>
+      </div>`;}).join("")}</div>`
+    :`<div class="empty-card" style="text-align:center"><div style="font-size:40px">🛒</div><p class="sub">Nothing scanned yet. Tap the pink camera below to scan a plant. It'll ask for the price on the tag.</p></div>`}
+    ${items.length?`<button class="btn primary trip-ask" onclick="askTripAdvice()">✦ Ask Gemini what to buy</button>`:""}
+    <div id="tripAdvice">${t.advice?renderTripAdvice(t.advice):""}</div>
+    <div class="trip-actions">
+      <button class="btn secondary" onclick="openFinishTrip()">✓ Finish trip</button>
+      <button class="link-btn" onclick="confirmDiscardTrip()">Cancel trip</button>
+    </div>
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
+  hydratePhotos();
+  if(t.location) drawTripMap(document.getElementById("tripMap"),[{lat:t.location.lat,lon:t.location.lon,label:t.centre}]);
+}
+function toggleTripPick(id){ const d=state.discoveries.find(x=>x.id===id); if(!d) return; d.picked=!d.picked; saveState(); renderTrip(); }
+function editTripPrice(id){
+  const d=state.discoveries.find(x=>x.id===id); if(!d) return;
+  modal(`<div class="eyebrow">Price</div><h2>${esc(d.common)}</h2>
+    <div class="trip-money-input"><b>£</b><input id="editPrice" inputmode="decimal" value="${d.price!=null?d.price.toFixed(2):""}" placeholder="0.00"></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="saveTripPrice('${id}')">Save price</button>`);
+  setTimeout(()=>{const i=document.getElementById("editPrice"); i?.focus(); i?.select();},250);
+}
+function saveTripPrice(id){
+  const d=state.discoveries.find(x=>x.id===id); if(!d) return;
+  d.price=parsePrice(document.getElementById("editPrice")?.value); saveState(); closeModal(); renderTrip();
+}
+function editTripBudget(){
+  const t=state.activeTrip; if(!t) return;
+  modal(`<div class="eyebrow">Budget</div><h2>${esc(t.centre)}</h2><div class="trip-money-input"><b>£</b><input id="editBudget" inputmode="decimal" value="${t.budget??""}" placeholder="40"></div>
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="state.activeTrip.budget=parsePrice(document.getElementById('editBudget').value);saveState();closeModal();renderTrip()">Save budget</button>`);
+}
+async function askTripAdvice(){
+  const t=state.activeTrip; if(!t) return;
+  if(!API_PROXY_URL){ toast("Trip advice needs the FloraLens Worker"); return; }
+  const box=document.getElementById("tripAdvice");
+  if(box) box.innerHTML=`<div class="trip-advice loading"><div class="flower-loader">✦</div><p>Gemini is weighing up your list…</p></div>`;
+  const items=tripItems().map(d=>({name:d.common,scientific:d.scientific,price:d.price,picked:!!d.picked,buyRating:d.buyCheck?.rating||"",buyHeadline:d.buyCheck?.headline||""}));
+  const body={centre:t.centre,budget:t.budget,month:new Date().toLocaleDateString("en-GB",{month:"long"}),items,
+    garden:state.plants.map(p=>({name:p.common,area:p.area})),areas:state.areas.filter(a=>a!=="Unplaced"),
+    weather:typeof weatherContextLine==="function"?weatherContextLine():""};
+  try{
+    const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/tripadvice`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const data=await res.json().catch(()=>null);
+    if(!data) throw new Error(res.status===404?"The Worker doesn't have trip advice yet. Upload the new worker.js.":`Trip advice failed (${res.status}).`);
+    if(!res.ok||data.error) throw new Error(data.error||`Trip advice failed (${res.status}).`);
+    t.advice={...data.result,askedAt:new Date().toISOString()}; saveState();
+    if(currentRoute==="trip") renderTrip();
+    document.getElementById("tripAdvice")?.scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(err){
+    if(box) box.innerHTML=`<div class="trip-advice"><b>Couldn't get advice</b><p>${esc(friendlyNetError(err,"Trip advice"))}</p></div>`;
+  }
+}
+function renderTripAdvice(a){
+  const row=(x,cls,icon)=>`<div class="ta-row ${cls}"><span>${icon}</span><p><b>${esc(x.name)}</b> ${esc(x.reason)}</p></div>`;
+  return `<section class="trip-advice">
+    <div class="eyebrow">✦ Gemini's advice</div><h2>${esc(a.headline||"")}</h2>${a.summary?`<p class="ta-sum">${esc(a.summary)}</p>`:""}
+    ${(a.buy||[]).length?`<div class="ta-sub">Buy${a.total?` · ${money(a.total)}`:""}</div>${a.buy.map(x=>row(x,"buy","✓")).join("")}`:""}
+    ${(a.skip||[]).length?`<div class="ta-sub">Leave</div>${a.skip.map(x=>row(x,"skip","×")).join("")}`:""}
+    ${a.tip?`<div class="ta-tip">💡 ${esc(a.tip)}</div>`:""}
+    <div class="ta-foot">Asked ${new Date(a.askedAt).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})} · <button class="link-btn" onclick="askTripAdvice()">Ask again</button></div>
+  </section>`;
+}
+function openFinishTrip(){
+  const items=tripItems();
+  if(!items.length){ confirmDiscardTrip(); return; }
+  modal(`<div class="eyebrow">Finish trip</div><h2>What did you buy?</h2>
+    <div class="trip-finish-list">${items.map(d=>`<label class="trip-finish-item"><input type="checkbox" value="${d.id}" ${d.picked?"checked":""} onchange="updateFinishTotal()"><span>${esc(d.common)}</span><b>${money(d.price)}</b></label>`).join("")}</div>
+    <div class="trip-finish-total" id="finishTotal"></div>
+    <label class="trip-label">Add what you bought to My Garden</label>
+    <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a==="Unplaced"?"active":""}" onclick="selectArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
+    <button class="btn primary" style="width:100%;margin-top:12px" onclick="completeTrip(true)">✓ Finish & add to Garden</button>
+    <button class="link-btn" style="width:100%;margin-top:10px" onclick="completeTrip(false)">Finish, keep them in Discover</button>`);
+  chosenArea="Unplaced"; updateFinishTotal();
+}
+function updateFinishTotal(){
+  const ids=[...document.querySelectorAll(".trip-finish-item input:checked")].map(i=>i.value);
+  const total=state.discoveries.filter(d=>ids.includes(d.id)).reduce((a,d)=>a+(d.price||0),0);
+  const b=state.activeTrip?.budget, el=document.getElementById("finishTotal");
+  if(el) el.innerHTML=`${ids.length} plant${ids.length===1?"":"s"} · <b>${money(total)}</b>${b?` of ${money(b)}`:""}`;
+}
+async function tripThumb(d){
+  try{
+    const url=d.photoKey?await getPhotoUrl(d.photoKey):d.photoUrl; if(!url) return null;
+    const img=await new Promise((res,rej)=>{const i=new Image();i.crossOrigin="anonymous";i.onload=()=>res(i);i.onerror=rej;i.src=url;});
+    const c=document.createElement("canvas"); c.width=c.height=120;
+    const s=Math.min(img.width,img.height); c.getContext("2d").drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,120,120);
+    return c.toDataURL("image/jpeg",.7);
+  }catch(e){ return null; }
+}
+async function completeTrip(addToGarden){
+  const t=state.activeTrip; if(!t) return;
+  const boughtIds=[...document.querySelectorAll(".trip-finish-item input:checked")].map(i=>i.value);
+  const area=chosenArea||"Unplaced";
+  closeModal();
+  const items=tripItems(), snapshot=[];
+  let n=0;
+  for(const d of items){
+    const bought=boughtIds.includes(d.id);
+    snapshot.push({name:d.common,scientific:d.scientific,price:d.price??null,bought,rating:d.buyCheck?.rating||null,thumb:await tripThumb(d)});
+    if(bought&&addToGarden){
+      await discoveryToPlant(d,area,++n);
+      state.discoveries=state.discoveries.filter(x=>x.id!==d.id);
+      if(d.photoKey) await deletePhoto(d.photoKey);
+    }else{
+      delete d.tripId; delete d.picked;
+      if(bought) d.bought=true;
+    }
+  }
+  const spent=snapshot.filter(x=>x.bought).reduce((a,x)=>a+(x.price||0),0);
+  state.trips=[{id:t.id,centre:t.centre,budget:t.budget,startedAt:t.startedAt,endedAt:new Date().toISOString(),spent,items:snapshot,advice:t.advice||null,location:t.location||null},...(state.trips||[])];
+  state.activeTrip=null;
+  saveState();
+  toast(boughtIds.length?`Trip saved · ${money(spent)} spent${addToGarden?` · ${boughtIds.length} added to ${area}`:""}`:"Trip saved");
+  setRoute(addToGarden&&boughtIds.length?"garden":"discover");
+}
+function confirmDiscardTrip(){
+  modal(`<div class="eyebrow">Cancel trip</div><h2>Cancel this trip?</h2><p class="sub">The plants you scanned stay in Discover as spotted plants. Nothing is added to your trip history.</p>
+    <div class="actions"><button class="btn secondary" onclick="closeModal()">Keep going</button><button class="btn danger" onclick="discardTrip()">Cancel trip</button></div>`);
+}
+function discardTrip(){
+  tripItems().forEach(d=>{ delete d.tripId; delete d.picked; });
+  state.activeTrip=null; saveState(); closeModal(); toast("Trip cancelled"); setRoute("discover");
+}
+function openTripHistory(){
+  const trips=state.trips||[];
+  const pins=[];
+  trips.forEach(t=>{ if(t.location&&!pins.some(p=>distanceM(p,t.location)<150)) pins.push({lat:t.location.lat,lon:t.location.lon,label:t.centre}); });
+  modal(`<div class="eyebrow">Trip history</div><h2>Past trips</h2>
+    ${pins.length?`<div class="trip-map tall" id="historyMap"></div>`:""}
+    <div class="trip-history">${trips.map(t=>{const bought=t.items.filter(x=>x.bought).length;return `<button class="trip-history-row" onclick="openPastTrip('${t.id}')">
+      <span>🛒</span><div><b>${esc(t.centre)}</b><small>${new Date(t.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})} · ${bought} bought</small></div>
+      <em class="${t.budget&&t.spent>t.budget?"over":""}">${money(t.spent)}${t.budget?`<small>of ${money(t.budget)}</small>`:""}</em></button>`;}).join("")}</div>`);
+  if(pins.length) drawTripMap(document.getElementById("historyMap"),pins,{zoom:12});
+}
+function openPastTrip(id){
+  const t=(state.trips||[]).find(x=>x.id===id); if(!t) return;
+  const bought=t.items.filter(x=>x.bought), rest=t.items.filter(x=>!x.bought);
+  const item=x=>`<div class="past-item ${x.bought?"":"not"}">${x.thumb?`<img src="${x.thumb}" alt="">`:`<span class="plant-art"></span>`}<div><b>${esc(x.name)}</b><small><i>${esc(x.scientific||"")}</i></small></div><em>${money(x.price)}</em></div>`;
+  closeModal();
+  modal(`<div class="eyebrow">${new Date(t.startedAt).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}</div><h2>${esc(t.centre)}</h2>
+    ${t.location?`<div class="trip-map-card in-sheet"><div class="trip-map" id="pastTripMap"></div>${tripLocationLine(t.location,t.centre)}</div>`:""}
+    <div class="trip-sum-row past"><div><small>Spent</small><b>${money(t.spent)}</b></div>${t.budget?`<div><small>Budget</small><b>${money(t.budget)}</b></div>`:""}<div><small>Bought</small><b>${bought.length}</b></div></div>
+    ${bought.length?`<div class="ta-sub">Bought</div>${bought.map(item).join("")}`:""}
+    ${rest.length?`<div class="ta-sub">Looked at</div>${rest.map(item).join("")}`:""}
+    ${t.advice?.headline?`<div class="ta-sub">Gemini said</div><p class="sub" style="margin:0">${esc(t.advice.headline)}${t.advice.summary?` ${esc(t.advice.summary)}`:""}</p>`:""}
+    <div class="actions" style="margin-top:16px"><button class="btn secondary" onclick="openTripHistory()">← All trips</button><button class="btn danger" onclick="deletePastTrip('${t.id}')">Delete</button></div>`);
+  if(t.location) drawTripMap(document.getElementById("pastTripMap"),[{lat:t.location.lat,lon:t.location.lon,label:t.centre}]);
+}
+function deletePastTrip(id){
+  if(!confirm("Delete this trip from your history?")) return;
+  state.trips=(state.trips||[]).filter(t=>t.id!==id); saveState(); closeModal();
+  toast("Trip deleted"); if(currentRoute==="discover") renderDiscover();
 }
 
 /* ===================== Plant Doctor (Gemini, via the FloraLens Worker) ===================== */
@@ -4062,6 +4434,8 @@ document.addEventListener("click",e=>{
   const route=routeTarget.dataset.route;
   if(route==="lens" && routeTarget.classList.contains("lens-nav")){
     e.preventDefault();
+    // On Discover the big camera is the garden-centre scan: identify + "Should I buy it?"
+    if(currentRoute==="discover"||currentRoute==="trip"||(currentRoute==="capture"&&captureIntent==="discover")){ startCamera("discover"); return; }
     setRoute("lens");
     return;
   }
@@ -4117,7 +4491,7 @@ async function backgroundEnrichTryV7SavedRecords(){
 // double on 1 Jan 2027; update these then.
 const GEMINI_RATE={input:0.75,output:3.75};
 const GBP_PER_USD=0.75;   // rough, for showing pence
-const GEMINI_ROUTES={doctor:"Plant Doctor",fill:"Filling gaps",buycheck:"Should I buy it?",lookup:"Plant lookup",suggest:"Garden planner"};
+const GEMINI_ROUTES={doctor:"Plant Doctor",fill:"Filling gaps",buycheck:"Should I buy it?",lookup:"Plant lookup",suggest:"Garden planner",tripadvice:"Trip advice"};
 (function trackGeminiCalls(){
   const base=String(API_PROXY_URL||"").replace(/\/$/,"");
   if(!base||!window.fetch) return;
@@ -4126,7 +4500,7 @@ const GEMINI_ROUTES={doctor:"Plant Doctor",fill:"Filling gaps",buycheck:"Should 
     const res=await realFetch(input,init);
     try{
       const url=typeof input==="string"?input:input?.url||"";
-      const m=url.startsWith(base)&&url.slice(base.length).match(/^\/(doctor|fill|buycheck|lookup|suggest)\b/);
+      const m=url.startsWith(base)&&url.slice(base.length).match(/^\/(doctor|fill|buycheck|lookup|suggest|tripadvice)\b/);
       if(m) res.clone().json().then(d=>recordGeminiUsage(m[1],d?.usage,res.status)).catch(()=>{});
     }catch(e){}
     return res;
@@ -4208,7 +4582,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.8 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4258,6 +4632,7 @@ function refreshCurrentView(){
     else if(currentRoute==="garden") renderGarden();
     else if(currentRoute==="care") renderCareCalendar();
     else if(currentRoute==="discover") renderDiscover();
+    else if(currentRoute==="trip") renderTrip();
     else if(currentRoute==="profile"){
       const id=view.dataset.profileId; if(!id) return;
       const tab=document.querySelector(".profile-tab.active")?.dataset.profileTab, y=appScrollTop();

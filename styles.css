@@ -1304,3 +1304,116 @@ html[data-season="winter"] body{background-image:url("icons/bg-winter.jpg")}
 .disc-chips .disc-clear{padding:8px 2px}
 .disc-empty{text-align:center;padding:26px 20px}
 .disc-empty .sub{margin:0 0 12px}
+/* On Discover the centre camera is the garden-centre scan, so it takes Discover's pink */
+body[data-page="discover"] .lens-nav{background:linear-gradient(135deg,#F77BB4,#EE4E95 55%,#C93A7C);box-shadow:0 10px 24px rgba(238,78,149,.40)}
+body[data-page="discover"] .disc-search{height:56px}
+
+/* ===== Garden centre trips ===== */
+.trip-start,.trip-strip{width:100%;display:block;text-align:left;border:0;font:inherit;color:inherit;margin:0 0 12px;border-radius:20px;box-shadow:var(--sh-1)}
+.trip-start{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(255,255,255,.88)}
+.trip-start>span{font-size:22px}
+.trip-start div{flex:1;min-width:0}.trip-start b{display:block;font-size:15px}.trip-start small{display:block;font-size:12.5px;color:var(--muted)}
+.trip-start i{font-style:normal;font-size:22px;color:#C93A7C}
+.trip-strip{padding:12px 16px 14px;color:#fff;background:linear-gradient(135deg,#F77BB4,#EE4E95 55%,#C93A7C);box-shadow:0 10px 24px rgba(238,78,149,.28)}
+.trip-strip-top{display:flex;align-items:center;gap:12px}
+.trip-strip-top>span{font-size:22px}.trip-strip-top div{flex:1;min-width:0}
+.trip-strip-top b{display:block;font-size:16px}.trip-strip-top small{display:block;font-size:12.5px;opacity:.9}
+.trip-strip-top i{font-style:normal;font-weight:700;font-size:13px;background:rgba(255,255,255,.22);padding:6px 10px;border-radius:999px}
+.trip-strip .trip-bar{margin-top:10px;background:rgba(255,255,255,.3)}.trip-strip .trip-bar span{background:#fff}
+.trip-bar{height:8px;border-radius:999px;background:rgba(14,154,94,.14);overflow:hidden}
+.trip-bar span{display:block;height:100%;border-radius:999px;background:var(--leaf-2);transition:width .3s}
+.trip-bar.near span{background:#E8A33A}.trip-bar.over span{background:#D9473B}
+.trip-strip .trip-bar.near span{background:#FFE2A8}.trip-strip .trip-bar.over span{background:#FFD0CC}
+.trip-history-link{display:block;margin:-4px 0 10px;font-size:13.5px;color:#C93A7C}
+.trip-label{display:block;font-size:13px;font-weight:800;color:var(--ink-2);margin:12px 2px 6px}
+.trip-past-centres{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.trip-past-centres button{border:0;border-radius:999px;padding:6px 12px;background:var(--bg);font:inherit;font-size:13px;font-weight:600}
+.trip-money-input{display:flex;align-items:center;gap:8px;padding:0 16px;height:54px;border-radius:16px;background:var(--bg)}
+.trip-money-input b{font-size:20px;color:var(--ink-2)}
+.trip-money-input input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:20px;font-weight:700;outline:none}
+.trip-price-field{display:flex;align-items:center;gap:8px;width:100%;padding:0 16px;height:58px;margin-bottom:4px;border-radius:18px;background:#fff;box-shadow:var(--sh-1);border:2px solid #F7B5D2}
+.trip-price-field span{flex:1;font-size:14px;font-weight:700;color:var(--ink-2)}
+.trip-price-field b{font-size:20px;color:#C93A7C}
+.trip-price-field input{width:96px;border:0;background:none;font:inherit;font-size:22px;font-weight:800;text-align:right;outline:none}
+.actions .trip-price-field{grid-column:1/-1}
+.trip-summary{padding:16px;border-radius:22px;background:rgba(255,255,255,.92);box-shadow:var(--sh-1);margin-bottom:12px}
+.trip-sum-row{display:flex;gap:10px;margin-bottom:12px}
+.trip-sum-row>div{flex:1}
+.trip-sum-row small{display:block;font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.trip-sum-row b{display:block;font-family:var(--display);font-size:26px;line-height:1.1}
+.trip-sum-row .over b{color:#D9473B}
+.trip-sum-row.past{margin:6px 0 4px}
+.trip-note{margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+.trip-hint{font-size:13px;color:var(--ink-2);margin:4px 2px 8px;text-shadow:0 0 8px rgba(255,255,255,.9)}
+.trip-list{display:grid;gap:8px;margin-bottom:14px}
+.trip-item{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 10px;border-radius:18px;background:rgba(255,255,255,.9);box-shadow:var(--sh-1);transition:background .2s}
+.trip-item.picked{background:#fff;box-shadow:0 0 0 2px var(--leaf-2),var(--sh-1)}
+.trip-tick{flex:none;width:30px;height:30px;border-radius:50%;border:2px solid #C9D3CC;background:#fff;color:#fff;font-weight:900;font-size:15px;display:grid;place-items:center;padding:0}
+.trip-item.picked .trip-tick{background:var(--leaf-2);border-color:var(--leaf-2)}
+.trip-thumb{flex:none;width:52px;height:52px;border-radius:14px;background-size:cover;background-position:center}
+.trip-item-copy{flex:1;min-width:0}
+.trip-item-copy b{display:block;font-size:15px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.buy-badge.mini{position:static;display:inline-flex;margin-top:4px;font-size:11px;padding:3px 8px;box-shadow:none}
+.trip-price{flex:none;border:0;border-radius:12px;padding:8px 10px;background:var(--bg);font:inherit;font-size:16px;font-weight:800;color:var(--ink)}
+.trip-price.empty{color:#C93A7C;background:#FDE8F1;font-size:14px}
+.trip-ask{width:100%;margin-bottom:12px;background:linear-gradient(135deg,#4F7BF7,#9B5CF6)}
+.trip-advice{padding:16px 18px;border-radius:22px;background:#fff;box-shadow:var(--sh-1);margin-bottom:12px}
+.trip-advice.loading{text-align:center;color:var(--muted)}
+.trip-advice h2{font-size:22px;margin:4px 0 6px}
+.ta-sum{margin:0 0 6px;font-size:14px;color:var(--ink-2);line-height:1.5}
+.ta-sub{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--leaf-2);margin:12px 0 6px}
+.ta-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
+.ta-row>span{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:900;color:#fff;background:var(--leaf-2)}
+.ta-row.skip>span{background:#C9786F}
+.ta-row p{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink-2)}
+.ta-row p b{color:var(--ink)}
+.ta-tip{margin-top:10px;padding:10px 12px;border-radius:14px;background:#FFF6DD;font-size:13px;line-height:1.45}
+.ta-foot{margin-top:10px;font-size:12px;color:var(--muted)}
+.ta-foot .link-btn{font-size:12px;padding:0}
+.trip-actions{display:flex;flex-direction:column;gap:8px;align-items:stretch;margin-top:4px}
+.trip-actions .link-btn{color:var(--muted);font-size:13.5px}
+.trip-finish-list{display:grid;gap:6px;max-height:34vh;overflow:auto}
+.trip-finish-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--bg)}
+.trip-finish-item input{width:22px;height:22px;accent-color:var(--leaf-2)}
+.trip-finish-item span{flex:1;font-weight:600}
+.trip-finish-total{margin:10px 2px 0;font-size:14px;color:var(--ink-2)}
+.trip-history{display:grid;gap:8px}
+.trip-history-row{display:flex;align-items:center;gap:12px;padding:12px;border:0;border-radius:16px;background:var(--bg);text-align:left;font:inherit;color:inherit}
+.trip-history-row>span{font-size:22px}.trip-history-row div{flex:1;min-width:0}
+.trip-history-row b{display:block;font-size:15px}.trip-history-row small{display:block;font-size:12.5px;color:var(--muted)}
+.trip-history-row em{font-style:normal;font-weight:800;font-size:16px;text-align:right}
+.trip-history-row em small{font-weight:600;font-size:11.5px}
+.trip-history-row em.over{color:#D9473B}
+.past-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.past-item img,.past-item .plant-art{width:44px;height:44px;border-radius:12px;object-fit:cover;flex:none}
+.past-item div{flex:1;min-width:0}.past-item b{display:block;font-size:14.5px}.past-item small{color:var(--muted)}
+.past-item em{font-style:normal;font-weight:800}
+.past-item.not{opacity:.6}
+.trip-finish-item b,.past-item em{white-space:nowrap}
+
+/* ===== Trip locations & maps ===== */
+.trip-near-btn{width:100%;margin-top:10px;border:0;border-radius:14px;padding:12px;font:inherit;font-size:14.5px;font-weight:700;color:#C93A7C;background:#FDE8F1}
+.trip-near-btn:disabled{opacity:.6}
+.trip-near-msg{margin:10px 2px 0;font-size:13px;color:var(--ink-2);line-height:1.45}
+.trip-near-msg.small{font-size:12px;color:var(--muted)}
+.trip-near-head{margin:12px 2px 6px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.trip-near-item{width:100%;display:flex;align-items:center;gap:10px;margin-bottom:6px;padding:10px 12px;border:0;border-radius:14px;background:var(--bg);font:inherit;text-align:left;color:inherit}
+.trip-near-item.on{background:#FDE8F1;box-shadow:0 0 0 2px #EE4E95}
+.trip-near-item div{flex:1;min-width:0}.trip-near-item b{display:block;font-size:14.5px}
+.trip-near-item small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trip-near-item em{font-style:normal;font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap}
+.trip-map-card{border-radius:22px;overflow:hidden;background:#fff;box-shadow:var(--sh-1);margin-bottom:12px}
+.trip-map-card.in-sheet{box-shadow:none;border:1px solid rgba(0,0,0,.06);margin:8px 0 10px}
+.trip-map{height:150px;background:#E8EEE9;position:relative;z-index:0}
+.trip-map.tall{height:200px;border-radius:18px;overflow:hidden;margin:6px 0 12px}
+.trip-map-off{height:100%;display:grid;place-items:center;font-size:13px;color:var(--muted)}
+.trip-loc-line{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;font-size:13px}
+.trip-loc-line span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+.trip-loc-line a{flex:none;font-weight:800;color:#C93A7C;text-decoration:none}
+.trip-pin-btn{width:100%;margin:0 0 12px;border:0;border-radius:16px;padding:11px;font:inherit;font-size:14px;font-weight:700;color:#C93A7C;background:rgba(255,255,255,.88);box-shadow:var(--sh-1)}
+.trip-pin{background:none;border:0}
+.trip-pin span{display:grid;place-items:center;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:linear-gradient(135deg,#F77BB4,#C93A7C);box-shadow:0 4px 10px rgba(201,58,124,.45);border:2px solid #fff}
+.trip-pin span{font-size:0}
+.trip-pin span::after{content:"";width:10px;height:10px;border-radius:50%;background:#fff;transform:rotate(45deg)}
+.leaflet-container{font:inherit}
+.leaflet-control-attribution{font-size:9px!important}

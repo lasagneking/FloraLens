@@ -4,7 +4,7 @@
    - Versioned files (?v=…), plant data shards and fonts: cache first.
    - API calls (identify, diagnose, enrich, GBIF): always network, never cached.
    Bump VERSION whenever you deploy; the app then offers "Update ready". */
-const VERSION = "3.8.0";
+const VERSION = "3.10.0";
 const SHELL = `floralens-shell-${VERSION}`;
 const RUNTIME = "floralens-runtime";
 
@@ -28,7 +28,9 @@ const SHELL_FILES = [
   "icons/bg-winter.jpg",
   "icons/doctor-guide.jpg?v=2",
   "icons/guide-identify.jpg?v=1",
-  "icons/guide-garden-centre.jpg?v=1"
+  "icons/guide-garden-centre.jpg?v=1",
+  "lib/leaflet.js?v=1.9.4",
+  "lib/leaflet.css?v=1.9.4"
 ];
 
 self.addEventListener("install", event => {
@@ -55,6 +57,7 @@ self.addEventListener("message", event => {
 
 const API_HOSTS = /workers\.dev$|api\.gbif\.org$|plantnet\.org$|raw\.githubusercontent\.com$/;
 const FONT_HOSTS = /^fonts\.(googleapis|gstatic)\.com$/;
+const MAP_TILES = /basemaps\.cartocdn\.com$/;   // trip maps: keep tiles she has seen, so past trips show offline
 
 self.addEventListener("fetch", event => {
   const req = event.request;
@@ -78,7 +81,7 @@ self.addEventListener("fetch", event => {
   }
 
   // Same-origin files and Google Fonts: cache first, then network (and remember it).
-  if (url.origin === self.location.origin || FONT_HOSTS.test(url.hostname)) {
+  if (url.origin === self.location.origin || FONT_HOSTS.test(url.hostname) || MAP_TILES.test(url.hostname)) {
     event.respondWith((async () => {
       const cached = await caches.match(req);
       if (cached) return cached;
