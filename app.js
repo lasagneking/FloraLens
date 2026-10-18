@@ -3838,6 +3838,14 @@ const NEAR_RADIUS_M=8050;
 const DIY_BRANDS=["B&Q","Homebase","The Range"];
 const DIY_RE=/\b(b\s*&\s*q|homebase|the range)\b/i;
 const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
+// Many small places are only a building with the name on it (Elm Court is), so a name that
+// says garden centre or nursery counts too. Childcare nurseries are always left out.
+const PLANT_NAME_RE=/garden\s*cent(re|er)|garden\s*world|plant\s*(centre|center|nursery|nurseries)|nurser(y|ies)/i;
+const CHILDCARE_RE=/day\s*(care|nursery)|montessori|pre-?school|childcare|child\s*care|nursery\s*school|kids|kindergarten|little\s+(ones|acorns|stars|angels)|playgroup|creche|tots/i;
+function isChildcare(name,category,type){
+  return CHILDCARE_RE.test(name||"")||/kindergarten|childcare|school|nursery_school/.test(type||"")||(category==="amenity"&&/nurser/i.test(name||""));
+}
+function soundsLikePlants(name){ return PLANT_NAME_RE.test(name||""); }
 // Fast: OpenStreetMap's place search inside a box around her. Its rules allow about one
 // request a second, so the DIY brand searches follow the garden-centre one, a second apart.
 async function nearbyFromNominatim(pos,collect,typed=""){
@@ -3856,16 +3864,16 @@ async function nearbyFromNominatim(pos,collect,typed=""){
       const brand=DIY_BRANDS.includes(term);
       for(const r of await res.json()){
         const a=r.address||{};
+        if(isChildcare(r.name,r.category,r.type)) continue;          // never childcare nurseries
         if(typedSearch){
-          // Only places that sell plants: never childcare nurseries, schools, streets or towns.
-          if(!r.name||!(r.category==="shop"||r.type==="plant_nursery")) continue;
-          if(/kindergarten|childcare|school|nursery_school/.test(r.type)) continue;
+          // A name she typed: any named place except streets, towns and the like.
+          if(!r.name||["highway","boundary","place","railway","waterway","natural"].includes(r.category)) continue;
         }
         else if(brand){ if(!DIY_RE.test(r.name||"")||r.category!=="shop") continue; }   // brand searches: only that brand's shops
-        else if(r.category!=="shop"&&r.type!=="plant_nursery") continue;
+        else if(!(r.category==="shop"||r.type==="plant_nursery"||soundsLikePlants(r.name))) continue;
         const place=[a.road,a.village||a.town||a.suburb||a.city].filter(Boolean).join(", ");
         collect({name:r.name||"Garden centre (no name on the map)",unnamed:!r.name,lat:+r.lat,lon:+r.lon,
-          kind:brand||r.type==="doityourself"?"diy":r.type==="plant_nursery"?"nursery":"garden",address:place,osm:`${r.osm_type}/${r.osm_id}`,typed:!!typedSearch});
+          kind:brand||r.type==="doityourself"?"diy":(r.type==="plant_nursery"||(/nurser/i.test(r.name||"")&&!/garden\s*cent/i.test(r.name||"")))?"nursery":"garden",address:place,osm:`${r.osm_type}/${r.osm_id}`,typed:!!typedSearch});
       }
     }catch(e){ console.warn("Nominatim",term,e?.name||e); }
   }
@@ -3887,13 +3895,15 @@ function collectOverpass(els,collect){
   for(const e of els){
     const lat=e.lat??e.center?.lat, lon=e.lon??e.center?.lon, t=e.tags||{};
     const name=t.name||t.brand; if(lat==null) continue;
-    collect({name:name||`${t.landuse==="plant_nursery"?"Plant nursery":"Garden centre"} (no name on the map)`,unnamed:!name,lat,lon,kind:t.shop==="doityourself"?"diy":t.landuse==="plant_nursery"?"nursery":"garden",
+    if(isChildcare(name,t.amenity?"amenity":"",t.amenity||"")) continue;          // never childcare nurseries
+    if(t.highway||t.boundary||t.place) continue;                                   // a road called "Nursery Lane" isn't a nursery
+    collect({name:name||`${t.landuse==="plant_nursery"?"Plant nursery":"Garden centre"} (no name on the map)`,unnamed:!name,lat,lon,kind:t.shop==="doityourself"?"diy":(t.landuse==="plant_nursery"||(/nurser/i.test(name||"")&&!/garden\s*cent/i.test(name||"")))?"nursery":"garden",
       address:[t["addr:street"],t["addr:city"]||t["addr:town"]||t["addr:village"]||t["addr:suburb"]].filter(Boolean).join(", "),osm:`${e.type}/${e.id}`});
   }
 }
 async function nearbyFromOverpass(pos,collect){
   const near=`(around:3500,${pos.lat},${pos.lon})`, far=`(around:${NEAR_RADIUS_M},${pos.lat},${pos.lon})`;
-  const closeQ=`[out:json][timeout:10];(nwr["shop"="garden_centre"]${near};nwr["landuse"="plant_nursery"]${near};);out center tags 30;`;
+  const closeQ=`[out:json][timeout:10];(nwr["shop"="garden_centre"]${near};nwr["landuse"="plant_nursery"]${near};nwr["name"~"garden cent|nurser|garden world",i]${near};);out center tags 40;`;
   const wideQ=`[out:json][timeout:20];(nwr["shop"="garden_centre"]${far};nwr["landuse"="plant_nursery"]["name"]${far};`
     +DIY_BRANDS.map(b=>`nwr["shop"="doityourself"]["brand"="${b}"]${far};nwr["shop"="doityourself"]["name"="${b}"]${far};`).join("")
     +`);out center tags 60;`;
@@ -4668,7 +4678,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.5 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.6 · made for our garden</div>`);
 });
 
 renderHome();
