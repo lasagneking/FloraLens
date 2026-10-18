@@ -1419,3 +1419,5 @@ body[data-page="discover"] .disc-search{height:56px}
 .leaflet-control-attribution{font-size:9px!important}
 /* OpenStreetMap tiles, softened to sit with the app's warm palette */
 .fl-tiles{filter:saturate(.75) sepia(.12) brightness(1.03)}
+.trip-near-item small{white-space:normal;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical}
+.trip-near-list{max-height:none}
