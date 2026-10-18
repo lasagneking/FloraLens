@@ -1417,3 +1417,5 @@ body[data-page="discover"] .disc-search{height:56px}
 .trip-pin span::after{content:"";width:10px;height:10px;border-radius:50%;background:#fff;transform:rotate(45deg)}
 .leaflet-container{font:inherit}
 .leaflet-control-attribution{font-size:9px!important}
+/* OpenStreetMap tiles, softened to sit with the app's warm palette */
+.fl-tiles{filter:saturate(.75) sepia(.12) brightness(1.03)}

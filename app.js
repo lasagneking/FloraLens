@@ -3828,22 +3828,52 @@ function distanceM(a,b){
   return Math.round(2*R*Math.asin(Math.sqrt(h)));
 }
 function fmtDistance(m){ return m<1000?`${Math.round(m/10)*10} m`:`${(m/1609.34).toFixed(1)} miles`; }
+// fetch() with a time limit, so a slow map server can never leave her waiting forever.
+async function fetchWithin(url,opts={},ms=8000){
+  const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),ms);
+  try{ return await fetch(url,{...opts,signal:ctl.signal}); }finally{ clearTimeout(timer); }
+}
+// Fast: OpenStreetMap's place search for "garden centre" inside a box around her.
+async function nearbyFromNominatim(pos){
+  const dLat=0.03, dLon=0.045;   // roughly 2 miles each way
+  const box=[pos.lon-dLon,pos.lat+dLat,pos.lon+dLon,pos.lat-dLat].join(",");
+  const res=await fetchWithin(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=10&bounded=1&viewbox=${box}&q=${encodeURIComponent("garden centre")}`,{headers:{"Accept-Language":"en-GB"}},7000);
+  if(!res.ok) throw new Error("Place search unavailable");
+  return (await res.json()).map(r=>{
+    const a=r.address||{}, name=r.name||(r.display_name||"").split(",")[0];
+    return {name,lat:+r.lat,lon:+r.lon,address:[a.road,a.village||a.town||a.suburb||a.city].filter(Boolean).join(", "),osm:`${r.osm_type}/${r.osm_id}`};
+  });
+}
+// Thorough: Overpass also finds plant nurseries, but its servers are often busy, so try two with a time limit.
+async function nearbyFromOverpass(pos){
+  const q=`[out:json][timeout:8];(nwr["shop"="garden_centre"](around:3000,${pos.lat},${pos.lon});nwr["landuse"="plant_nursery"]["name"](around:3000,${pos.lat},${pos.lon}););out center tags 25;`;
+  const ask=async host=>{
+    const res=await fetchWithin(host,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}},6000);
+    if(!res.ok) throw new Error(`Overpass ${res.status}`);
+    const data=await res.json();
+    return (data.elements||[]).map(e=>{
+      const lat=e.lat??e.center?.lat, lon=e.lon??e.center?.lon, t=e.tags||{};
+      const name=t.name||t.brand; if(!name||lat==null) return null;
+      return {name,lat,lon,address:[t["addr:street"],t["addr:city"]||t["addr:town"]||t["addr:village"]||t["addr:suburb"]].filter(Boolean).join(", "),osm:`${e.type}/${e.id}`};
+    }).filter(Boolean);
+  };
+  try{ return await Promise.any(["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter"].map(ask)); }
+  catch(e){ console.warn("Overpass unavailable",e); }
+  return [];
+}
 async function findNearbyCentres(pos){
-  const q=`[out:json][timeout:12];(nwr["shop"="garden_centre"](around:3000,${pos.lat},${pos.lon});nwr["landuse"="plant_nursery"]["name"](around:3000,${pos.lat},${pos.lon});nwr["shop"="florist"]["name"~"nursery|garden",i](around:3000,${pos.lat},${pos.lon}););out center tags 25;`;
-  const res=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"}});
-  if(!res.ok) throw new Error("Map search unavailable");
-  const data=await res.json();
+  const [a,b]=await Promise.allSettled([nearbyFromNominatim(pos),nearbyFromOverpass(pos)]);
+  const all=[...(a.value||[]),...(b.value||[])].filter(x=>x&&x.name&&Number.isFinite(x.lat));
+  if(!all.length&&a.status==="rejected"&&b.status==="fulfilled"&&!b.value.length) throw a.reason;
   const seen=new Set();
-  return (data.elements||[]).map(e=>{
-    const lat=e.lat??e.center?.lat, lon=e.lon??e.center?.lon, t=e.tags||{};
-    const name=t.name||t.brand; if(!name||lat==null) return null;
-    const town=t["addr:city"]||t["addr:town"]||t["addr:village"]||t["addr:suburb"]||"";
-    return {name,lat,lon,dist:distanceM(pos,{lat,lon}),address:[t["addr:street"],town].filter(Boolean).join(", "),osm:`${e.type}/${e.id}`};
-  }).filter(x=>x&&!seen.has(x.name.toLowerCase())&&seen.add(x.name.toLowerCase())).sort((a,b)=>a.dist-b.dist).slice(0,6);
+  return all.map(x=>({...x,dist:distanceM(pos,x)})).filter(x=>x.dist<=4000)
+    .sort((x,y)=>x.dist-y.dist)
+    .filter(x=>{ const k=x.name.toLowerCase().replace(/[^a-z0-9]/g,""); if(seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0,6);
 }
 async function reverseGeocode(pos){
   try{
-    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat=${pos.lat}&lon=${pos.lon}`,{headers:{"Accept-Language":"en-GB"}});
+    const r=await fetchWithin(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat=${pos.lat}&lon=${pos.lon}`,{headers:{"Accept-Language":"en-GB"}},6000);
     const d=await r.json(), a=d.address||{};
     return [a.road,a.village||a.town||a.suburb||a.city,a.county&&!(a.town||a.city)?a.county:""].filter(Boolean).slice(0,2).join(", ");
   }catch(e){ return ""; }
@@ -3855,13 +3885,13 @@ async function tripFindNearby(btn){
     const pos=await getPosition();
     pendingTripLoc={...pos,source:"gps"};
     box.innerHTML=`<p class="trip-near-msg">🔎 Looking for garden centres nearby…</p>`;
-    let list=[];
-    try{ list=await findNearbyCentres(pos); }catch(e){ console.warn(e); }
+    let list=[], searchFailed=false;
+    try{ list=await findNearbyCentres(pos); }catch(e){ console.warn(e); searchFailed=true; }
     reverseGeocode(pos).then(addr=>{ if(pendingTripLoc&&pendingTripLoc.source==="gps"&&!pendingTripLoc.address) pendingTripLoc.address=addr; });
     window._nearbyCentres=list;
     box.innerHTML=list.length
       ?`<div class="trip-near-head">Nearby</div>${list.map((c,i)=>`<button class="trip-near-item" onclick="pickNearbyCentre(${i},this)"><span>📍</span><div><b>${esc(c.name)}</b>${c.address?`<small>${esc(c.address)}</small>`:""}</div><em>${fmtDistance(c.dist)}</em></button>`).join("")}<p class="trip-near-msg small">Not listed? Type the name above. The trip is pinned to where you are now.</p>`
-      :`<p class="trip-near-msg">📍 Location saved. No garden centres are mapped nearby, so type its name above.</p>`;
+      :`<p class="trip-near-msg">📍 Location saved. ${searchFailed?"The map search isn't answering right now,":"No garden centres are mapped right here,"} so type its name above. The trip is pinned to where you are.</p>`;
   }catch(err){
     box.innerHTML=`<p class="trip-near-msg">${esc(friendlyNetError(err,"Finding your location"))}</p>`;
   }finally{ btn.disabled=false; }
@@ -3915,8 +3945,8 @@ async function drawTripMap(el,points,{zoom=15}={}){
     if(!el.isConnected) return;
     el.innerHTML="";
     const map=L.map(el,{zoomControl:false,attributionControl:true,dragging:points.length>1,scrollWheelZoom:false,tap:false,touchZoom:points.length>1,doubleClickZoom:points.length>1});
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,subdomains:"abcd",
-      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,className:"fl-tiles",
+      attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
     const icon=L.divIcon({className:"trip-pin",html:"<span>🛒</span>",iconSize:[34,34],iconAnchor:[17,32]});
     const markers=points.map(p=>L.marker([p.lat,p.lon],{icon}).addTo(map).bindTooltip(esc(p.label||""),{direction:"top",offset:[0,-28]}));
     if(points.length===1) map.setView([points[0].lat,points[0].lon],zoom);
@@ -4582,7 +4612,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.1 · made for our garden</div>`);
 });
 
 renderHome();

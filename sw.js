@@ -4,7 +4,7 @@
    - Versioned files (?v=…), plant data shards and fonts: cache first.
    - API calls (identify, diagnose, enrich, GBIF): always network, never cached.
    Bump VERSION whenever you deploy; the app then offers "Update ready". */
-const VERSION = "3.10.0";
+const VERSION = "3.10.1";
 const SHELL = `floralens-shell-${VERSION}`;
 const RUNTIME = "floralens-runtime";
 
@@ -47,6 +47,11 @@ self.addEventListener("activate", event => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k.startsWith("floralens-shell-") && k !== SHELL).map(k => caches.delete(k)));
+    // 3.10 cached CARTO's "API key required" tiles; throw those away.
+    try {
+      const rt = await caches.open(RUNTIME);
+      for (const req of await rt.keys()) if (req.url.includes("cartocdn.com")) await rt.delete(req);
+    } catch {}
     await self.clients.claim();
   })());
 });
@@ -57,7 +62,7 @@ self.addEventListener("message", event => {
 
 const API_HOSTS = /workers\.dev$|api\.gbif\.org$|plantnet\.org$|raw\.githubusercontent\.com$/;
 const FONT_HOSTS = /^fonts\.(googleapis|gstatic)\.com$/;
-const MAP_TILES = /basemaps\.cartocdn\.com$/;   // trip maps: keep tiles she has seen, so past trips show offline
+const MAP_TILES = /^tile\.openstreetmap\.org$/;   // trip maps: keep tiles she has seen, so past trips show offline
 
 self.addEventListener("fetch", event => {
   const req = event.request;
