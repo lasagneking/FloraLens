@@ -1429,3 +1429,23 @@ body[data-page="discover"] .disc-search{height:56px}
 .page-head.profile-back .link-btn:active{transform:scale(.97)}
 .page-head .eyebrow{color:#0A6B42;font-weight:800;
   text-shadow:0 0 2px #fff,0 0 6px rgba(255,255,255,1),0 0 14px rgba(255,255,255,.95),0 0 24px rgba(255,255,255,.8)}
+
+/* ===== Discover landing: two picture cards ===== */
+.disc-home-head{padding-top:6px}
+.disc-home-head h1{font-size:44px;margin-bottom:4px}
+.disc-home-head .sub{margin:0;text-shadow:0 0 2px #fff,0 0 10px rgba(255,255,255,.9),0 0 20px rgba(255,255,255,.7)}
+.disc-search-home{height:58px;margin:4px 0 16px;border-radius:999px;padding:0 20px}
+.disc-card{position:relative;border-radius:28px;overflow:hidden;background:#FFFBF5;box-shadow:0 2px 4px rgba(60,50,30,.06),0 14px 34px rgba(60,50,30,.14);margin-bottom:16px;cursor:pointer;transition:transform .15s}
+.disc-card:active{transform:scale(.985)}
+.disc-card-img{aspect-ratio:1050/560;background-size:cover;background-position:center;position:relative}
+.disc-card-body{position:relative;margin-top:-26px;padding:18px 18px 18px 22px;display:flex;align-items:center;gap:12px;background:#FFFBF5;
+  border-top-left-radius:60% 26px;border-top-right-radius:40% 18px}
+.disc-card-copy{flex:1;min-width:0}
+.disc-card-copy h2{font-size:25px;line-height:1.12;margin:0 0 4px}
+.disc-card-copy p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.4}
+.disc-card-copy .trip-bar{margin-top:10px}
+.disc-card-btn{flex:none;border:0;border-radius:999px;padding:12px 16px;font:inherit;font-size:14.5px;font-weight:800;color:#0A6B42;background:#DDF3E7;white-space:nowrap}
+.disc-card.live .disc-card-btn{color:#fff;background:linear-gradient(135deg,#F77BB4,#C93A7C)}
+.disc-card-link{display:block;margin-top:8px;border:0;background:none;padding:0;font:inherit;font-size:13px;font-weight:700;color:#C93A7C}
+.disc-live-pill{position:absolute;top:14px;left:14px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.94);color:#C93A7C;font-size:12.5px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.12)}
+@media (max-width:360px){.disc-card-body{flex-direction:column;align-items:stretch}.disc-card-btn{align-self:flex-start}}

@@ -1774,6 +1774,7 @@ function setRoute(route, data={}){
   if(route==="care") renderCareCalendar();
   if(route==="discover") renderDiscover();
   if(route==="trip") renderTrip();
+  if(route==="saved"){ renderSaved(); }
   if(route==="profile" && data.id) renderProfile(data.id);
   appScrollTo(0);   // new screen opens at the top, like a native app
 }
@@ -2605,7 +2606,7 @@ async function saveDiscovery(){
     saveState(); captures=[]; pendingResults=null;
     toast(`Your photo of ${looked.common} replaced the reference photo`);
     runBuyCheck(looked.id,{files:buyFiles});
-    setRoute(state.activeTrip?"trip":"discover");
+    setRoute(state.activeTrip?"trip":"saved");
     return;
   }
   const id="discovery-"+Date.now();
@@ -2633,7 +2634,7 @@ async function saveDiscovery(){
   if(!state.speciesCache[speciesKey]?.enrichment){
     enrichSpecies(x.sci,speciesKey).catch(()=>{});
   }
-  setRoute(state.activeTrip?"trip":"discover");
+  setRoute(state.activeTrip?"trip":"saved");
 }
 
 /* ===================== "Should I buy it?" (Discover, via Gemini) ===================== */
@@ -2765,7 +2766,7 @@ async function deleteDiscovery(id){
   closeModal();
   await deletePhoto(d.photoKey);
   toast("Discovery removed");
-  renderDiscover();
+  setRoute("saved");
 }
 
 function confirmClearDiscoveries(){
@@ -3204,8 +3205,8 @@ async function renderProfile(id,isNew=false){
   const confidence=p.score?`${Math.round(Number(p.score))}% match`:"Identified";
   const placeLabel=isDiscovery?(p.wishlist?"Wishlist":"Discover"):(p.area||"My Garden");
   const bloomStatus=profileBloomStatus(bloom);
-  const backRoute=isDiscovery?"discover":"garden";
-  const backLabel=isDiscovery?"Discover":"My Garden";
+  const backRoute=isDiscovery?"saved":"garden";
+  const backLabel=isDiscovery?"Saved discoveries":"My Garden";
   const plantToday=plantTodayModel(p,care,isDiscovery);
   const pruningAssistant=buildPruningAssistant(care,p,bloom);
 
@@ -3720,7 +3721,7 @@ async function addLookupToWishlist(){
   });
   saveState();
   toast(`${r.common||r.scientific} added to your wishlist`);
-  setRoute("discover");
+  setRoute("saved");
   setTimeout(fillGardenGaps,1500);    // fetch the real botanical sources in the background
 }
 // When she scans the real plant, her photo replaces any reference photo for that species.
@@ -3735,7 +3736,48 @@ async function replaceStockPhotos(speciesKey,file){
   return n;
 }
 
-function renderDiscover(){
+// Discover = a simple landing page (garden centre trip + saved discoveries).
+// The saved list lives on its own page. renderDiscover() redraws whichever is showing.
+function renderDiscover(){ return currentRoute==="saved"?renderSaved():renderDiscoverHome(); }
+function renderDiscoverHome(){
+  currentRoute="discover"; document.body.dataset.page="discover";
+  const t=state.activeTrip, items=state.discoveries, wish=items.filter(d=>d.wishlist).length;
+  const trips=(state.trips||[]).length;
+  let tripCard;
+  if(t){
+    const {items:ti,pickedTotal}=tripTotals();
+    tripCard=`<article class="disc-card live" onclick="if(!event.target.closest('.disc-card-link')) setRoute('trip')">
+      <div class="disc-card-img" style="background-image:url('icons/disc-trip-live.jpg?v=1')"><span class="disc-live-pill">● Trip in progress</span></div>
+      <div class="disc-card-body"><div class="disc-card-copy"><h2>${esc(t.centre)}</h2>
+        <p>${ti.length} plant${ti.length===1?"":"s"} · ${money(pickedTotal)} shortlisted${t.budget?` of ${money(t.budget)}`:""}</p>
+        ${budgetBar(pickedTotal,t.budget)}</div>
+        <button class="disc-card-btn" onclick="event.stopPropagation();setRoute('trip')">Continue →</button></div>
+    </article>`;
+  }else{
+    tripCard=`<article class="disc-card" onclick="if(!event.target.closest('.disc-card-link')) openTripStart()">
+      <div class="disc-card-img" style="background-image:url('icons/disc-trip.jpg?v=1')"></div>
+      <div class="disc-card-body"><div class="disc-card-copy"><h2>Off to a garden centre?</h2><p>Start a trip: set a budget and price what you find</p>
+        ${trips?`<button class="disc-card-link" onclick="event.stopPropagation();openTripHistory()">🛒 Past trips (${trips})</button>`:""}</div>
+        <button class="disc-card-btn" onclick="event.stopPropagation();openTripStart()">Start a trip →</button></div>
+    </article>`;
+  }
+  view.innerHTML=`<section class="page-head disc-home-head"><h1>Discover</h1><p class="sub">Where will you find your next plant?</p></section>
+    <form class="disc-search disc-search-home" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
+      <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="Look up a plant by name">
+    </form>
+    ${tripCard}
+    <article class="disc-card" onclick="if(!event.target.closest('.disc-card-link')) setRoute('saved')">
+      <div class="disc-card-img" style="background-image:url('icons/disc-saved.jpg?v=1')"></div>
+      <div class="disc-card-body"><div class="disc-card-copy"><h2>Saved discoveries</h2>
+        <p>${items.length?`${items.length} saved${wish?` · ${wish} on your wishlist`:""}`:"Plants you've spotted, loved or looked up"}</p>
+        ${t&&trips?`<button class="disc-card-link" onclick="event.stopPropagation();openTripHistory()">🛒 Past trips (${trips})</button>`:""}</div>
+        <button class="disc-card-btn" onclick="event.stopPropagation();setRoute('saved')">Open →</button></div>
+    </article>
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
+}
+function renderSaved(){
+  currentRoute="saved"; document.body.dataset.page="discover";
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route==="discover"));
   const items=state.discoveries;
   const families=new Set(items.map(d=>d.family).filter(Boolean)).size;
   const wishlist=items.filter(d=>d.wishlist).length;
@@ -3743,20 +3785,14 @@ function renderDiscover(){
   const spotted=items.length-wishlist;
   const f=window.discoverFilter||"all";
   const shown=f==="wish"?items.filter(d=>d.wishlist):f==="spotted"?items.filter(d=>!d.wishlist):items;
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Saved inspiration</div><h1>Discover</h1></section>
-    <div class="disc-actions">
-      <form class="disc-search" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
-        <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="Look up a plant by name">
-      </form>
-    </div>
-    ${tripStrip()}
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">‹ Discover</button></section>
+    <section class="page-head"><div class="eyebrow">Spotted, loved and looked up</div><h1>Saved discoveries</h1></section>
     <div class="disc-chips">
       <button class="${f==="all"?"on":""}" onclick="discoverFilter='all';renderDiscover()">All <i>${items.length}</i></button>
       <button class="${f==="wish"?"on":""}" onclick="discoverFilter='wish';renderDiscover()">♥ Wishlist <i>${wishlist}</i></button>
       <button class="${f==="spotted"?"on":""}" onclick="discoverFilter='spotted';renderDiscover()">Spotted <i>${spotted}</i></button>
       ${spotted&&f==="spotted"?`<button class="disc-clear" onclick="confirmClearDiscoveries()">Clear all</button>`:""}
     </div>
-    ${(state.trips||[]).length?`<button class="link-btn trip-history-link" onclick="openTripHistory()">🛒 Past trips (${state.trips.length})</button>`:""}
     ${!shown.length&&items.length
       ? `<div class="empty-card disc-empty"><p class="sub">${f==="wish"?"Nothing on the wishlist yet. Tap ♡ on a plant to save it here.":"No spotted plants right now."}</p><button class="mini-action" onclick="discoverFilter='all';renderDiscover()">Show all</button></div>`
       : shown.length
@@ -4188,7 +4224,7 @@ async function completeTrip(addToGarden){
   state.activeTrip=null;
   saveState();
   toast(boughtIds.length?`Trip saved · ${money(spent)} spent${addToGarden?` · ${boughtIds.length} added to ${area}`:""}`:"Trip saved");
-  setRoute(addToGarden&&boughtIds.length?"garden":"discover");
+  setRoute(addToGarden&&boughtIds.length?"garden":"saved");
 }
 function confirmDiscardTrip(){
   modal(`<div class="eyebrow">Cancel trip</div><h2>Cancel this trip?</h2><p class="sub">The plants you scanned stay in Discover as spotted plants. Nothing is added to your trip history.</p>
@@ -4531,7 +4567,7 @@ document.addEventListener("click",e=>{
   if(route==="lens" && routeTarget.classList.contains("lens-nav")){
     e.preventDefault();
     // On Discover the big camera is the garden-centre scan: identify + "Should I buy it?"
-    if(currentRoute==="discover"||currentRoute==="trip"||(currentRoute==="capture"&&captureIntent==="discover")){ startCamera("discover"); return; }
+    if(currentRoute==="discover"||currentRoute==="trip"||currentRoute==="saved"||(currentRoute==="capture"&&captureIntent==="discover")){ startCamera("discover"); return; }
     setRoute("lens");
     return;
   }
@@ -4574,7 +4610,7 @@ async function backgroundEnrichTryV7SavedRecords(){
     if(changed){
       if(currentRoute==="home") renderHome();
       else if(currentRoute==="garden") renderGarden();
-      else if(currentRoute==="discover") renderDiscover();
+      else if(currentRoute==="discover"||currentRoute==="saved") renderDiscover();
     }
   }catch(err){
     console.warn("TRY v7 background enrichment failed",err);
@@ -4678,7 +4714,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.10.7 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.11 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4727,7 +4763,7 @@ function refreshCurrentView(){
     if(currentRoute==="home") renderHome();
     else if(currentRoute==="garden") renderGarden();
     else if(currentRoute==="care") renderCareCalendar();
-    else if(currentRoute==="discover") renderDiscover();
+    else if(currentRoute==="discover"||currentRoute==="saved") renderDiscover();
     else if(currentRoute==="trip") renderTrip();
     else if(currentRoute==="profile"){
       const id=view.dataset.profileId; if(!id) return;
