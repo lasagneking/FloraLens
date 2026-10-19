@@ -3432,19 +3432,41 @@ function formatJournalDate(v){
   return d.toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"});
 }
 function renderJournal(){
-  const entries=[...state.journal].sort((x,y)=>String(y.date||"").localeCompare(String(x.date||"")));
-  const plantCount=new Set(entries.map(j=>j.plantId)).size;
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">Garden memories</div><h1>Journal</h1><p class="sub">A living record of what changed, flowered, moved and surprised you.</p></section>
-  <button class="journal-hero-button" onclick="openJournalComposer()"><span class="journal-hero-mark">✎</span><span><strong>Add a garden moment</strong><small>Photo, note, care job or milestone</small></span><b>＋</b></button>
-  <div class="stats-strip"><div class="stat"><b>${entries.length}</b><small>moments</small></div><div class="stat"><b>${plantCount}</b><small>plants</small></div><div class="stat"><b>${entries.filter(j=>j.photoKey).length}</b><small>photos</small></div></div>
-  ${entries.length?`<div class="journal-feed">${entries.map(j=>{
-    const p=state.plants.find(x=>x.id===j.plantId); if(!p)return "";
-    return `<article class="journal-entry" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${p.id}'})">
-      ${j.photoKey?`<div class="journal-photo" data-photo-key="${esc(j.photoKey)}"></div>`:""}
-      <div class="journal-entry-body"><div class="journal-date">${formatJournalDate(j.date)}</div>
-      <div class="journal-entry-head"><span class="journal-type">${journalTypeIcon(j.type)} ${esc(j.type||"Note")}</span><button class="journal-delete" onclick="event.stopPropagation();confirmDeleteJournal('${j.id}')">×</button></div>
-      <h2>${esc(p.common)}</h2><em>${esc(p.scientific)}</em>${j.text?`<p>${esc(j.text)}</p>`:""}<div class="journal-link">View ${esc(p.common)} →</div></div>
-    </article>`}).join("")}</div>`:`<div class="empty-card journal-empty"><div class="pressed-flower">❀</div><h2>Your garden story starts here</h2><p class="sub">Capture first flowers, new growth, pruning, moves, problems or simply a moment you loved.</p><button class="btn primary" onclick="openJournalComposer()">Add first moment</button></div>`}`;
+  // Only moments whose plant still exists are shown, so only those are counted.
+  const entries=[...state.journal].filter(j=>state.plants.some(p=>p.id===j.plantId))
+    .sort((x,y)=>String(y.date||"").localeCompare(String(x.date||"")));
+  const plantCount=new Set(entries.map(j=>j.plantId)).size, photos=entries.filter(j=>j.photoKey).length;
+  const plural=(n,w)=>`${n} ${w}${n===1?"":"s"}`;
+  // Group by month: "October 2026"
+  const groups=[];
+  for(const j of entries){
+    const d=j.date?new Date(`${j.date}T12:00:00`):null;
+    const key=d&&!isNaN(d)?d.toLocaleDateString("en-GB",{month:"long",year:"numeric"}):"Undated";
+    (groups.at(-1)?.key===key?groups.at(-1):(groups.push({key,items:[]}),groups.at(-1))).items.push(j);
+  }
+  const card=j=>{
+    const p=state.plants.find(x=>x.id===j.plantId);
+    const d=j.date?new Date(`${j.date}T12:00:00`):null, day=d&&!isNaN(d)?d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric"}):"";
+    return `<article class="jm-card" onclick="if(!event.target.closest('button')) setRoute('profile',{id:'${p.id}'})">
+      ${j.photoKey?`<div class="jm-photo" data-photo-key="${esc(j.photoKey)}"></div>`:""}
+      <div class="jm-body">
+        <div class="jm-top"><span class="jm-type">${journalTypeIcon(j.type)} ${esc(j.type||"Note")}</span><span class="jm-day">${esc(day)}</span><button class="jm-delete" aria-label="Delete this moment" onclick="event.stopPropagation();confirmDeleteJournal('${j.id}')">×</button></div>
+        <div class="jm-plant"><span class="jm-thumb plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></span><div><b>${esc(p.common)}</b><small>${esc(p.area&&p.area!=="Unplaced"?p.area:p.scientific)}</small></div></div>
+        ${j.text?`<p class="jm-text">${esc(j.text)}</p>`:""}
+      </div>
+    </article>`;
+  };
+  view.innerHTML=`<article class="journal-cover">
+      <div class="journal-cover-img" style="background-image:url('icons/journal-hero.jpg?v=1')"></div>
+      <div class="journal-cover-body">
+        <div class="journal-cover-copy"><h1>Journal</h1><p>Your garden's story: what flowered, changed, moved and surprised you.</p></div>
+        <button class="journal-cover-btn" onclick="openJournalComposer()">＋ Add a garden moment</button>
+      </div>
+    </article>
+    ${entries.length?`<p class="journal-tally">${plural(entries.length,"moment")} · ${plural(plantCount,"plant")} · ${plural(photos,"photo")}</p>
+      ${groups.map(g=>`<section class="jm-month"><h3>${esc(g.key)}</h3>${g.items.map(card).join("")}</section>`).join("")}`
+    :`<div class="journal-start"><div>❀</div><b>Your garden story starts here</b><p>Capture first flowers, new growth, pruning, moves, problems, or simply a moment you loved.</p></div>`}
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
   hydratePhotos();
 }
 function addJournalForPlant(id){openJournalComposer(id)}
@@ -4791,7 +4813,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.13 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.14 · made for our garden</div>`);
 });
 
 renderHome();

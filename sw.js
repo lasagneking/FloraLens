@@ -4,7 +4,7 @@
    - Versioned files (?v=…), plant data shards and fonts: cache first.
    - API calls (identify, diagnose, enrich, GBIF): always network, never cached.
    Bump VERSION whenever you deploy; the app then offers "Update ready". */
-const VERSION = "3.13.0";
+const VERSION = "3.14.0";
 const SHELL = `floralens-shell-${VERSION}`;
 const RUNTIME = "floralens-runtime";
 
@@ -39,6 +39,7 @@ const SHELL_FILES = [
   "icons/space-indoors.jpg?v=1",
   "icons/space-greenhouse.jpg?v=1",
   "icons/space-other.jpg?v=1",
+  "icons/journal-hero.jpg?v=1",
   "lib/leaflet.js?v=1.9.4",
   "lib/leaflet.css?v=1.9.4"
 ];
