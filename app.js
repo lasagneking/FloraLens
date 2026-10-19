@@ -1768,7 +1768,7 @@ function setRoute(route, data={}){
   document.body.dataset.page=route;   // lets the camera button take Discover's colour
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route===route));
   if(route==="home") renderHome();
-  if(route==="garden") renderGarden();
+  if(route==="garden"||route==="gardenAll"||route==="space") renderGarden();
   if(route==="lens") renderLens();
   if(route==="journal") renderJournal();
   if(route==="care") renderCareCalendar();
@@ -2139,7 +2139,7 @@ function renderHome(){
       <button class="quick-tile t-care" onclick="setRoute('care')"><span>💧</span><small>Care</small></button>
       <button class="quick-tile t-journal" onclick="openJournalComposer()"><span>✎</span><small>Add moment</small></button>
     </div>
-    <div class="section-title"><h3>My plants</h3><button class="link-btn" onclick="setRoute('garden')">See all</button></div>
+    <div class="section-title"><h3>My plants</h3><button class="link-btn" onclick="setRoute('gardenAll')">See all</button></div>
     <div class="plant-rail">
       ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
       <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
@@ -2303,22 +2303,77 @@ async function planToWishlist(i,btn){
   setTimeout(fillGardenGaps,1500);   // real sources + Gemini gap-fill for its care details
 }
 
+/* ===================== My Garden: picture cards for each space =====================
+   Landing = one card per space (artwork by type of space) + All plants + plants needing a home.
+   Each space has its own page; the full gallery sits behind "All plants". */
+const SPACE_ART={front:"space-front",garden:"space-back",border:"space-border",patio:"space-patio",indoor:"space-indoors",glass:"space-greenhouse",other:"space-other"};
+function spaceArt(area){ return `icons/${SPACE_ART[areaMood(area).cls]||"space-other"}.jpg?v=1`; }
+let currentSpace=null;
 function renderGarden(){
-  const isMap=state.gardenView==="map";
-  view.innerHTML=`<section class="page-head"><div class="eyebrow">My collection</div><h1>My Garden</h1><p class="sub">${state.plants.length} plants across ${state.areas.filter(x=>x!=="Unplaced").length} named spaces.</p></section>
-    <div class="garden-view-switch">
-      <button class="${!isMap?"active":""}" onclick="setGardenView('gallery')">▦ Gallery</button>
-      <button class="${isMap?"active":""}" onclick="setGardenView('map')">⌂ Garden Map</button>
+  if(currentRoute==="space"&&currentSpace) return renderSpace(currentSpace);
+  if(currentRoute==="gardenAll") return renderGardenAll();
+  return renderGardenHome();
+}
+function gardenTab(){
+  document.body.dataset.page="garden";
+  document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route==="garden"));
+}
+function spaceThumbs(plants,max=4){
+  if(!plants.length) return "";
+  return `<div class="space-thumbs">${plants.slice(0,max).map(p=>`<span class="space-thumb plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}" title="${esc(p.common)}"></span>`).join("")}${plants.length>max?`<span class="space-thumb more">+${plants.length-max}</span>`:""}</div>`;
+}
+function renderGardenHome(){
+  currentRoute="garden"; gardenTab();
+  const spaces=state.areas.filter(a=>a!=="Unplaced");
+  const homeless=state.plants.filter(p=>!p.area||p.area==="Unplaced"||!state.areas.includes(p.area));
+  const n=state.plants.length;
+  view.innerHTML=`<section class="page-head disc-home-head"><h1>My Garden</h1><p class="sub">${n} plant${n===1?"":"s"} in ${spaces.length} space${spaces.length===1?"":"s"}</p></section>
+    ${spaces.map(a=>{
+      const plants=state.plants.filter(p=>p.area===a);
+      return `<article class="disc-card space-card" onclick="if(!event.target.closest('.space-menu')) openSpace(decodeURIComponent('${jsArg(a)}'))">
+        <div class="disc-card-img" style="background-image:url('${spaceArt(a)}')"><button class="space-menu" aria-label="Options for ${esc(a)}" onclick="event.stopPropagation();areaMenu(decodeURIComponent('${jsArg(a)}'))">•••</button></div>
+        <div class="disc-card-body"><div class="disc-card-copy"><h2>${esc(a)}</h2>
+          <p>${plants.length?`${plants.length} plant${plants.length===1?"":"s"}`:"Waiting for its first plant"}</p>
+          ${spaceThumbs(plants)}</div>
+          <button class="disc-card-btn" onclick="event.stopPropagation();openSpace(decodeURIComponent('${jsArg(a)}'))">Open</button></div>
+      </article>`;}).join("")}
+    <div class="garden-rows">
+      <button class="garden-row" onclick="setRoute('gardenAll')"><span>🌿</span><div><b>All ${n} plant${n===1?"":"s"}</b><small>Search and browse everything in one place</small></div><i>›</i></button>
+      ${homeless.length?`<button class="garden-row warn" onclick="openSpace('Unplaced')"><span>📍</span><div><b>${homeless.length} plant${homeless.length===1?" needs":"s need"} a home</b><small>Choose which space ${homeless.length===1?"it lives":"they live"} in</small></div><i>›</i></button>`:""}
+      <button class="garden-row add" onclick="addAreaFromMap()"><span>＋</span><div><b>Add a space</b><small>“Rose bed”, “Kitchen window”, “Allotment”…</small></div><i>›</i></button>
     </div>
-    ${plannerBanner()}
-    ${isMap?gardenMapMarkup():gardenGalleryMarkup()}`;
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
   hydratePhotos();
 }
-function setGardenView(mode){
-  state.gardenView=mode==="map"?"map":"gallery";
-  saveState();
-  renderGarden();
+function openSpace(area){ currentSpace=area; setRoute("space"); }
+function renderSpace(area){
+  currentRoute="space"; currentSpace=area; gardenTab();
+  const unplaced=area==="Unplaced";
+  const plants=unplaced?state.plants.filter(p=>!p.area||p.area==="Unplaced"||!state.areas.includes(p.area)):state.plants.filter(p=>p.area===area);
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('garden')">‹ My Garden</button></section>
+    ${unplaced?`<section class="page-head"><div class="eyebrow">Needs a home</div><h1>Unplaced plants</h1><p class="sub">Open a plant and use “Move area” on its History tab to give it a space.</p></section>`
+    :`<div class="space-hero" style="background-image:url('${spaceArt(area)}')"><div class="space-hero-shade"></div>
+        <button class="space-menu" aria-label="Options for ${esc(area)}" onclick="areaMenu(decodeURIComponent('${jsArg(area)}'))">•••</button>
+        <div class="space-hero-copy"><small>${esc(areaMood(area).note)}</small><h1>${esc(area)}</h1><p>${plants.length?`${plants.length} plant${plants.length===1?"":"s"}`:"Waiting for its first plant"}</p></div></div>
+      <div class="space-actions">
+        <button class="space-plan" onclick="openPlanner(decodeURIComponent('${jsArg(area)}'))"><span>✦</span><div><b>What should I plant here?</b><small>Ideas for this spot's light, soil and neighbours</small></div><i>›</i></button>
+        <button class="space-add" onclick="startCamera('identify')">⌾ Add a plant</button>
+      </div>`}
+    ${plants.length?`<section class="masonry" id="gardenPins">${plants.map(p=>pin(p,{canDelete:true})).join("")}</section>`
+      :unplaced?`<div class="empty-card" style="text-align:center"><p class="sub">Every plant has a home.</p></div>`
+      :`<div class="empty-card space-empty"><div>🌱</div><p class="sub">Nothing here yet. Identify a plant and choose ${esc(area)} when you save it.</p></div>`}
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
+  hydratePhotos();
 }
+function renderGardenAll(){
+  currentRoute="gardenAll"; gardenTab();
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('garden')">‹ My Garden</button></section>
+    <section class="page-head"><div class="eyebrow">My collection</div><h1>All plants</h1></section>
+    ${gardenGalleryMarkup()}
+    <div class="profile-dock-reserve" aria-hidden="true"></div>`;
+  hydratePhotos();
+}
+function setGardenView(mode){ setRoute(mode==="map"?"garden":"gardenAll"); }
 function gardenGalleryMarkup(){
   return `<input class="search" id="gardenSearch" placeholder="Search your plants…" oninput="filterGarden(this.value)">
     <div class="toolbar">${["All",...state.areas].map((a,i)=>`<button class="filter ${i===0?"active":""}" onclick="filterByArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
@@ -2326,9 +2381,9 @@ function gardenGalleryMarkup(){
 }
 function areaMood(area){
   const s=String(area).toLowerCase();
-  if(/indoor|house|kitchen|bedroom|living|conservatory/.test(s)) return {icon:"⌂",cls:"indoor",note:"Indoor collection"};
-  if(/patio|terrace|deck|pot|container/.test(s)) return {icon:"◌",cls:"patio",note:"Pots & containers"};
-  if(/greenhouse|glasshouse/.test(s)) return {icon:"◇",cls:"glass",note:"Under glass"};
+  if(/greenhouse|glasshouse|polytunnel/.test(s)) return {icon:"◇",cls:"glass",note:"Under glass"};   // before "house"
+  if(/indoor|house|kitchen|bedroom|living|conservatory|window|office|bathroom/.test(s)) return {icon:"⌂",cls:"indoor",note:"Indoor collection"};
+  if(/patio|terrace|deck|pot|container|balcony/.test(s)) return {icon:"◌",cls:"patio",note:"Pots & containers"};
   if(/front/.test(s)) return {icon:"❀",cls:"front",note:"Front garden"};
   if(/border|bed/.test(s)) return {icon:"❧",cls:"border",note:"Planting bed"};
   if(/back|garden|lawn/.test(s)) return {icon:"✿",cls:"garden",note:"Outdoor space"};
@@ -2400,6 +2455,7 @@ function saveAreaRename(oldName){
   state.plants.forEach(p=>{if(p.area===oldName)p.area=name});
   if(state.areaInfo?.[oldName]){ state.areaInfo[name]=state.areaInfo[oldName]; delete state.areaInfo[oldName]; }
   state.discoveries.forEach(d=>{ if(d.plannedArea===oldName) d.plannedArea=name; });
+  if(currentSpace===oldName) currentSpace=name;
   saveState();closeModal();toast("Area renamed");renderGarden();
 }
 function deleteAreaPrompt(area){
@@ -2411,7 +2467,7 @@ function deleteGardenArea(area){
   state.plants.forEach(p=>{if(p.area===area)p.area="Unplaced"});
   state.areas=state.areas.filter(a=>a!==area);
   if(!state.areas.includes("Unplaced"))state.areas.push("Unplaced");
-  saveState();closeModal();toast("Area removed");renderGarden();
+  saveState();closeModal();toast("Area removed");setRoute("garden");
 }
 function filterGarden(q){
   const list=state.plants.filter(p=>(p.common+p.scientific+p.area).toLowerCase().includes(q.toLowerCase()));
@@ -3209,8 +3265,9 @@ async function renderProfile(id,isNew=false){
   window._profileOnTrip=!!onTrip;
   const placeLabel=onTrip?`${state.activeTrip.centre} trip`:isDiscovery?(p.wishlist?"Wishlist":"Discover"):(p.area||"My Garden");
   const bloomStatus=profileBloomStatus(bloom);
+  const inSpace=!isDiscovery&&p.area&&p.area!=="Unplaced"&&state.areas.includes(p.area);
   const backRoute=onTrip?"trip":isDiscovery?"saved":"garden";
-  const backLabel=onTrip?`${state.activeTrip.centre} trip`:isDiscovery?"Saved discoveries":"My Garden";
+  const backLabel=onTrip?`${state.activeTrip.centre} trip`:isDiscovery?"Saved discoveries":inSpace?p.area:"My Garden";
   const plantToday=plantTodayModel(p,care,isDiscovery);
   const pruningAssistant=buildPruningAssistant(care,p,bloom);
 
@@ -3247,7 +3304,7 @@ async function renderProfile(id,isNew=false){
       <div class="history-actions"><button class="mini-action" onclick="openCareComposer('${p.id}')">＋ Care record</button><button class="mini-action" onclick="addJournalForPlant('${p.id}')">＋ Garden moment</button></div>
       <div class="profile-card plant-life-timeline"><div class="timeline-item"><div class="timeline-icon">✿</div><div><b>Added to FloraLens</b><div class="small">${esc(p.added||"")}</div></div></div>${[...state.journal].filter(j=>j.plantId===p.id).sort((x,y)=>String(y.date||"").localeCompare(String(x.date||""))).map(j=>`<div class="timeline-item story-moment"><div class="timeline-icon">${journalTypeIcon(j.type)}</div><div class="story-moment-copy"><b>${esc(j.type||"Garden moment")}</b><div class="small">${formatJournalDate(j.date)}</div>${j.text?`<div class="story-note">${esc(j.text)}</div>`:""}${j.photoKey?`<div class="story-thumb" data-photo-key="${esc(j.photoKey)}"></div>`:""}</div></div>`).join("")}<div class="timeline-item"><div class="timeline-icon">📷</div><div><b>Plant profile created</b><div class="small">Its original identification photo is stored on this device.</div></div></div>${intel?`<div class="timeline-item"><div class="timeline-icon">❧</div><div><b>Botanical record enriched</b><div class="small">${intel.fetchedAt?new Date(intel.fetchedAt).toLocaleDateString("en-GB"):"Cached"} · ${uniqueSources.map(esc).join(" + ")||"connected sources"}</div></div></div>`:""}</div>`;
 
-  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('${backRoute}')">← ${backLabel}</button></section>
+  view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="${inSpace?`openSpace(decodeURIComponent('${jsArg(p.area)}'))`:`setRoute('${backRoute}')`}">‹ ${esc(backLabel)}</button></section>
     <div class="profile-dossier-hero" id="profileHero">
       <div class="plant-art ${p.art||""}"></div><div class="profile-dossier-shade"></div>${p.stockPhoto?`<span class="hero-credit">Reference photo${p.photoCredit?` · ${esc(p.photoCredit)}`:""}</span>`:""}
       <div class="profile-dossier-top"><span class="profile-family">${esc(p.family||"Botanical profile")}</span><span class="profile-season-badge">${esc(bloomStatus)}</span></div>
@@ -3363,7 +3420,7 @@ async function deletePlant(id){
   for(const j of moments) if(j.photoKey) await deletePhoto(j.photoKey);
   toast(`${p.common} removed`);
   if(currentRoute==="profile") setRoute("garden");
-  else if(currentRoute==="garden") renderGarden(); else renderHome();
+  else if(["garden","gardenAll","space"].includes(currentRoute)) renderGarden(); else renderHome();
 }
 
 function journalTypeIcon(type){
@@ -4629,7 +4686,7 @@ async function backgroundEnrichTryV7SavedRecords(){
     const changed=refreshStoredCareFields();
     if(changed){
       if(currentRoute==="home") renderHome();
-      else if(currentRoute==="garden") renderGarden();
+      else if(["garden","gardenAll","space"].includes(currentRoute)) renderGarden();
       else if(currentRoute==="discover"||currentRoute==="saved") renderDiscover();
     }
   }catch(err){
@@ -4734,7 +4791,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.12 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.13 · made for our garden</div>`);
 });
 
 renderHome();
@@ -4781,7 +4838,7 @@ async function fillGardenGaps(){
 function refreshCurrentView(){
   try{
     if(currentRoute==="home") renderHome();
-    else if(currentRoute==="garden") renderGarden();
+    else if(["garden","gardenAll","space"].includes(currentRoute)) renderGarden();
     else if(currentRoute==="care") renderCareCalendar();
     else if(currentRoute==="discover"||currentRoute==="saved") renderDiscover();
     else if(currentRoute==="trip") renderTrip();

@@ -1466,3 +1466,32 @@ body[data-page="discover"] .disc-search{height:56px}
 .ta-row{align-items:center}
 .ta-row p{flex:1;min-width:0}
 .ta-take{flex:none;border:0;border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:800;color:#B8382D;background:#FDE7E5}
+
+/* ===== My Garden: space cards ===== */
+.space-card .disc-card-img{position:relative}
+.space-menu{position:absolute;top:12px;right:12px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(255,255,255,.9);color:var(--ink);font-weight:900;letter-spacing:1px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:2}
+.space-thumbs{display:flex;margin-top:10px}
+.space-thumb{width:34px;height:34px;border-radius:50%;border:2.5px solid #FFFBF5;background-size:cover;background-position:center;margin-left:-8px;box-shadow:0 2px 6px rgba(0,0,0,.12);flex:none}
+.space-thumb:first-child{margin-left:0}
+.space-thumb.more{display:grid;place-items:center;background:#E6F2EA;color:#0A6B42;font-size:12px;font-weight:800}
+.garden-rows{display:grid;gap:10px;margin:4px 0 8px}
+.garden-row{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:0;border-radius:20px;background:rgba(255,255,255,.92);box-shadow:var(--sh-1);text-align:left;font:inherit;color:inherit}
+.garden-row>span{flex:none;width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:#E6F2EA;font-size:19px}
+.garden-row div{flex:1;min-width:0}.garden-row b{display:block;font-size:15.5px}.garden-row small{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.garden-row i{font-style:normal;font-size:22px;color:var(--muted)}
+.garden-row.warn>span{background:#FFF1DA}
+.garden-row.add>span{background:#F1ECFF;color:#6B4FD8;font-weight:800}
+.space-hero{position:relative;height:230px;border-radius:28px;overflow:hidden;background-size:cover;background-position:center;margin-bottom:14px;box-shadow:0 14px 34px rgba(60,50,30,.16)}
+.space-hero-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(10,30,18,.72),rgba(10,30,18,.05) 60%)}
+.space-hero .space-menu{z-index:3}
+.space-hero-copy{position:absolute;left:20px;right:20px;bottom:16px;color:#fff;z-index:2}
+.space-hero-copy small{font-size:12.5px;font-weight:700;opacity:.9}
+.space-hero-copy h1{color:#fff;margin:2px 0 2px;font-size:36px}
+.space-hero-copy p{margin:0;font-size:14px;opacity:.92}
+.space-actions{display:grid;gap:10px;margin-bottom:14px}
+.space-plan{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:0;border-radius:20px;color:#fff;text-align:left;font:inherit;background:linear-gradient(135deg,#7C6CF2,#5B43D6);box-shadow:0 10px 24px rgba(91,67,214,.28)}
+.space-plan>span{flex:none;width:40px;height:40px;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.18);font-size:18px}
+.space-plan div{flex:1;min-width:0}.space-plan b{display:block;font-size:15.5px}.space-plan small{display:block;font-size:12.5px;opacity:.88}
+.space-plan i{font-style:normal;font-size:22px;opacity:.8}
+.space-add{border:0;border-radius:16px;padding:13px;font:inherit;font-size:15px;font-weight:800;color:#0A6B42;background:#DDF3E7}
+.space-empty{text-align:center}.space-empty div{font-size:40px}
