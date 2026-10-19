@@ -1522,3 +1522,10 @@ body[data-page="discover"] .disc-search{height:56px}
 .journal-start div{font-size:38px;color:#C9A0DC}
 .journal-start b{display:block;font-family:var(--display);font-size:22px;margin:4px 0 6px;text-shadow:0 0 10px #fff}
 .journal-start p{margin:0;font-size:14px;line-height:1.5;color:var(--ink-2);text-shadow:0 0 8px #fff,0 0 16px rgba(255,255,255,.9)}
+
+/* 3.14.1 units */
+.unit-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--bg);border-radius:18px;padding:12px 14px;margin:8px 0}
+.unit-row b{display:block;font-size:15px;font-weight:800}.unit-row small{display:block;font-size:12.5px;color:var(--muted)}
+.unit-seg{display:flex;background:#fff;border-radius:12px;padding:3px;box-shadow:var(--sh-1);flex:none}
+.unit-seg button{border:0;background:none;font:inherit;font-size:14px;font-weight:800;color:var(--muted);padding:8px 13px;border-radius:9px}
+.unit-seg button.on{background:var(--leaf-2,#2E8B57);color:#fff}

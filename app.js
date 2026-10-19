@@ -1964,6 +1964,16 @@ async function refreshWeather(force=false){
   }catch(e){ console.warn("Weather",e); return false; }
   finally{ wxBusy=false; }
 }
+function fmtWind(kmh){ return state.windUnit==="mph"?`${Math.round(kmh*0.621371)} mph`:`${Math.round(kmh)} km/h`; }
+function windUnitRow(){
+  const u=state.windUnit==="mph"?"mph":"kmh";
+  return `<div class="unit-row"><span><b>Wind speed</b><small>Used in weather warnings</small></span><div class="unit-seg" role="group" aria-label="Wind speed units"><button class="${u==="mph"?"on":""}" onclick="setWindUnit('mph')">mph</button><button class="${u==="kmh"?"on":""}" onclick="setWindUnit('kmh')">km/h</button></div></div>`;
+}
+function setWindUnit(u){
+  state.windUnit=u; saveState();
+  document.querySelectorAll(".unit-row").forEach(r=>r.outerHTML=windUnitRow());
+  if(currentRoute==="home") renderHome();
+}
 function wxToday(){ return localISODate(); }
 function wxSplit(){
   const days=state.weather?.days||[]; const t=wxToday();
@@ -1996,7 +2006,7 @@ function weatherAlerts(){
       plants:tender.map(p=>p.id),date:frost.date});
   }
   const windy=soon.find(d=>d.gust>=55);
-  if(windy) out.push({type:"wind",level:windy.gust>=75?"high":"medium",icon:"⌁",title:`Strong winds ${wxDayName(windy.date)} (gusts ${Math.round(windy.gust)} km/h)`,
+  if(windy) out.push({type:"wind",level:windy.gust>=75?"high":"medium",icon:"⌁",title:`Strong winds ${wxDayName(windy.date)} (gusts ${fmtWind(windy.gust)})`,
     detail:"Check stakes and ties on tall plants, and move light pots out of exposed spots."});
   const hot=soon.find(d=>d.max>=27);
   if(hot) out.push({type:"heat",level:"medium",icon:"☀",title:`Hot ${wxDayName(hot.date)} (${Math.round(hot.max)}°)`,
@@ -4813,7 +4823,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.14 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button>${windUnitRow()}<div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.14.1 · made for our garden</div>`);
 });
 
 renderHome();
