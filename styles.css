@@ -1449,3 +1449,20 @@ body[data-page="discover"] .disc-search{height:56px}
 .disc-card-link{display:block;margin-top:8px;border:0;background:none;padding:0;font:inherit;font-size:13px;font-weight:700;color:#C93A7C}
 .disc-live-pill{position:absolute;top:14px;left:14px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.94);color:#C93A7C;font-size:12.5px;font-weight:800;box-shadow:0 4px 12px rgba(0,0,0,.12)}
 @media (max-width:360px){.disc-card-body{flex-direction:column;align-items:stretch}.disc-card-btn{align-self:flex-start}}
+
+/* ===== Trip list: everything counts; help only when over budget ===== */
+.trip-item{padding-left:10px}
+.trip-remove{flex:none;width:30px;height:30px;border-radius:50%;border:0;background:var(--bg);color:var(--muted);font-size:16px;display:grid;place-items:center;padding:0;margin-left:-2px}
+.trip-over{padding:16px 18px;border-radius:22px;background:#FFF1EF;box-shadow:inset 0 0 0 1.5px #F2B7AF;margin-bottom:12px}
+.trip-over b{display:block;font-family:var(--display);font-size:22px;color:#B8382D}
+.trip-over p{margin:4px 0 12px;font-size:13.5px;line-height:1.45;color:var(--ink-2)}
+.trip-over .trip-ask{margin-bottom:0}
+.trip-ok{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:20px;background:#E6F6EC;margin-bottom:12px}
+.trip-ok>span{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--leaf-2);color:#fff;font-weight:900}
+.trip-ok p{margin:0;font-size:14px;line-height:1.45;color:var(--ink-2)}
+.trip-ok.neutral{background:rgba(255,255,255,.88)}
+.trip-ok.neutral>span{background:#C9D3CC}
+.trip-ok .link-btn{padding:0;font-size:14px}
+.ta-row{align-items:center}
+.ta-row p{flex:1;min-width:0}
+.ta-take{flex:none;border:0;border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:800;color:#B8382D;background:#FDE7E5}

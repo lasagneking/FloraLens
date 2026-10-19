@@ -6,6 +6,7 @@
    /image     Fetches a reference photo (iNaturalist / Wikimedia only)
    /photo     Finds a reference photo for a plant name (no Gemini call)
    /suggest   "What should I plant here?" for a garden area (Gemini + reference photos)
+   /tripadvice  Garden centre trip: what to buy within budget (Gemini)
    Secrets: PLANTNET_API_KEY, PERENUAL_API_KEY, TREFLE_TOKEN, GEMINI_API_KEY */
 
 const PLANTNET_BASE = "https://my-api.plantnet.org/v2/identify/all";
@@ -178,8 +179,9 @@ export default {
       return json({ photo }, 200, cors);
     }
 
-    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup" || url.pathname === "/suggest") {
+    if (url.pathname === "/doctor" || url.pathname === "/fill" || url.pathname === "/buycheck" || url.pathname === "/lookup" || url.pathname === "/suggest" || url.pathname === "/tripadvice") {
       try {
+        if (url.pathname === "/tripadvice") return await handleTripAdvice(request, env, cors);
         if (url.pathname === "/doctor") return await handleDoctor(request, env, cors);
         if (url.pathname === "/fill") return await handleFill(request, env, cors);
         if (url.pathname === "/lookup") return await handleLookup(request, env, cors);
@@ -785,6 +787,63 @@ async function handleImage(request, url, corsHeaders) {
 }
 
 /* ------------------------------------------------------------------ /suggest */
+
+/* ------------------------------------------------------------------ /tripadvice */
+
+const TRIP_RULES = `You are FloraLens, an experienced, friendly UK gardener on a garden-centre trip with a home gardener.
+She has set a budget, and everything on her list is something she is tempted to buy, with its price and, where available, an AI health check of the actual plant in front of her ("Should I buy it?").
+Her list has gone over budget. Help her decide what to put back so the total comes within budget.
+You may also be told what already grows in her garden, its areas, the month and the local weather.
+
+How to choose:
+- The plants in "buy" must add up to no more than her budget (count only priced plants). Leave out as little as possible: use the budget well, don't cut more than needed.
+- Leave out unhealthy plants first: anything rated "avoid", then "caution".
+- Then use her garden: duplicates of what she already has, plants that don't suit her spaces, or that are the wrong time of year to plant or tender just before frost.
+- Then value: one expensive plant may be worth swapping for two cheaper ones she wants, or the reverse.
+- An unpriced plant can't be counted: mention it in skip with "check the price first" if it matters.
+- Only use the exact plant names given. Never invent prices.
+
+British English, warm and practical. headline under 12 words saying how to get within budget; summary 1–2 sentences; each reason one sentence under 20 words.`;
+
+const TRIP_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    summary:  { type: "string" },
+    buy:      { type: "array", items: { type: "object", properties: { name: { type: "string" }, reason: { type: "string" } }, required: ["name", "reason"] } },
+    skip:     { type: "array", items: { type: "object", properties: { name: { type: "string" }, reason: { type: "string" } }, required: ["name", "reason"] } },
+    total:    { type: "number", description: "Sum of the prices of the plants in buy, in pounds; 0 if none are priced" },
+    tip:      { type: "string", description: "One extra tip for the trip or for planting them; empty if nothing useful" },
+  },
+  required: ["headline", "summary", "buy", "skip", "total"],
+};
+
+async function handleTripAdvice(request, env, corsHeaders) {
+  if (request.method !== "POST") return doctorJson({ error: "Use POST" }, 405, corsHeaders);
+  if (!originAllowed(request)) return doctorJson({ error: "Origin not allowed" }, 403, corsHeaders);
+  if (!env.GEMINI_API_KEY) return doctorJson({ error: "GEMINI_API_KEY is not set on the Worker." }, 500, corsHeaders);
+  let body;
+  try { body = await request.json(); } catch { return doctorJson({ error: "Bad request" }, 400, corsHeaders); }
+  const clip = (v, n) => String(v ?? "").slice(0, n);
+  const items = (Array.isArray(body.items) ? body.items : []).slice(0, 25);
+  if (!items.length) return doctorJson({ error: "The trip list is empty." }, 400, corsHeaders);
+  const money = (v) => Number.isFinite(Number(v)) && v !== null && v !== "" ? `£${Number(v).toFixed(2)}` : "no price";
+  const lines = items.map((it, i) => `${i + 1}. ${clip(it.name, 80)} (${clip(it.scientific, 80)}) · ${money(it.price)}${it.buyRating ? ` · health check: ${clip(it.buyRating, 12)}${it.buyHeadline ? ` ("${clip(it.buyHeadline, 100)}")` : ""}` : ""}`);
+  const garden = Array.isArray(body.garden) ? body.garden.slice(0, 60).map(g => `${clip(g.name, 60)}${g.area ? ` (${clip(g.area, 40)})` : ""}`) : [];
+  const text = [
+    `Garden centre: ${clip(body.centre, 80) || "unnamed"}`,
+    `Budget: ${body.budget ? money(body.budget) : "none set"}`,
+    `Her list totals ${money(body.total)}${body.overBy ? `, which is ${money(body.overBy)} over budget` : ""}.`,
+    `Month: ${clip(body.month, 20)}`,
+    body.weather ? `Local weather: ${clip(body.weather, 300)}` : "",
+    `Her list today:\n${lines.join("\n")}`,
+    garden.length ? `Already in her garden:\n${garden.join("; ")}` : "Her garden: not shared",
+    Array.isArray(body.areas) && body.areas.length ? `Garden areas: ${body.areas.slice(0, 15).map(a => clip(a, 40)).join(", ")}` : "",
+  ].filter(Boolean).join("\n\n");
+  const out = await callGemini(env, { system: TRIP_RULES, schema: TRIP_SCHEMA, input: [{ type: "text", text }] });
+  if (out.error) return doctorJson({ error: out.error, retryAfter: out.retryAfter ?? null, usage: out.usage ?? null }, out.status, corsHeaders);
+  return doctorJson({ result: out.result, model: GEMINI_MODEL, usage: out.usage }, 200, corsHeaders);
+}
 
 const SUGGEST_RULES = `You are FloraLens, an experienced UK garden designer helping a home gardener choose plants for one particular spot in her garden.
 You are given the area's name and conditions, what she'd like, what already grows there and elsewhere in her garden, today's date, and sometimes a photo of the spot.

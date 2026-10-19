@@ -2599,7 +2599,7 @@ async function saveDiscovery(){
   const tripPrice=parsePrice(document.getElementById("tripPrice")?.value);
   const looked=state.discoveries.find(d=>d.speciesKey===speciesKey&&d.stockPhoto);
   if(looked){
-    if(state.activeTrip){ looked.tripId=state.activeTrip.id; looked.price=tripPrice; looked.picked=false; }
+    if(state.activeTrip){ looked.tripId=state.activeTrip.id; looked.price=tripPrice; tripListChanged(); }
     const buyFiles=captures.slice(0,3).map(c=>c.file);
     await replaceStockPhotos(speciesKey,captures[0].file);
     looked.score=Math.round((r.score||0)*100); looked.spotted=new Date().toISOString(); delete looked.buyCheck;
@@ -2620,8 +2620,9 @@ async function saveDiscovery(){
     spotted:new Date().toISOString(),
     wishlist:false,
     note:"",
-    ...(state.activeTrip?{tripId:state.activeTrip.id,price:tripPrice,picked:false}:{})
+    ...(state.activeTrip?{tripId:state.activeTrip.id,price:tripPrice}:{})
   });
+  tripListChanged();
   if(state.activeTrip&&!state.activeTrip.location) pinTripHereQuietly();
   saveState();
   const buyFiles=captures.slice(0,3).map(c=>c.file);
@@ -2766,7 +2767,7 @@ async function deleteDiscovery(id){
   closeModal();
   await deletePhoto(d.photoKey);
   toast("Discovery removed");
-  setRoute("saved");
+  setRoute(state.activeTrip&&d.tripId===state.activeTrip.id?"trip":"saved");
 }
 
 function confirmClearDiscoveries(){
@@ -3203,10 +3204,13 @@ async function renderProfile(id,isNew=false){
   const careCoverage=Math.round((careAvailable/7)*100);
   const botanicalRecordCoverage=botanicalCoverage(care);
   const confidence=p.score?`${Math.round(Number(p.score))}% match`:"Identified";
-  const placeLabel=isDiscovery?(p.wishlist?"Wishlist":"Discover"):(p.area||"My Garden");
+  // A plant scanned on the trip that's still running belongs to that trip: back goes to the trip list.
+  const onTrip=isDiscovery&&state.activeTrip&&p.tripId===state.activeTrip.id;
+  window._profileOnTrip=!!onTrip;
+  const placeLabel=onTrip?`${state.activeTrip.centre} trip`:isDiscovery?(p.wishlist?"Wishlist":"Discover"):(p.area||"My Garden");
   const bloomStatus=profileBloomStatus(bloom);
-  const backRoute=isDiscovery?"saved":"garden";
-  const backLabel=isDiscovery?"Saved discoveries":"My Garden";
+  const backRoute=onTrip?"trip":isDiscovery?"saved":"garden";
+  const backLabel=onTrip?`${state.activeTrip.centre} trip`:isDiscovery?"Saved discoveries":"My Garden";
   const plantToday=plantTodayModel(p,care,isDiscovery);
   const pruningAssistant=buildPruningAssistant(care,p,bloom);
 
@@ -3308,6 +3312,7 @@ async function renderProfile(id,isNew=false){
   hydrateDistributionMaps();
   requestAnimationFrame(()=>markClampedGlance());
   view.dataset.profileId=p.id; view.setAttribute("data-profile-id",p.id);
+  if(onTrip){ document.body.dataset.page="discover"; document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route==="discover")); }
   maybeFillGaps(p);
 }
 
@@ -3749,7 +3754,7 @@ function renderDiscoverHome(){
     tripCard=`<article class="disc-card live" onclick="if(!event.target.closest('.disc-card-link')) setRoute('trip')">
       <div class="disc-card-img" style="background-image:url('icons/disc-trip-live.jpg?v=1')"><span class="disc-live-pill">● Trip in progress</span></div>
       <div class="disc-card-body"><div class="disc-card-copy"><h2>${esc(t.centre)}</h2>
-        <p>${ti.length} plant${ti.length===1?"":"s"} · ${money(pickedTotal)} shortlisted${t.budget?` of ${money(t.budget)}`:""}</p>
+        <p>${ti.length} plant${ti.length===1?"":"s"} · ${money(pickedTotal)}${t.budget?` of ${money(t.budget)}`:""}${t.budget&&pickedTotal>t.budget?" · over budget":""}</p>
         ${budgetBar(pickedTotal,t.budget)}</div>
         <button class="disc-card-btn" onclick="event.stopPropagation();setRoute('trip')">Continue →</button></div>
     </article>`;
@@ -3826,11 +3831,13 @@ function parsePrice(v){
 }
 function money(n){ return n==null?"no price":`£${Number(n).toFixed(2).replace(/\.00$/,"")}`; }
 function tripItems(){ const t=state.activeTrip; return t?state.discoveries.filter(d=>d.tripId===t.id):[]; }
+// Everything on the trip list is something she's tempted by, so it all counts towards the total.
 function tripTotals(){
-  const items=tripItems(), picked=items.filter(d=>d.picked);
-  const pickedTotal=picked.reduce((a,d)=>a+(d.price||0),0);
-  return {items,picked,pickedTotal,allTotal:items.reduce((a,d)=>a+(d.price||0),0),unpriced:picked.filter(d=>d.price==null).length};
+  const items=tripItems(), total=items.reduce((a,d)=>a+(d.price||0),0);
+  return {items,total,pickedTotal:total,unpriced:items.filter(d=>d.price==null).length};
 }
+// Any change to the list makes an earlier suggestion out of date.
+function tripListChanged(){ if(state.activeTrip?.advice){ state.activeTrip.advice=null; } }
 function budgetBar(spent,budget){
   if(!budget) return "";
   const pct=Math.min(100,Math.round(spent/budget*100)), cls=spent>budget?"over":pct>=85?"near":"";
@@ -3841,7 +3848,7 @@ function tripStrip(){
   if(!t) return `<button class="trip-start" onclick="openTripStart()"><span>🛒</span><div><b>Off to a garden centre?</b><small>Start a trip: set a budget and price what you find</small></div><i>›</i></button>`;
   const {items,pickedTotal}=tripTotals();
   return `<button class="trip-strip" onclick="setRoute('trip')">
-    <div class="trip-strip-top"><span>🛒</span><div><b>${esc(t.centre)}</b><small>${items.length} plant${items.length===1?"":"s"} · ${money(pickedTotal)} shortlisted${t.budget?` of ${money(t.budget)}`:""}</small></div><i>Open ›</i></div>
+    <div class="trip-strip-top"><span>🛒</span><div><b>${esc(t.centre)}</b><small>${items.length} plant${items.length===1?"":"s"} · ${money(pickedTotal)}${t.budget?` of ${money(t.budget)}`:""}</small></div><i>Open ›</i></div>
     ${budgetBar(pickedTotal,t.budget)}
   </button>`;
 }
@@ -4095,28 +4102,32 @@ function renderTrip(){
   if(!t) return setRoute("discover");
   currentRoute="trip"; document.body.dataset.page="discover";
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.route==="discover"));
-  const {items,picked,pickedTotal,unpriced}=tripTotals();
+  const {items,total:pickedTotal,unpriced}=tripTotals();
   const left=t.budget!=null?t.budget-pickedTotal:null;
+  const over=left!=null&&left<0;
   view.innerHTML=`<section class="page-head profile-back"><button class="link-btn" onclick="setRoute('discover')">← Discover</button></section>
     <section class="page-head"><div class="eyebrow">Garden centre trip · ${new Date(t.startedAt).toLocaleDateString("en-GB",{day:"numeric",month:"short"})}</div><h1>${esc(t.centre)}</h1></section>
     ${t.location?`<div class="trip-map-card"><div class="trip-map" id="tripMap"></div>${tripLocationLine(t.location,t.centre)}</div>`:`<button class="trip-pin-btn" onclick="repinTripHere()">📍 Pin this trip to where you are</button>`}
     <div class="trip-summary">
-      <div class="trip-sum-row"><div><small>Shortlisted</small><b>${money(pickedTotal)}</b></div>${t.budget!=null?`<div><small>Budget</small><b>${money(t.budget)}</b></div><div class="${left<0?"over":""}"><small>${left<0?"Over by":"Left"}</small><b>${money(Math.abs(left))}</b></div>`:`<div><button class="mini-action" onclick="editTripBudget()">＋ Set budget</button></div>`}</div>
+      <div class="trip-sum-row"><div><small>On your list</small><b>${money(pickedTotal)}</b></div>${t.budget!=null?`<div><small>Budget</small><b>${money(t.budget)}</b></div><div class="${over?"over":""}"><small>${over?"Over by":"Left"}</small><b>${money(Math.abs(left))}</b></div>`:`<div><button class="mini-action" onclick="editTripBudget()">＋ Set budget</button></div>`}</div>
       ${budgetBar(pickedTotal,t.budget)}
-      ${unpriced?`<p class="trip-note">${unpriced} shortlisted plant${unpriced===1?" has":"s have"} no price yet.</p>`:""}
+      ${unpriced?`<p class="trip-note">${unpriced} plant${unpriced===1?" has":"s have"} no price yet, so ${unpriced===1?"it isn't":"they aren't"} counted.</p>`:""}
     </div>
-    ${items.length?`<p class="trip-hint">Tick the ones you're tempted by. Tap a price to change it.</p>
+    ${items.length?`<p class="trip-hint">Tap a price to change it. Changed your mind? Tap × to take it off the list.</p>
     <div class="trip-list">${items.map(d=>{
       const r=d.buyCheck&&BUY_RATING[d.buyCheck.rating];
-      return `<div class="trip-item ${d.picked?"picked":""}">
-        <button class="trip-tick" aria-label="${d.picked?"Remove from":"Add to"} shortlist" onclick="toggleTripPick('${d.id}')">${d.picked?"✓":""}</button>
+      return `<div class="trip-item">
         <span class="trip-thumb plant-art" data-photo-key="${esc(d.photoKey||"")}" data-photo-url="${esc(d.photoUrl||"")}" onclick="setRoute('profile',{id:'${d.id}'})"></span>
         <div class="trip-item-copy" onclick="setRoute('profile',{id:'${d.id}'})"><b>${esc(d.common)}</b>${r?`<span class="buy-badge mini ${r.cls}">${r.icon} ${r.label}</span>`:buyCheckInFlight.has(d.id)?`<span class="buy-badge mini checking"><i></i>Checking…</span>`:""}</div>
         <button class="trip-price ${d.price==null?"empty":""}" onclick="editTripPrice('${d.id}')">${d.price==null?"＋ £":money(d.price)}</button>
+        <button class="trip-remove" aria-label="Take ${esc(d.common)} off the list" onclick="removeFromTrip('${d.id}')">×</button>
       </div>`;}).join("")}</div>`
     :`<div class="empty-card" style="text-align:center"><div style="font-size:40px">🛒</div><p class="sub">Nothing scanned yet. Tap the pink camera below to scan a plant. It'll ask for the price on the tag.</p></div>`}
-    ${items.length?`<button class="btn primary trip-ask" onclick="askTripAdvice()">✦ Ask Gemini what to buy</button>`:""}
-    <div id="tripAdvice">${t.advice?renderTripAdvice(t.advice):""}</div>
+    ${!items.length?"":over
+      ?`<div class="trip-over"><b>${money(-left)} over budget</b><p>Not sure what to put back? FloraLens can weigh up your list and suggest what to leave so you stay within ${money(t.budget)}.</p><button class="btn primary trip-ask" onclick="askTripAdvice()">✦ Help me decide</button></div>`
+      :t.budget!=null?`<div class="trip-ok"><span>✓</span><p><b>You're within budget</b>${left>0?` with ${money(left)} to spare`:""}. ${items.length===1?"It's":"They're"} all yours.</p></div>`
+      :`<div class="trip-ok neutral"><span>£</span><p><b>No budget set</b>. <button class="link-btn" onclick="editTripBudget()">Set one</button> and FloraLens will help if the list goes over.</p></div>`}
+    <div id="tripAdvice">${t.advice&&over?renderTripAdvice(t.advice):""}</div>
     <div class="trip-actions">
       <button class="btn secondary" onclick="openFinishTrip()">✓ Finish trip</button>
       <button class="link-btn" onclick="confirmDiscardTrip()">Cancel trip</button>
@@ -4125,7 +4136,12 @@ function renderTrip(){
   hydratePhotos();
   if(t.location) drawTripMap(document.getElementById("tripMap"),[{lat:t.location.lat,lon:t.location.lon,label:t.centre}]);
 }
-function toggleTripPick(id){ const d=state.discoveries.find(x=>x.id===id); if(!d) return; d.picked=!d.picked; saveState(); renderTrip(); }
+// Off the trip list, but still kept in Saved discoveries as a spotted plant.
+function removeFromTrip(id){
+  const d=state.discoveries.find(x=>x.id===id); if(!d) return;
+  delete d.tripId; delete d.picked; tripListChanged(); saveState();
+  toast(`${d.common} taken off · kept in Saved`); renderTrip();
+}
 function editTripPrice(id){
   const d=state.discoveries.find(x=>x.id===id); if(!d) return;
   modal(`<div class="eyebrow">Price</div><h2>${esc(d.common)}</h2>
@@ -4135,38 +4151,42 @@ function editTripPrice(id){
 }
 function saveTripPrice(id){
   const d=state.discoveries.find(x=>x.id===id); if(!d) return;
-  d.price=parsePrice(document.getElementById("editPrice")?.value); saveState(); closeModal(); renderTrip();
+  d.price=parsePrice(document.getElementById("editPrice")?.value); tripListChanged(); saveState(); closeModal(); renderTrip();
 }
 function editTripBudget(){
   const t=state.activeTrip; if(!t) return;
   modal(`<div class="eyebrow">Budget</div><h2>${esc(t.centre)}</h2><div class="trip-money-input"><b>£</b><input id="editBudget" inputmode="decimal" value="${t.budget??""}" placeholder="40"></div>
-    <button class="btn primary" style="width:100%;margin-top:14px" onclick="state.activeTrip.budget=parsePrice(document.getElementById('editBudget').value);saveState();closeModal();renderTrip()">Save budget</button>`);
+    <button class="btn primary" style="width:100%;margin-top:14px" onclick="state.activeTrip.budget=parsePrice(document.getElementById('editBudget').value);tripListChanged();saveState();closeModal();renderTrip()">Save budget</button>`);
 }
 async function askTripAdvice(){
   const t=state.activeTrip; if(!t) return;
   if(!API_PROXY_URL){ toast("Trip advice needs the FloraLens Worker"); return; }
   const box=document.getElementById("tripAdvice");
-  if(box) box.innerHTML=`<div class="trip-advice loading"><div class="flower-loader">✦</div><p>Gemini is weighing up your list…</p></div>`;
-  const items=tripItems().map(d=>({name:d.common,scientific:d.scientific,price:d.price,picked:!!d.picked,buyRating:d.buyCheck?.rating||"",buyHeadline:d.buyCheck?.headline||""}));
-  const body={centre:t.centre,budget:t.budget,month:new Date().toLocaleDateString("en-GB",{month:"long"}),items,
+  if(box) box.innerHTML=`<div class="trip-advice loading"><div class="flower-loader">✦</div><p>Weighing up your list, your budget and your garden…</p></div>`;
+  const items=tripItems().map(d=>({name:d.common,scientific:d.scientific,price:d.price,buyRating:d.buyCheck?.rating||"",buyHeadline:d.buyCheck?.headline||""}));
+  const {total}=tripTotals();
+  const body={centre:t.centre,budget:t.budget,total,overBy:t.budget!=null?Math.max(0,Math.round((total-t.budget)*100)/100):0,month:new Date().toLocaleDateString("en-GB",{month:"long"}),items,
     garden:state.plants.map(p=>({name:p.common,area:p.area})),areas:state.areas.filter(a=>a!=="Unplaced"),
     weather:typeof weatherContextLine==="function"?weatherContextLine():""};
   try{
     const res=await fetch(`${API_PROXY_URL.replace(/\/$/,"")}/tripadvice`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     const data=await res.json().catch(()=>null);
-    if(!data) throw new Error(res.status===404?"The Worker doesn't have trip advice yet. Upload the new worker.js.":`Trip advice failed (${res.status}).`);
-    if(!res.ok||data.error) throw new Error(data.error||`Trip advice failed (${res.status}).`);
+    if(res.status===404) throw new Error("The FloraLens Worker doesn't have this feature yet. Upload the latest worker.js to GitHub so Cloudflare can deploy it.");
+    if(!data) throw new Error(`Couldn't get a suggestion (${res.status}).`);
+    if(!res.ok||data.error) throw new Error(data.error||`Couldn't get a suggestion (${res.status}).`);
     t.advice={...data.result,askedAt:new Date().toISOString()}; saveState();
     if(currentRoute==="trip") renderTrip();
     document.getElementById("tripAdvice")?.scrollIntoView({behavior:"smooth",block:"start"});
   }catch(err){
-    if(box) box.innerHTML=`<div class="trip-advice"><b>Couldn't get advice</b><p>${esc(friendlyNetError(err,"Trip advice"))}</p></div>`;
+    if(box) box.innerHTML=`<div class="trip-advice"><b>Couldn't help decide just now</b><p>${esc(friendlyNetError(err,"Trip advice"))}</p></div>`;
   }
 }
 function renderTripAdvice(a){
-  const row=(x,cls,icon)=>`<div class="ta-row ${cls}"><span>${icon}</span><p><b>${esc(x.name)}</b> ${esc(x.reason)}</p></div>`;
+  const onList=name=>tripItems().find(d=>d.common.toLowerCase()===String(name||"").toLowerCase());
+  const row=(x,cls,icon)=>{ const d=cls==="skip"&&onList(x.name);
+    return `<div class="ta-row ${cls}"><span>${icon}</span><p><b>${esc(x.name)}</b> ${esc(x.reason)}</p>${d?`<button class="ta-take" onclick="removeFromTrip('${d.id}')">Take off</button>`:""}</div>`; };
   return `<section class="trip-advice">
-    <div class="eyebrow">✦ Gemini's advice</div><h2>${esc(a.headline||"")}</h2>${a.summary?`<p class="ta-sum">${esc(a.summary)}</p>`:""}
+    <div class="eyebrow">✦ Help me decide</div><h2>${esc(a.headline||"")}</h2>${a.summary?`<p class="ta-sum">${esc(a.summary)}</p>`:""}
     ${(a.buy||[]).length?`<div class="ta-sub">Buy${a.total?` · ${money(a.total)}`:""}</div>${a.buy.map(x=>row(x,"buy","✓")).join("")}`:""}
     ${(a.skip||[]).length?`<div class="ta-sub">Leave</div>${a.skip.map(x=>row(x,"skip","×")).join("")}`:""}
     ${a.tip?`<div class="ta-tip">💡 ${esc(a.tip)}</div>`:""}
@@ -4177,7 +4197,7 @@ function openFinishTrip(){
   const items=tripItems();
   if(!items.length){ confirmDiscardTrip(); return; }
   modal(`<div class="eyebrow">Finish trip</div><h2>What did you buy?</h2>
-    <div class="trip-finish-list">${items.map(d=>`<label class="trip-finish-item"><input type="checkbox" value="${d.id}" ${d.picked?"checked":""} onchange="updateFinishTotal()"><span>${esc(d.common)}</span><b>${money(d.price)}</b></label>`).join("")}</div>
+    <div class="trip-finish-list">${items.map(d=>`<label class="trip-finish-item"><input type="checkbox" value="${d.id}" checked onchange="updateFinishTotal()"><span>${esc(d.common)}</span><b>${money(d.price)}</b></label>`).join("")}</div>
     <div class="trip-finish-total" id="finishTotal"></div>
     <label class="trip-label">Add what you bought to My Garden</label>
     <div class="area-grid">${state.areas.map(a=>`<button class="area-choice ${a==="Unplaced"?"active":""}" onclick="selectArea(decodeURIComponent('${jsArg(a)}'),this)">${esc(a)}</button>`).join("")}</div>
@@ -4255,7 +4275,7 @@ function openPastTrip(id){
     <div class="trip-sum-row past"><div><small>Spent</small><b>${money(t.spent)}</b></div>${t.budget?`<div><small>Budget</small><b>${money(t.budget)}</b></div>`:""}<div><small>Bought</small><b>${bought.length}</b></div></div>
     ${bought.length?`<div class="ta-sub">Bought</div>${bought.map(item).join("")}`:""}
     ${rest.length?`<div class="ta-sub">Looked at</div>${rest.map(item).join("")}`:""}
-    ${t.advice?.headline?`<div class="ta-sub">Gemini said</div><p class="sub" style="margin:0">${esc(t.advice.headline)}${t.advice.summary?` ${esc(t.advice.summary)}`:""}</p>`:""}
+    ${t.advice?.headline?`<div class="ta-sub">The suggestion</div><p class="sub" style="margin:0">${esc(t.advice.headline)}${t.advice.summary?` ${esc(t.advice.summary)}`:""}</p>`:""}
     <div class="actions" style="margin-top:16px"><button class="btn secondary" onclick="openTripHistory()">← All trips</button><button class="btn danger" onclick="deletePastTrip('${t.id}')">Delete</button></div>`);
   if(t.location) drawTripMap(document.getElementById("pastTripMap"),[{lat:t.location.lat,lon:t.location.lon,label:t.centre}]);
 }
@@ -4567,7 +4587,7 @@ document.addEventListener("click",e=>{
   if(route==="lens" && routeTarget.classList.contains("lens-nav")){
     e.preventDefault();
     // On Discover the big camera is the garden-centre scan: identify + "Should I buy it?"
-    if(currentRoute==="discover"||currentRoute==="trip"||currentRoute==="saved"||(currentRoute==="capture"&&captureIntent==="discover")){ startCamera("discover"); return; }
+    if(currentRoute==="discover"||currentRoute==="trip"||currentRoute==="saved"||(currentRoute==="capture"&&captureIntent==="discover")||(currentRoute==="profile"&&window._profileOnTrip)){ startCamera("discover"); return; }
     setRoute("lens");
     return;
   }
@@ -4714,7 +4734,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.11 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button><div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.12 · made for our garden</div>`);
 });
 
 renderHome();
