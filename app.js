@@ -2132,32 +2132,44 @@ function homeHeroLeaves(){
     <circle cx="160" cy="168" r="5" fill="#FFC95C"/>
   </svg></div>`;
 }
+function homeWeatherBlock(){
+  if(!state.weatherLocation){
+    return `<button class="hc-wx hc-wx-setup" onclick="openWeatherSetup()"><span class="hc-setup-ico">${wxIcon(2)}</span><span class="hc-meta"><small>Garden weather</small><strong>Add your local weather</strong><em>Frost, wind and rain warnings for your plants.</em></span><span class="hc-chev">›</span></button>`;
+  }
+  const {today}=wxSplit(); const cur=state.weather?.current;
+  if(!today||cur?.temp==null){
+    return `<button class="hc-wx" onclick="openWeatherSheet()"><span class="hc-now">${wxIcon(3,"wx-big")}<b>–°</b></span><span class="hc-meta"><small>${esc(state.weatherLocation.name)}</small><strong>Fetching the forecast…</strong></span></button>`;
+  }
+  const alerts=weatherAlerts(); const top=alerts[0];
+  return `<button class="hc-wx" onclick="openWeatherSheet()">
+    <span class="hc-row"><span class="hc-now">${wxIcon(cur.code,"wx-big")}<b>${Math.round(cur.temp)}°</b></span>
+      <span class="hc-meta"><small>${esc(state.weatherLocation.name)}</small><strong>${esc(wxLabel(today.code))}</strong><em>High ${Math.round(today.max)}° · Low ${Math.round(today.min)}°${today.chance!=null?` · Rain ${today.chance}%`:""}</em></span><span class="hc-chev">›</span></span>
+    ${top?`<span class="hc-alert hc-alert-${top.level}"><i>${top.icon}</i><span><b>${esc(top.title)}</b><small>${esc(top.detail)}</small></span></span>`:""}
+    ${alerts.length>1?`<span class="hc-more">+${alerts.length-1} more weather note${alerts.length>2?"s":""}</span>`:""}
+  </button>`;
+}
 function renderHome(){
-  const flowering=plantsFloweringNow().length;
   const recent=[...state.plants].slice(0,10);
   view.innerHTML=`
-    <section class="home-hero">
-      ${homeHeroLeaves()}
-      <p class="home-greeting">${homeGreeting()} · ${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</p>
-      <h1>What's growing today?</h1>
-      <button class="home-scan" onclick="startCamera()"><span class="home-scan-icon">⌾</span><span><b>Identify a plant</b><small>Snap a flower, leaf or bark</small></span><span class="go">→</span></button>
-      <div class="home-stats"><div><b>${state.plants.length}</b><small>in your garden</small></div><div><b>${flowering}</b><small>flowering now</small></div><div><b>${state.discoveries.length}</b><small>discoveries</small></div></div>
-    </section>
-    <div class="quick-grid">
-      <button class="quick-tile t-identify" onclick="startCamera()"><span>⌾</span><small>Identify</small></button>
-      <button class="quick-tile t-doctor" onclick="openPlantDoctor()"><span>✚</span><small>Plant Doctor</small></button>
-      <button class="quick-tile t-care" onclick="setRoute('care')"><span>💧</span><small>Care</small></button>
-      <button class="quick-tile t-journal" onclick="openJournalComposer()"><span>✎</span><small>Add moment</small></button>
-    </div>
-    <div class="section-title"><h3>My plants</h3><button class="link-btn" onclick="setRoute('gardenAll')">See all</button></div>
-    <div class="plant-rail">
-      ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
-      <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
-    </div>
-    <div class="section-title"><h3>Today in the garden</h3></div>
-    ${weatherHomeCard()}
-    ${careHomeCard()}
-    ${seasonalHomeCard()}`;
+    <article class="home-cover">
+      <div class="home-cover-img" style="background-image:url('icons/home-cover.jpg?v=1')">
+        <div class="home-cover-greet"><small>${homeGreeting()} · ${new Date().toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</small><h1>What's growing today?</h1></div>
+      </div>
+      <div class="home-cover-body">${homeWeatherBlock()}</div>
+    </article>
+    <article class="home-card">
+      <h3 class="home-card-h">Today in the garden</h3>
+      <div class="home-rows">${careHomeCard()}${seasonalHomeCard()}</div>
+      <div class="home-tools">
+        <button class="home-tool t-doc" onclick="openPlantDoctor()"><span>✚</span><div>Plant Doctor</div></button>
+        <button class="home-tool t-mom" onclick="openJournalComposer()"><span>✎</span><div>Add moment</div></button>
+      </div>
+      <div class="home-card-sec"><h3 class="home-card-h">My plants</h3>${recent.length?`<button class="link-btn" onclick="setRoute('gardenAll')">See all</button>`:""}</div>
+      <div class="plant-rail home-rail">
+        ${recent.map(p=>`<button class="rail-card" onclick="setRoute('profile',{id:'${p.id}'})"><span class="plant-art ${p.art||""}" data-photo-key="${esc(p.photoKey||"")}" data-photo-url="${esc(p.photoUrl||"")}"></span><span class="rail-copy"><b>${esc(p.common)}</b><small>${esc(p.area||"Unplaced")}</small></span></button>`).join("")}
+        <button class="rail-card rail-add" onclick="startCamera()"><span>＋</span>Add a plant</button>
+      </div>
+    </article>`;
   hydratePhotos();
 }
 
@@ -4823,7 +4835,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button>${windUnitRow()}<div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.14.1 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button>${windUnitRow()}<div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.15 · made for our garden</div>`);
 });
 
 renderHome();

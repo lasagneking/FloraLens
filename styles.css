@@ -1529,3 +1529,42 @@ body[data-page="discover"] .disc-search{height:56px}
 .unit-seg{display:flex;background:#fff;border-radius:12px;padding:3px;box-shadow:var(--sh-1);flex:none}
 .unit-seg button{border:0;background:none;font:inherit;font-size:14px;font-weight:800;color:var(--muted);padding:8px 13px;border-radius:9px}
 .unit-seg button.on{background:var(--leaf-2,#2E8B57);color:#fff}
+
+/* 3.15 Home: cover + one card */
+.home-cover{border-radius:30px;overflow:hidden;background:#FFFBF5;box-shadow:0 2px 4px rgba(60,50,30,.06),0 16px 38px rgba(60,50,30,.16);margin:8px 0 16px}
+.home-cover-img{aspect-ratio:3/2;background-size:cover;background-position:center 40%;position:relative}
+.home-cover-img::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(20,30,15,.42))}
+.home-cover-greet{position:absolute;left:20px;right:16px;bottom:42px;z-index:1;color:#fff;text-shadow:0 1px 10px rgba(0,0,0,.4)}
+.home-cover-greet small{display:block;font-size:13px;font-weight:700}
+.home-cover-greet h1{margin:2px 0 0;font-size:33px;line-height:1.05;color:#fff}
+.home-cover-body{position:relative;margin-top:-28px;padding:16px 18px 16px;background:#FFFBF5;border-top-left-radius:55% 28px;border-top-right-radius:45% 20px}
+.hc-wx{display:block;width:100%;border:0;background:none;padding:0;text-align:left;font:inherit;color:var(--ink)}
+.hc-row,.hc-wx-setup{display:flex;align-items:center;gap:14px}
+.hc-now{display:flex;align-items:center;gap:8px;flex:none}
+.hc-now b{font-family:var(--display);font-size:40px;font-weight:600;line-height:1}
+.hc-meta{flex:1;min-width:0}.hc-meta small{display:block;font-size:12.5px;color:var(--muted);font-weight:700}
+.hc-meta strong{display:block;font-size:18px}.hc-meta em{display:block;font-style:normal;font-size:13px;color:var(--muted)}
+.hc-chev{font-size:24px;color:var(--muted);flex:none}
+.hc-setup-ico{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:#EAF3FF;flex:none}
+.hc-alert{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:11px 12px;border-radius:16px;background:#FFF1DE;line-height:1.35}
+.hc-alert-high{background:#E4F1FB}.hc-alert-good{background:#E8F4FB}
+.hc-alert i{font-style:normal;width:30px;height:30px;flex:none;border-radius:10px;background:#fff;display:grid;place-items:center;color:#C26510}
+.hc-alert-high i{color:var(--frost)}.hc-alert-good i{color:var(--water)}
+.hc-alert b{display:block;font-size:14.5px}.hc-alert small{display:block;font-size:13.5px;color:var(--ink-2)}
+.hc-more{display:block;margin-top:9px;font-size:13px;font-weight:800;color:#3B78D8}
+.home-card{border-radius:30px;background:#FFFBF5;box-shadow:0 2px 4px rgba(60,50,30,.06),0 16px 38px rgba(60,50,30,.16);padding:20px 18px 12px;margin:0 0 18px;overflow:hidden}
+.home-card-h{font-size:21px;margin:0}
+.home-rows{margin-top:4px}
+.home-rows .care-home-card,.home-rows .season-home-card{background:none;box-shadow:none;border-radius:0;margin:0;padding:14px 0;border-bottom:1px solid rgba(80,60,30,.10);width:100%}
+.home-tools{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:16px 0 22px}
+.home-tool{display:flex;align-items:center;justify-content:center;gap:9px;border:0;border-radius:18px;padding:11px 10px;background:#F5EEE3;font:inherit;font-weight:800;font-size:14.5px;color:var(--ink);text-align:left;min-width:0;white-space:nowrap}
+.home-tool>div{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.home-tool span{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;font-size:17px;background:#fff;flex:none}
+.home-tool.t-doc span{color:#D9475B}.home-tool.t-mom span{color:#6A52E0}
+.home-tool small{display:block;font-weight:600;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.home-tool:active{transform:scale(.98)}
+.home-card-sec{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.home-card .home-rail{margin:0 -18px;padding:2px 18px 10px;scroll-padding-left:18px}
+.home-tool{gap:8px;padding:10px 8px;font-size:14px}
+.home-tool span{width:30px;height:30px;border-radius:10px;font-size:15px}
+.home-tool>div{overflow:visible}
