@@ -1568,3 +1568,73 @@ body[data-page="discover"] .disc-search{height:56px}
 .home-tool{gap:8px;padding:10px 8px;font-size:14px}
 .home-tool span{width:30px;height:30px;border-radius:10px;font-size:15px}
 .home-tool>div{overflow:visible}
+
+/* ===================== 3.16 Seasonal glass =====================
+   Cards become tinted frosted glass that picks up the season's colour.
+   Tokens per season; html.no-glass switches it all off. */
+html[data-season="autumn"]{--g1:rgba(122,10,22,.84);--g2:rgba(184,36,40,.72);--g-btn:rgba(206,44,50,.92);--g-edge:rgba(255,196,190,.55);--g-glow:rgba(255,110,100,.30);--g-shadow:rgba(70,10,10,.22)}
+html[data-season="spring"]{--g1:rgba(36,100,46,.80);--g2:rgba(104,164,76,.66);--g-btn:rgba(80,156,72,.92);--g-edge:rgba(220,255,210,.60);--g-glow:rgba(170,240,150,.28);--g-shadow:rgba(20,60,20,.20)}
+html[data-season="summer"]{--g1:rgba(184,80,6,.82);--g2:rgba(232,146,30,.70);--g-btn:rgba(232,120,22,.94);--g-edge:rgba(255,232,180,.62);--g-glow:rgba(255,200,110,.32);--g-shadow:rgba(90,40,0,.20)}
+html[data-season="winter"]{--g1:rgba(24,70,160,.80);--g2:rgba(84,144,226,.66);--g-btn:rgba(60,124,226,.92);--g-edge:rgba(214,232,255,.62);--g-glow:rgba(170,210,255,.30);--g-shadow:rgba(10,30,80,.22)}
+
+html:not(.no-glass) :is(.home-cover-body,.home-card,.disc-card-body,.journal-cover-body,.garden-row,.space-plan,.pin,.rail-add,
+  .care-add,.care-season-card,.care-task,.care-suggestion,.plant-today-card,.pruning-assistant,.profile-summary-card,.profile-card,.empty-card,.note-card,
+  .trip-summary,.trip-item,.trip-ok,.jm-card,.planner-banner,.plant-about,.discover-clear,.bottom-nav,
+  .botany-identity,.record-meter,.profile-empty,.source-dossier,.history-lead,.profile-location-card,.buy-card,.care-glance,.care-tile,.good-know,.trip-over,.trip-advice){
+  background:linear-gradient(150deg,var(--g1),var(--g2))!important;
+  -webkit-backdrop-filter:blur(22px) saturate(165%);backdrop-filter:blur(22px) saturate(165%);
+  border:1px solid var(--g-edge);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.38),inset 0 0 24px var(--g-glow),0 12px 30px var(--g-shadow)!important;
+  color:#fff;
+  --ink:#fff;--ink-2:rgba(255,255,255,.93);--muted:rgba(255,255,255,.80);--faint:rgba(255,255,255,.66);
+  --line:rgba(255,255,255,.20);--line-2:rgba(255,255,255,.28);
+}
+/* picture cards: the frame goes see-through so only the glass body shows */
+html:not(.no-glass) :is(.home-cover,.journal-cover,.disc-card){background:transparent!important}
+html:not(.no-glass) .home-cover-body,html:not(.no-glass) .journal-cover-body,html:not(.no-glass) .disc-card-body{border-bottom-left-radius:inherit;border-bottom-right-radius:inherit}
+html:not(.no-glass) :is(.home-cover,.journal-cover,.disc-card){box-shadow:0 14px 34px var(--g-shadow)!important}
+/* glass that sits on a glass card stays clear, not double-tinted */
+html:not(.no-glass) .home-card .rail-add{background:rgba(255,255,255,.14)!important;-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none!important}
+html:not(.no-glass) .pin-body,html:not(.no-glass) .jm-card *{color:inherit}
+
+/* text inside glass */
+html:not(.no-glass) :is(.home-cover-body,.home-card,.disc-card-body,.journal-cover-body,.garden-row,.pin,.care-task,.care-suggestion,.care-season-card,.plant-today-card,.pruning-assistant,.profile-summary-card,.profile-card,.empty-card,.trip-summary,.trip-item,.trip-ok,.jm-card,.plant-about,.discover-clear) :is(.eyebrow,.link-btn,small,em,p,h1,h2,h3,b,strong,i){color:inherit}
+html:not(.no-glass) :is(.home-card,.care-task,.care-suggestion,.profile-card,.plant-today-card,.trip-summary,.jm-card,.disc-card-body,.pin,.pruning-assistant) :is(.eyebrow,small,em,p){color:rgba(255,255,255,.82)}
+html:not(.no-glass) :is(.home-card,.home-cover-body,.profile-card,.trip-summary,.trip-ok,.pruning-assistant) .link-btn{color:#fff;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(255,255,255,.5)}
+html:not(.no-glass) .hc-more{color:#fff;opacity:.9}
+html:not(.no-glass) .home-rows .care-home-card,html:not(.no-glass) .home-rows .season-home-card{border-bottom-color:rgba(255,255,255,.2)!important}
+
+/* inner panels and icon tiles: clear white glass */
+html:not(.no-glass) :is(.hc-alert,.home-tool,.plant-today-item,.pruning-verdict,.jm-type,.care-home-icon,.season-mark,.garden-row>span,.space-plan>span,.hc-setup-ico,
+  .home-tool span,.plant-today-item>span,.care-suggest-icon,.care-check,.chip,.trip-ok>span,.disc-live-pill){
+  background:rgba(255,255,255,.17)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)!important;border-color:rgba(255,255,255,.35)!important}
+html:not(.no-glass) .hc-alert i{background:rgba(255,255,255,.22);color:#fff}
+html:not(.no-glass) .care-season-card>span{color:#fff}
+
+/* buttons on glass: deeper seasonal pills with a bright rim */
+html:not(.no-glass) :is(.mini-action,.journal-cover-btn,.disc-card-btn,.space-add,.trip-summary .btn,.trip-ok .btn){
+  background:var(--g-btn)!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px var(--g-shadow)!important}
+html:not(.no-glass) .space-add{-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+
+/* tab bar */
+html:not(.no-glass) .bottom-nav .nav-item{color:rgba(255,255,255,.78)}
+html:not(.no-glass) .bottom-nav .nav-item.active{color:#fff}
+html:not(.no-glass) .bottom-nav .nav-item.active span{background:rgba(255,255,255,.22)}
+
+html:not(.no-glass) .care-task :is(.care-task-top span,.care-task-top small,.care-plant-link,.care-more){color:rgba(255,255,255,.88)!important}
+html:not(.no-glass) .care-task.overdue{box-shadow:inset 4px 0 0 #FFD27A,inset 0 1px 0 rgba(255,255,255,.38),0 12px 30px var(--g-shadow)!important}
+html:not(.no-glass) .trip-item.picked{box-shadow:0 0 0 2px #fff,0 12px 30px var(--g-shadow)!important}
+html:not(.no-glass) .plant-today-status,html:not(.no-glass) .pruning-assistant .eyebrow,html:not(.no-glass) .pruning-assistant .pruning-verdict{color:#fff!important}
+html:not(.no-glass) :is(.plant-today-mark,.pruning-assistant-head>span){background:rgba(255,255,255,.17)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)!important}
+
+html:not(.no-glass) :is(.glance-tile,.dossier-fact){background:rgba(255,255,255,.15)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)!important;border-color:rgba(255,255,255,.3)!important;--ink:#fff;--ink-2:rgba(255,255,255,.93);--muted:rgba(255,255,255,.8);color:#fff}
+html:not(.no-glass) :is(.botany-identity,.record-meter,.profile-empty,.source-dossier,.history-lead,.profile-location-card,.buy-card,.care-glance,.care-tile,.good-know,.trip-over) :is(.eyebrow,small,em,p,h2,h3,b,strong,.link-btn){color:inherit}
+html:not(.no-glass) :is(.botany-identity,.record-meter,.profile-empty,.source-dossier,.history-lead,.profile-location-card,.buy-card,.care-glance,.care-tile,.good-know,.trip-over) :is(.eyebrow,small,p){color:rgba(255,255,255,.82)}
+html:not(.no-glass) :is(.trip-pin-btn,.trip-finish,#view>.btn.secondary,.trip-over .btn,.buy-card .btn,.profile-location-card .btn,.discovery-profile-actions .btn){
+  background:var(--g-btn)!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px var(--g-shadow)!important}
+
+html:not(.no-glass) :is(.trip-price,.trip-remove,.trip-history-row,.trip-item button:not(.trip-price)){background:rgba(255,255,255,.17)!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important}
+html:not(.no-glass) .trip-price.empty{background:rgba(255,255,255,.26)!important}
+html:not(.no-glass) .trip-actions .btn.secondary{background:var(--g-btn)!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px var(--g-shadow)!important}
+html:not(.no-glass) .trip-advice :is(p,small,.eyebrow,b,h3){color:inherit}
