@@ -1580,7 +1580,7 @@ html[data-season="winter"]{--g1:rgba(24,70,160,.80);--g2:rgba(84,144,226,.66);--
 html:not(.no-glass) :is(.home-cover-body,.home-card,.disc-card-body,.journal-cover-body,.garden-row,.space-plan,.pin,.rail-add,
   .care-add,.care-season-card,.care-task,.care-suggestion,.plant-today-card,.pruning-assistant,.profile-summary-card,.profile-card,.empty-card,.note-card,
   .trip-summary,.trip-item,.trip-ok,.jm-card,.planner-banner,.plant-about,.discover-clear,.bottom-nav,
-  .botany-identity,.record-meter,.profile-empty,.source-dossier,.history-lead,.profile-location-card,.buy-card,.care-glance,.care-tile,.good-know,.trip-over,.trip-advice){
+  .botany-identity,.record-meter,.profile-empty,.source-dossier,.history-lead,.profile-location-card,.buy-card,.care-glance,.care-tile,.good-know,.trip-over,.trip-advice,.buy-card){
   background:linear-gradient(150deg,var(--g1),var(--g2))!important;
   -webkit-backdrop-filter:blur(22px) saturate(165%);backdrop-filter:blur(22px) saturate(165%);
   border:1px solid var(--g-edge);
@@ -1638,3 +1638,22 @@ html:not(.no-glass) :is(.trip-price,.trip-remove,.trip-history-row,.trip-item bu
 html:not(.no-glass) .trip-price.empty{background:rgba(255,255,255,.26)!important}
 html:not(.no-glass) .trip-actions .btn.secondary{background:var(--g-btn)!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px var(--g-shadow)!important}
 html:not(.no-glass) .trip-advice :is(p,small,.eyebrow,b,h3){color:inherit}
+html:not(.no-glass) :is(.disc-card-link,.trip-history-link){display:inline-flex;align-items:center;gap:6px;margin-top:10px;padding:6px 12px;border-radius:999px;
+  background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff!important;font-size:13px;font-weight:800;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+
+/* 3.16.2 search button + buying tips on glass */
+.disc-search-home{padding:0 6px 0 20px}
+.disc-search-go{flex:none;height:44px;padding:0 18px;border:0;border-radius:999px;font:inherit;font-size:15px;font-weight:800;color:#fff;
+  background:linear-gradient(135deg,#F06AA8,#D93A82);box-shadow:0 6px 16px rgba(217,58,130,.3)}
+.disc-search-go:active{transform:scale(.96)}
+html:not(.no-glass) .buy-card:after{display:none}
+html:not(.no-glass) .buy-card :is(.eyebrow,h2,p,b,small){color:inherit!important}
+html:not(.no-glass) .buy-card .eyebrow{color:rgba(255,255,255,.85)!important}
+html:not(.no-glass) .buy-list>div{background:rgba(255,255,255,.15)!important;border:1px solid rgba(255,255,255,.28);color:#fff}
+html:not(.no-glass) .buy-list p{color:#fff!important}
+html:not(.no-glass) .buy-list>div>span{box-shadow:0 0 0 2px rgba(255,255,255,.55)}
+html:not(.no-glass) .buy-mark{background:rgba(255,255,255,.18)!important;color:#fff!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+html:not(.no-glass) .lookup-actions .btn{background:var(--g-btn)!important;color:#fff!important;border:1px solid rgba(255,255,255,.42)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 16px var(--g-shadow)!important}
+html:not(.no-glass) .lookup-actions .btn.secondary{background:rgba(255,255,255,.2)!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.lookup-card .lookup-row button{width:auto;padding:0 14px;font:inherit;font-size:14px;font-weight:800}
+html:not(.no-glass) .lookup-actions .btn.secondary{background:linear-gradient(150deg,var(--g1),var(--g2))!important;-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%)}

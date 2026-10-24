@@ -3694,8 +3694,13 @@ function lookupBack(){ if(lookupFrom==="planner"&&planResult){ lookupFrom=null; 
 function lookupCard(){
   return `<form class="lookup-card" onsubmit="event.preventDefault();lookupFrom=null;lookupPlant(this.elements.q.value)">
     <div class="lookup-head"><span>⌕</span><div><b>Look up a plant</b><small>Type a name from a label, a magazine or a friend's tip</small></div></div>
-    <div class="lookup-row"><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="e.g. Salvia Hot Lips"><button aria-label="Look up">→</button></div>
+    <div class="lookup-row"><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" enterkeyhint="search" placeholder="e.g. Salvia Hot Lips"><button aria-label="Look up">Search</button></div>
   </form>`;
+}
+function discSearchGo(form){
+  const inp=form.elements.q; const q=String(inp.value||"").trim();
+  if(!q){ inp.focus(); toast("Type a plant name first"); return; }
+  inp.blur(); lookupPlant(q);
 }
 async function lookupPlant(q){
   q=String(q||"").trim();
@@ -3876,8 +3881,9 @@ function renderDiscoverHome(){
     </article>`;
   }
   view.innerHTML=`<section class="page-head disc-home-head"><h1>Discover</h1><p class="sub">Where will you find your next plant?</p></section>
-    <form class="disc-search disc-search-home" onsubmit="event.preventDefault();lookupPlant(this.elements.q.value)">
-      <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" placeholder="Look up a plant by name">
+    <form class="disc-search disc-search-home" onsubmit="event.preventDefault();discSearchGo(this)">
+      <span>⌕</span><input name="q" maxlength="120" autocomplete="off" autocapitalize="words" enterkeyhint="search" placeholder="Look up a plant by name">
+      <button type="submit" class="disc-search-go">Search</button>
     </form>
     ${tripCard}
     <article class="disc-card" onclick="if(!event.target.closest('.disc-card-link')) setRoute('saved')">
@@ -4843,7 +4849,7 @@ function resetGeminiUsage(){
 }
 
 menuBtn?.addEventListener("click",()=>{
-  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button>${windUnitRow()}${glassRow()}<div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.16 · made for our garden</div>`);
+  modal(`<div class="eyebrow">FloraLens</div><h2>Garden tools</h2><button class="destination-choice" onclick="openWeatherSetup()"><span>☀</span><div><b>Garden weather</b><small>${state.weatherLocation?`Forecast for ${esc(state.weatherLocation.name)}. Tap to change.`:"Set your location for frost and rain warnings."}</small></div></button><button class="destination-choice" onclick="closeModal();setRoute('care')"><span>❧</span><div><b>Care Calendar</b><small>See upcoming jobs and seasonal suggestions.</small></div></button><button class="destination-choice" onclick="closeModal();openGardenYear()"><span>✿</span><div><b>Garden Year</b><small>See the story FloraLens is collecting this year.</small></div></button><button class="destination-choice" onclick="openGeminiLab()"><span>✦</span><div><b>Gemini lab${state.geminiOnly?' <i class="gm-on-pill">Gemini-only</i>':''}</b><small>Gemini-only test mode and token usage.</small></div></button>${windUnitRow()}${glassRow()}<div class="backup-card"><b>Keep your garden safe</b><p class="small">Export a single backup containing plant records, journal data, species intelligence and locally stored hero photos.</p><button class="btn primary" style="width:100%" onclick="exportBackup();closeModal()">⇩ Export backup</button></div><div class="small">FloraLens 3.16.2 · made for our garden</div>`);
 });
 
 renderHome();
