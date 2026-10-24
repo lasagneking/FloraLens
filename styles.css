@@ -1588,6 +1588,7 @@ html:not(.no-glass) :is(.home-cover-body,.home-card,.disc-card-body,.journal-cov
   color:#fff;
   --ink:#fff;--ink-2:rgba(255,255,255,.93);--muted:rgba(255,255,255,.80);--faint:rgba(255,255,255,.66);
   --line:rgba(255,255,255,.20);--line-2:rgba(255,255,255,.28);
+  --bg:rgba(255,255,255,.14);--bg-2:rgba(255,255,255,.22);
 }
 /* picture cards: the frame goes see-through so only the glass body shows */
 html:not(.no-glass) :is(.home-cover,.journal-cover,.disc-card){background:transparent!important}
@@ -1657,3 +1658,6 @@ html:not(.no-glass) .lookup-actions .btn{background:var(--g-btn)!important;color
 html:not(.no-glass) .lookup-actions .btn.secondary{background:rgba(255,255,255,.2)!important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .lookup-card .lookup-row button{width:auto;padding:0 14px;font:inherit;font-size:14px;font-weight:800}
 html:not(.no-glass) .lookup-actions .btn.secondary{background:linear-gradient(150deg,var(--g1),var(--g2))!important;-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%)}
+
+html:not(.no-glass) .month{background:rgba(255,255,255,.14);color:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.22)}
+html:not(.no-glass) .month.on{background:linear-gradient(180deg,#F77BB4,#EE4E95);color:#fff;border-color:rgba(255,255,255,.55);box-shadow:0 4px 10px rgba(238,78,149,.35)}
